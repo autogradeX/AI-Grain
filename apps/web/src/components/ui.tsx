@@ -1,23 +1,33 @@
-import { SOUND, UNCLEAR, classLabel, type ClassDef } from "@ai-grain/core";
+import { SOUND, UNCLEAR, type ClassDef } from "@ai-grain/core";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api/client";
+import { common, useGrainLabels } from "../i18n/common";
+import { defineMessages, locale, useT } from "../i18n";
 
-export function Spinner({ label = "Loading…" }: { label?: string }) {
+const m = defineMessages({
+  somethingWrong: { en: "Something went wrong", hi: "कुछ गड़बड़ हो गई" },
+  imageUnavailable: { en: "Image unavailable", hi: "चित्र उपलब्ध नहीं" },
+});
+
+export function Spinner({ label }: { label?: string }) {
+  const t = useT(common);
   return (
     <div className="spinner" role="status">
-      <span className="spinner-dot" aria-hidden /> {label}
+      <span className="spinner-dot" aria-hidden /> {label ?? t("loading")}
     </div>
   );
 }
 
 export function ErrorNote({ error }: { error: unknown }) {
+  const t = useT(m);
   if (!error) return null;
+  // Server messages are in English; the API has no translations.
   const message =
     error instanceof Error
       ? error.message
       : typeof error === "string"
         ? error
-        : "Something went wrong";
+        : t("somethingWrong");
   return (
     <p className="error" role="alert">
       {message}
@@ -85,7 +95,8 @@ export function ClassBadge({
   cls: string | null;
   classes: readonly ClassDef[];
 }) {
-  if (!cls) return <Badge>not classified</Badge>;
+  const { classLabel } = useGrainLabels();
+  if (!cls) return <Badge>{classLabel(classes, null)}</Badge>;
   const tone = cls === SOUND ? "good" : cls === UNCLEAR ? "warn" : "bad";
   return <Badge tone={tone}>{classLabel(classes, cls)}</Badge>;
 }
@@ -108,6 +119,7 @@ export function AuthImage({
   alt: string;
   className?: string;
 }) {
+  const t = useT(m);
   const [loaded, setLoaded] = useState<{
     path: string;
     url: string | null;
@@ -135,7 +147,7 @@ export function AuthImage({
   if (current && !current.url)
     return (
       <div className={`img-placeholder ${className ?? ""}`}>
-        Image unavailable
+        {t("imageUnavailable")}
       </div>
     );
   if (!current)
@@ -145,7 +157,7 @@ export function AuthImage({
 
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString(undefined, {
+  return new Date(iso).toLocaleString(locale(), {
     dateStyle: "medium",
     timeStyle: "short",
   });

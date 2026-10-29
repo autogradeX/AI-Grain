@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
+import { LanguageSelect, useT } from "../../i18n";
+import { m } from "./PublicLayout.i18n";
 
 export interface PublicSite {
   name: string;
@@ -26,22 +28,23 @@ export function PublicLayout() {
   const { user } = useAuth();
   const site = usePublicSite();
   const [open, setOpen] = useState(false);
+  const t = useT(m);
   const links = (
     <>
       <NavLink to="/demo" onClick={() => setOpen(false)}>
-        Demo analysis
+        {t("demo")}
       </NavLink>
       <NavLink to="/roi" onClick={() => setOpen(false)}>
-        ROI calculator
+        {t("roi")}
       </NavLink>
       <NavLink to="/hub" onClick={() => setOpen(false)}>
-        Knowledge hub
+        {t("hub")}
       </NavLink>
       <NavLink to="/verify" onClick={() => setOpen(false)}>
-        Verify a report
+        {t("verify")}
       </NavLink>
       <NavLink to="/contact" onClick={() => setOpen(false)}>
-        Contact
+        {t("contact")}
       </NavLink>
     </>
   );
@@ -51,33 +54,34 @@ export function PublicLayout() {
         <Link to="/" className="brand">
           <img src="/icon.svg" alt="" width={28} height={28} /> AI-Grain
         </Link>
-        <nav className="site-nav" aria-label="Website">
+        <nav className="site-nav" aria-label={t("websiteNav")}>
           {links}
         </nav>
         <div className="site-cta">
+          <LanguageSelect />
           {user ? (
             <Link to="/app" className="button">
-              Open the app
+              {t("openApp")}
             </Link>
           ) : (
             <Link to="/login" className="button">
-              Sign in
+              {t("signIn")}
             </Link>
           )}
           <Link to="/contact" className="button primary">
-            Book a meeting
+            {t("bookMeeting")}
           </Link>
           <button
             className="site-menu-toggle"
             aria-expanded={open}
             onClick={() => setOpen(!open)}
           >
-            Menu
+            {t("menu")}
           </button>
         </div>
       </header>
       {open && (
-        <nav className="site-nav-mobile" aria-label="Website">
+        <nav className="site-nav-mobile" aria-label={t("websiteNav")}>
           {links}
         </nav>
       )}
@@ -90,27 +94,23 @@ export function PublicLayout() {
             <div className="brand">
               <img src="/icon.svg" alt="" width={24} height={24} /> AI-Grain
             </div>
-            <p className="muted small">
-              Grain impurity screening with a phone, a precise scale and Claude.
-              A screening and pre-check tool, not an official grading method
-              unless validated and approved.
-            </p>
+            <p className="muted small">{t("footerAbout")}</p>
           </div>
           <div className="site-footer-links">
-            <strong>Product</strong>
-            <Link to="/demo">Demo analysis</Link>
-            <Link to="/roi">ROI calculator</Link>
-            <Link to="/verify">Verify a report</Link>
+            <strong>{t("product")}</strong>
+            <Link to="/demo">{t("demo")}</Link>
+            <Link to="/roi">{t("roi")}</Link>
+            <Link to="/verify">{t("verify")}</Link>
           </div>
           <div className="site-footer-links">
-            <strong>Resources</strong>
-            <Link to="/hub?kind=guide">Guides</Link>
-            <Link to="/hub?kind=glossary">Glossary</Link>
-            <Link to="/hub?kind=news">News</Link>
-            <Link to="/hub?kind=case_study">Case studies</Link>
+            <strong>{t("resources")}</strong>
+            <Link to="/hub?kind=guide">{t("guides")}</Link>
+            <Link to="/hub?kind=glossary">{t("glossary")}</Link>
+            <Link to="/hub?kind=news">{t("news")}</Link>
+            <Link to="/hub?kind=case_study">{t("caseStudies")}</Link>
           </div>
           <div className="site-footer-links">
-            <strong>Contact</strong>
+            <strong>{t("contact")}</strong>
             <span className="small">{site.data?.name}</span>
             {site.data?.contactEmail && (
               <a href={`mailto:${site.data.contactEmail}`}>
@@ -125,7 +125,7 @@ export function PublicLayout() {
             {site.data?.address && (
               <span className="small muted">{site.data.address}</span>
             )}
-            <Link to="/contact">Send a message</Link>
+            <Link to="/contact">{t("sendMessage")}</Link>
           </div>
         </div>
       </footer>
