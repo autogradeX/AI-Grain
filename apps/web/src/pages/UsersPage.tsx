@@ -11,15 +11,26 @@ import {
   formatDate,
   Spinner,
 } from "../components/ui";
+import { useT } from "../i18n";
+import { common } from "../i18n/common";
+import { m } from "./UsersPage.i18n";
 
-const ROLE_HELP: Record<Role, string> = {
-  admin: "Everything, including users, standards and deleting samples",
-  grader: "Create and grade samples, review kernels",
-  viewer: "Read-only access to samples and reports",
-};
+const ROLE_HELP = {
+  admin: "helpAdmin",
+  grader: "helpGrader",
+  viewer: "helpViewer",
+} as const satisfies Record<Role, keyof typeof m>;
+
+const ROLE_NAME = {
+  admin: "roleAdmin",
+  grader: "roleGrader",
+  viewer: "roleViewer",
+} as const satisfies Record<Role, keyof typeof common>;
 
 export function UsersPage() {
   const { user: me } = useAuth();
+  const t = useT(m);
+  const tc = useT(common);
   const qc = useQueryClient();
   const users = useQuery({
     queryKey: ["users"],
@@ -47,28 +58,28 @@ export function UsersPage() {
 
   return (
     <div className="stack">
-      <h1>Users</h1>
+      <h1>{t("users")}</h1>
       <InviteForm />
-      <Card title="Pending invites">
+      <Card title={t("pendingInvites")}>
         <ErrorNote error={invites.error ?? revoke.error} />
-        {invites.data?.length === 0 && <p className="muted">None.</p>}
+        {invites.data?.length === 0 && <p className="muted">{t("none")}</p>}
         <ul className="list">
           {invites.data?.map((i) => (
             <li key={i.id} className="list-item">
               <span>
-                {i.email} · {i.role}
+                {i.email} · {tc(ROLE_NAME[i.role])}
                 <div className="muted small">
-                  expires {formatDate(i.expiresAt)}
+                  {t("expires", { date: formatDate(i.expiresAt) })}
                 </div>
               </span>
               <button className="link" onClick={() => revoke.mutate(i.id)}>
-                Revoke
+                {t("revoke")}
               </button>
             </li>
           ))}
         </ul>
       </Card>
-      <Card title="Members">
+      <Card title={t("members")}>
         {users.isPending && <Spinner />}
         <ErrorNote error={users.error ?? update.error} />
         <ul className="list">
@@ -76,25 +87,25 @@ export function UsersPage() {
             <li key={u.id} className="list-item wrap">
               <div>
                 <strong>{u.name}</strong>{" "}
-                {u.id === me?.id && <Badge>you</Badge>}{" "}
-                {!u.active && <Badge tone="bad">disabled</Badge>}
+                {u.id === me?.id && <Badge>{t("you")}</Badge>}{" "}
+                {!u.active && <Badge tone="bad">{t("disabled")}</Badge>}
                 <div className="muted small">
                   {u.email}
-                  {!u.emailVerified && " (unconfirmed)"} · last sign-in{" "}
-                  {formatDate(u.lastLoginAt)}
+                  {!u.emailVerified && t("unconfirmed")} ·{" "}
+                  {t("lastSignIn", { date: formatDate(u.lastLoginAt) })}
                 </div>
               </div>
               <div className="row">
                 <select
-                  aria-label={`Role of ${u.name}`}
+                  aria-label={t("roleOf", { name: u.name })}
                   value={u.role}
                   onChange={(e) =>
                     update.mutate({ id: u.id, role: e.target.value as Role })
                   }
                 >
-                  <option value="admin">Admin</option>
-                  <option value="grader">Grader</option>
-                  <option value="viewer">Viewer</option>
+                  <option value="admin">{tc("roleAdmin")}</option>
+                  <option value="grader">{tc("roleGrader")}</option>
+                  <option value="viewer">{tc("roleViewer")}</option>
                 </select>
                 {u.id !== me?.id && (
                   <button
@@ -102,7 +113,7 @@ export function UsersPage() {
                       update.mutate({ id: u.id, active: !u.active })
                     }
                   >
-                    {u.active ? "Disable" : "Enable"}
+                    {u.active ? t("disable") : t("enable")}
                   </button>
                 )}
               </div>
@@ -116,6 +127,8 @@ export function UsersPage() {
 
 function InviteForm() {
   const qc = useQueryClient();
+  const t = useT(m);
+  const tc = useT(common);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("grader");
   const invite = useMutation({
@@ -126,7 +139,7 @@ function InviteForm() {
     },
   });
   return (
-    <Card title="Invite someone">
+    <Card title={t("inviteSomeone")}>
       <form
         className="grid-3"
         onSubmit={(e) => {
@@ -134,7 +147,7 @@ function InviteForm() {
           invite.mutate();
         }}
       >
-        <Field label="Email">
+        <Field label={t("email")}>
           <input
             type="email"
             required
@@ -142,28 +155,29 @@ function InviteForm() {
             onChange={(e) => setEmail(e.target.value)}
           />
         </Field>
-        <Field label="Role" hint={ROLE_HELP[role]}>
+        <Field label={t("role")} hint={t(ROLE_HELP[role])}>
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as Role)}
           >
-            <option value="grader">Grader</option>
-            <option value="viewer">Viewer</option>
-            <option value="admin">Admin</option>
+            <option value="grader">{tc("roleGrader")}</option>
+            <option value="viewer">{tc("roleViewer")}</option>
+            <option value="admin">{tc("roleAdmin")}</option>
           </select>
         </Field>
         <div className="field">
           <span className="field-label">&nbsp;</span>
           <button className="primary" disabled={invite.isPending}>
-            Send invite
+            {t("sendInvite")}
           </button>
         </div>
       </form>
       <ErrorNote error={invite.error} />
       {invite.data?.link && (
         <p className="small">
-          Invite sent. If email isn't set up on the server, share this link
-          (valid 7 days): <code className="break">{invite.data.link}</code>
+          {t.rich("inviteSent", {
+            link: <code className="break">{invite.data.link}</code>,
+          })}
         </p>
       )}
     </Card>

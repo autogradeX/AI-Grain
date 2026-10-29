@@ -1,4 +1,3 @@
-import { classLabel } from "@ai-grain/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -7,11 +6,16 @@ import { useCrop } from "../api/crops";
 import { CropSelect } from "../components/CropSelect";
 import type { ValidationReport } from "../api/types";
 import { Badge, Card, ErrorNote, Field, Spinner } from "../components/ui";
+import { useT } from "../i18n";
+import { useGrainLabels } from "../i18n/common";
+import { m } from "./ValidationPage.i18n";
 
 const f = (v: number) => v.toFixed(2);
 
 export function ValidationPage() {
   const [crop, setCrop] = useState("wheat");
+  const t = useT(m);
+  const { classLabel } = useGrainLabels();
   const report = useQuery({
     queryKey: ["validation", crop],
     queryFn: () =>
@@ -23,24 +27,22 @@ export function ValidationPage() {
 
   return (
     <div className="stack">
-      <h1>Validation</h1>
-      <p className="muted small">
-        Claude is a general-purpose AI, not trained on your grain, so its
-        accuracy is unknown until tested. Grade 30–50 samples both ways (a
-        certified grader and this method), enter the grader's result on each
-        sample, and compare per class here before relying on the results.
-      </p>
-      <Field label="Crop">
+      <h1>{t("title")}</h1>
+      <p className="muted small">{t("intro")}</p>
+      <Field label={t("crop")}>
         <CropSelect value={crop} onChange={setCrop} />
       </Field>
       {report.isPending && <Spinner />}
       <ErrorNote error={report.error} />
       {r && (
         <>
-          <Card title="Progress">
+          <Card title={t("progress")}>
             <div
               className="progress"
-              aria-label={`${n} of ${r.target.recommended} samples`}
+              aria-label={t("progressLabel", {
+                count: n,
+                target: r.target.recommended,
+              })}
             >
               <div
                 style={{
@@ -49,36 +51,41 @@ export function ValidationPage() {
               />
             </div>
             <p>
-              {n} sample{n === 1 ? "" : "s"} graded both ways.{" "}
+              {t.n("gradedBoth", n)}{" "}
               {n < r.target.min ? (
                 <Badge tone="warn">
-                  At least {r.target.min - n} more needed
+                  {t("moreNeeded", { count: r.target.min - n })}
                 </Badge>
               ) : (
-                <Badge tone="good">Enough for a first assessment</Badge>
+                <Badge tone="good">{t("enough")}</Badge>
               )}
             </p>
             {r.summary.gradeAgreement !== null && (
               <p>
-                Same grade as the certified grader in{" "}
-                <strong>{Math.round(r.summary.gradeAgreement * 100)} %</strong>{" "}
-                of {r.summary.gradeComparable} samples.
+                {t.rich("sameGrade", {
+                  pct: (
+                    <strong>
+                      {Math.round(r.summary.gradeAgreement * 100)} %
+                    </strong>
+                  ),
+                  count: r.summary.gradeComparable,
+                })}
               </p>
             )}
           </Card>
           {r.summary.byClass.length > 0 && (
-            <Card title="Agreement per defect class (mass %)">
+            <Card title={t("agreement")}>
               <div className="table-scroll">
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Class</th>
+                      <th>{t("class")}</th>
                       <th>n</th>
-                      <th>Method mean</th>
-                      <th>Grader mean</th>
-                      <th>Bias</th>
-                      <th>Mean abs. diff.</th>
-                      <th>Max abs. diff.</th>
+                      <th>{t("methodMean")}</th>
+                      <th>{t("graderMean")}</th>
+                      <th>{t("bias")}</th>
+                      <th>{t("meanAbsDiff")}</th>
+                      <th>{t("maxAbsDiff")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -99,29 +106,27 @@ export function ValidationPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="muted small">
-                Bias is method minus grader: positive means this method reads
-                high. Expect subtle defects (light heat damage, early sprouting,
-                Fusarium versus weather bleaching) to agree least. Internal and
-                fluorescent defects are invisible in a phone photo.
-              </p>
+              <p className="muted small">{t("biasNote")}</p>
             </Card>
           )}
           {r.samples.length > 0 && (
-            <Card title="Samples">
+            <Card title={t("samples")}>
               <ul className="list">
                 {r.samples.map((s) => (
                   <li key={s.id}>
                     <Link to={`/app/samples/${s.id}`} className="list-item">
                       <span>
-                        #{s.number} · {s.standardName ?? "no standard"}
+                        #{s.number} · {s.standardName ?? t("noStandard")}
                       </span>
                       <span>
-                        {s.methodGrade ?? "—"} vs {s.referenceGrade ?? "—"}{" "}
+                        {t("versus", {
+                          method: s.methodGrade ?? "—",
+                          reference: s.referenceGrade ?? "—",
+                        })}{" "}
                         {s.methodGrade === s.referenceGrade ? (
-                          <Badge tone="good">match</Badge>
+                          <Badge tone="good">{t("match")}</Badge>
                         ) : (
-                          <Badge tone="bad">differs</Badge>
+                          <Badge tone="bad">{t("differs")}</Badge>
                         )}
                       </span>
                     </Link>

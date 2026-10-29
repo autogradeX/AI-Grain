@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useT } from "../i18n";
+import { m } from "./charts.i18n";
 
 /*
  * Small hand-built SVG charts. One series each, in the first categorical slot
@@ -87,9 +89,10 @@ function TableView({
   head: [string, string];
   rows: [string, string][];
 }) {
+  const t = useT(m);
   return (
     <details className="chart-table small">
-      <summary>Show as table</summary>
+      <summary>{t("showTable")}</summary>
       <table className="table">
         <thead>
           <tr>
@@ -262,6 +265,7 @@ export function LineChart({
 }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
+  const t = useT(m);
   const ticks = niceTicks(
     Math.max(maxHint ?? 0, ...data.map((d) => d.value)),
     3,
@@ -308,23 +312,23 @@ export function LineChart({
           onBlur={() => setHover(null)}
         >
           <g transform={`translate(${LINE_AXIS_W},4)`}>
-            {ticks.map((t) => (
-              <g key={t}>
+            {ticks.map((tick) => (
+              <g key={tick}>
                 <line
                   x1={0}
                   x2={plotW}
-                  y1={y(t)}
-                  y2={y(t)}
+                  y1={y(tick)}
+                  y2={y(tick)}
                   className="chart-grid"
                 />
                 <text
                   x={-6}
-                  y={y(t)}
+                  y={y(tick)}
                   dy="0.32em"
                   textAnchor="end"
                   className="chart-axis"
                 >
-                  {format(t)}
+                  {format(tick)}
                 </text>
               </g>
             ))}
@@ -396,7 +400,7 @@ export function LineChart({
         }
       />
       <TableView
-        head={["Week", "Value"]}
+        head={[t("week"), t("value")]}
         rows={data.map((d) => [d.detail ?? d.label, format(d.value)])}
       />
     </div>

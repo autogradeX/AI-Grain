@@ -13,7 +13,9 @@ import {
   formatDate,
   Spinner,
 } from "../components/ui";
-import { KIND_LABELS } from "./public/HubPage";
+import { useT } from "../i18n";
+import { common } from "../i18n/common";
+import { m } from "./WebsitePage.i18n";
 
 interface SiteSettings {
   bookingUrl?: string;
@@ -33,7 +35,8 @@ interface Lead {
   createdAt: string;
 }
 
-type Kind = keyof typeof KIND_LABELS;
+const KINDS = ["guide", "glossary", "news", "case_study"] as const;
+type Kind = (typeof KINDS)[number];
 
 interface Article {
   id: string;
@@ -56,15 +59,14 @@ export function WebsitePage() {
     queryFn: () => api.get<Org>("/org"),
   });
   const [tab, setTab] = useState<Tab>("leads");
+  const t = useT(m);
   if (org.isPending) return <Spinner />;
   if (!org.data?.isSiteOwner) {
     return (
       <div className="stack">
-        <h1>Website</h1>
+        <h1>{t("website")}</h1>
         <ErrorNote error={org.error} />
-        <p className="muted">
-          Only the organisation that runs the public website manages it.
-        </p>
+        <p className="muted">{t("notOwner")}</p>
       </div>
     );
   }
@@ -72,20 +74,20 @@ export function WebsitePage() {
     <div className="stack">
       <div className="page-head">
         <div>
-          <h1>Website</h1>
+          <h1>{t("website")}</h1>
           <div className="muted small">
-            Enquiries from the contact form, knowledge-hub articles and the
-            contact details shown on <Link to="/">the public site</Link>. Demo
-            samples are published from a completed sample's page.
+            {t.rich("intro", {
+              link: <Link to="/">{t("publicSite")}</Link>,
+            })}
           </div>
         </div>
       </div>
       <div className="segmented" role="tablist">
         {(
           [
-            ["leads", "Enquiries"],
-            ["articles", "Articles"],
-            ["settings", "Contact details"],
+            ["leads", t("enquiries")],
+            ["articles", t("articles")],
+            ["settings", t("contactDetails")],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -114,6 +116,7 @@ const LEAD_TONE = {
 
 function Leads() {
   const qc = useQueryClient();
+  const t = useT(m);
   const leads = useQuery({
     queryKey: ["site-leads"],
     queryFn: () => api.get<Lead[]>("/site/leads"),
@@ -125,12 +128,7 @@ function Leads() {
   });
   if (leads.isPending) return <Spinner />;
   if (leads.error) return <ErrorNote error={leads.error} />;
-  if (!leads.data.length)
-    return (
-      <p className="muted">
-        No enquiries yet. They arrive from the website's contact page.
-      </p>
-    );
+  if (!leads.data.length) return <p className="muted">{t("noEnquiries")}</p>;
   return (
     <div className="stack-sm">
       <ErrorNote error={update.error} />
@@ -143,7 +141,9 @@ function Leads() {
               {l.company && <span className="muted small">· {l.company}</span>}
             </>
           }
-          actions={<Badge tone={LEAD_TONE[l.status]}>{l.status}</Badge>}
+          actions={
+            <Badge tone={LEAD_TONE[l.status]}>{t(`status_${l.status}`)}</Badge>
+          }
         >
           <div className="small muted">
             <a href={`mailto:${l.email}`}>{l.email}</a>
@@ -165,7 +165,7 @@ function Leads() {
                   disabled={update.isPending}
                   onClick={() => update.mutate({ id: l.id, status: s })}
                 >
-                  Mark {s}
+                  {t(`mark_${s}`)}
                 </button>
               ))}
           </div>
@@ -194,6 +194,7 @@ function slugify(title: string) {
 }
 
 function Articles() {
+  const t = useT(m);
   const articles = useQuery({
     queryKey: ["site-articles"],
     queryFn: () => api.get<Article[]>("/site/articles"),
@@ -212,17 +213,17 @@ function Articles() {
     <div className="stack-sm">
       <div>
         <button className="primary" onClick={() => setEditing("new")}>
-          New article
+          {t("newArticle")}
         </button>
       </div>
       <div className="table-scroll">
         <table className="table">
           <thead>
             <tr>
-              <th>Title</th>
-              <th>Kind</th>
-              <th>Status</th>
-              <th>Updated</th>
+              <th>{t("title")}</th>
+              <th>{t("kind")}</th>
+              <th>{t("status")}</th>
+              <th>{t("updated")}</th>
             </tr>
           </thead>
           <tbody>
@@ -233,12 +234,12 @@ function Articles() {
                     {a.title}
                   </button>
                 </td>
-                <td>{KIND_LABELS[a.kind]}</td>
+                <td>{t(`kind_${a.kind}`)}</td>
                 <td>
                   {a.published ? (
-                    <Badge tone="good">published</Badge>
+                    <Badge tone="good">{t("published")}</Badge>
                   ) : (
-                    <Badge>draft</Badge>
+                    <Badge>{t("draft")}</Badge>
                   )}
                 </td>
                 <td className="small muted">{formatDate(a.updatedAt)}</td>
@@ -259,6 +260,8 @@ function ArticleEditor({
   onDone: () => void;
 }) {
   const qc = useQueryClient();
+  const t = useT(m);
+  const tc = useT(common);
   const [form, setForm] = useState(() =>
     article ? { ...article, summary: article.summary ?? "" } : EMPTY,
   );
@@ -290,9 +293,13 @@ function ArticleEditor({
     onSuccess: done,
   });
   return (
-    <Card title={article ? `Edit “${article.title}”` : "New article"}>
+    <Card
+      title={
+        article ? t("editArticle", { title: article.title }) : t("newArticle")
+      }
+    >
       <div className="grid-2">
-        <Field label="Title">
+        <Field label={t("title")}>
           <input
             value={form.title}
             maxLength={200}
@@ -305,7 +312,7 @@ function ArticleEditor({
             }
           />
         </Field>
-        <Field label="Address" hint={`/hub/${form.slug || "…"}`}>
+        <Field label={t("address")} hint={`/hub/${form.slug || "…"}`}>
           <input
             value={form.slug}
             maxLength={80}
@@ -316,19 +323,19 @@ function ArticleEditor({
             }}
           />
         </Field>
-        <Field label="Kind">
+        <Field label={t("kind")}>
           <select
             value={form.kind}
             onChange={(e) => setForm({ ...form, kind: e.target.value as Kind })}
           >
-            {Object.entries(KIND_LABELS).map(([k, label]) => (
+            {KINDS.map((k) => (
               <option key={k} value={k}>
-                {label}
+                {t(`kind_${k}`)}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Summary" hint="One or two sentences for the hub listing">
+        <Field label={t("summary")} hint={t("summaryHint")}>
           <input
             value={form.summary ?? ""}
             maxLength={500}
@@ -341,26 +348,23 @@ function ArticleEditor({
           className={!preview ? "active" : ""}
           onClick={() => setPreview(false)}
         >
-          Write
+          {t("write")}
         </button>
         <button
           className={preview ? "active" : ""}
           onClick={() => setPreview(true)}
         >
-          Preview
+          {t("preview")}
         </button>
       </div>
       {preview ? (
         <div className="article">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {form.body || "*Nothing to preview yet.*"}
+            {form.body || t("nothingToPreview")}
           </ReactMarkdown>
         </div>
       ) : (
-        <Field
-          label="Body"
-          hint="Markdown: ## headings, **bold**, lists, links and tables"
-        >
+        <Field label={t("body")} hint={t("bodyHint")}>
           <textarea
             rows={16}
             value={form.body}
@@ -374,27 +378,28 @@ function ArticleEditor({
           checked={form.published}
           onChange={(e) => setForm({ ...form, published: e.target.checked })}
         />
-        Published on the knowledge hub
+        {t("publishedOnHub")}
       </label>
       <ErrorNote error={save.error ?? remove.error} />
       <div className="row wrap">
-        <button onClick={onDone}>Cancel</button>
+        <button onClick={onDone}>{tc("cancel")}</button>
         <button
           className="primary"
           disabled={save.isPending || !form.title.trim() || !form.slug}
           onClick={() => save.mutate()}
         >
-          Save
+          {tc("save")}
         </button>
         {article && (
           <button
             className="danger"
             disabled={remove.isPending}
             onClick={() =>
-              confirm(`Delete “${article.title}”?`) && remove.mutate()
+              confirm(t("confirmDelete", { title: article.title })) &&
+              remove.mutate()
             }
           >
-            Delete
+            {tc("delete")}
           </button>
         )}
       </div>
@@ -404,6 +409,8 @@ function ArticleEditor({
 
 function Settings() {
   const qc = useQueryClient();
+  const t = useT(m);
+  const tc = useT(common);
   const settings = useQuery({
     queryKey: ["site-settings"],
     queryFn: () => api.get<SiteSettings>("/site/settings"),
@@ -427,26 +434,19 @@ function Settings() {
       setForm({ ...f, [key]: e.target.value }),
   });
   return (
-    <Card title="Contact details">
-      <p className="muted small">
-        Shown in the website footer and on the contact page. Enquiries are
-        emailed to the contact email, or to the organisation's admins when it is
-        empty.
-      </p>
+    <Card title={t("contactDetails")}>
+      <p className="muted small">{t("contactIntro")}</p>
       <div className="grid-2">
-        <Field label="Contact email">
+        <Field label={t("contactEmail")}>
           <input type="email" {...field("contactEmail")} />
         </Field>
-        <Field label="Phone">
+        <Field label={t("phone")}>
           <input type="tel" {...field("phone")} />
         </Field>
-        <Field label="Address">
+        <Field label={t("postalAddress")}>
           <input {...field("address")} />
         </Field>
-        <Field
-          label="Meeting booking link"
-          hint="Optional, e.g. a calendar scheduling page"
-        >
+        <Field label={t("bookingLink")} hint={t("bookingHint")}>
           <input type="url" {...field("bookingUrl")} />
         </Field>
       </div>
@@ -457,7 +457,7 @@ function Settings() {
           disabled={!form || save.isPending}
           onClick={() => save.mutate(f)}
         >
-          Save
+          {tc("save")}
         </button>
       </div>
     </Card>

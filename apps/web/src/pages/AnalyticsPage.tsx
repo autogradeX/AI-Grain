@@ -1,15 +1,13 @@
-import {
-  CLASS_GROUPS,
-  GROUP_LABELS,
-  classLabel,
-  type ClassGroup,
-} from "@ai-grain/core";
+import { CLASS_GROUPS, type ClassGroup } from "@ai-grain/core";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client";
 import { useCrops } from "../api/crops";
 import { BarList, ColumnChart, LineChart, Meter } from "../components/charts";
 import { Card, ErrorNote, Spinner } from "../components/ui";
+import { locale, useT, type Translate } from "../i18n";
+import { useGrainLabels } from "../i18n/common";
+import { m } from "./AnalyticsPage.i18n";
 
 interface Analytics {
   range: { days: number; from: string; crop: string | null };
@@ -68,20 +66,23 @@ interface Analytics {
 }
 
 const PERIODS = [
-  [7, "Last 7 days"],
-  [30, "Last 30 days"],
-  [90, "Last 90 days"],
-  [365, "Last 12 months"],
+  [7, "last7"],
+  [30, "last30"],
+  [90, "last90"],
+  [365, "last365"],
 ] as const;
 
 const p2 = (v: number) => `${v.toFixed(2)} %`;
 const usd = (v: number) => (v < 1 ? `$${v.toFixed(3)}` : `$${v.toFixed(2)}`);
 
-function duration(minutes: number | null): string {
+function duration(
+  minutes: number | null,
+  t: Translate<keyof typeof m>,
+): string {
   if (minutes === null) return "—";
-  if (minutes < 90) return `${Math.round(minutes)} min`;
-  if (minutes < 48 * 60) return `${(minutes / 60).toFixed(1)} h`;
-  return `${(minutes / 1440).toFixed(1)} days`;
+  if (minutes < 90) return t("minutes", { n: Math.round(minutes) });
+  if (minutes < 48 * 60) return t("hours", { n: (minutes / 60).toFixed(1) });
+  return t("days", { n: (minutes / 1440).toFixed(1) });
 }
 
 function Kpi({
@@ -106,6 +107,8 @@ export function AnalyticsPage() {
   const [days, setDays] = useState(30);
   const [crop, setCrop] = useState("");
   const crops = useCrops(true);
+  const t = useT(m);
+  const { groupLabel, classLabel, cropLabel } = useGrainLabels();
   const q = useQuery({
     queryKey: ["analytics", days, crop],
     queryFn: () =>
@@ -122,7 +125,7 @@ export function AnalyticsPage() {
     [];
   const classes = classesOf(crop || null);
   const shortDate = (iso: string) =>
-    new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, {
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale(), {
       month: "short",
       day: "numeric",
       timeZone: "UTC",
@@ -130,32 +133,34 @@ export function AnalyticsPage() {
 
   return (
     <div className="stack">
-      <h1>Analytics</h1>
+      <h1>{t("title")}</h1>
       <div className="filter-row">
         <select
-          aria-label="Period"
+          aria-label={t("period")}
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
         >
           {PERIODS.map(([d, label]) => (
             <option key={d} value={d}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
         <select
-          aria-label="Crop"
+          aria-label={t("crop")}
           value={crop}
           onChange={(e) => setCrop(e.target.value)}
         >
-          <option value="">All crops</option>
+          <option value="">{t("allCrops")}</option>
           {crops.data?.map((c) => (
             <option key={c.key} value={c.key}>
-              {c.label}
+              {cropLabel(c.label)}
             </option>
           ))}
         </select>
-        {q.isFetching && a && <span className="muted small">Updating…</span>}
+        {q.isFetching && a && (
+          <span className="muted small">{t("updating")}</span>
+        )}
       </div>
       {q.isPending && <Spinner />}
       <ErrorNote error={q.error} />
@@ -163,115 +168,127 @@ export function AnalyticsPage() {
         <div className={`stack ${q.isPlaceholderData ? "refetching" : ""}`}>
           <div className="kpis">
             <Kpi
-              label="Completed samples"
+              label={t("completedSamples")}
               value={String(a.totals.completed)}
-              note={`${a.totals.inProgress} in progress`}
+              note={t("inProgress", { count: a.totals.inProgress })}
             />
             <Kpi
-              label="Average purity"
+              label={t("averagePurity")}
               value={
                 a.totals.meanPurityPct === null
                   ? "—"
                   : `${a.totals.meanPurityPct.toFixed(1)} %`
               }
-              note="completed samples"
+              note={t("completedSamplesNote")}
             />
             <Kpi
-              label="Median turnaround"
-              value={duration(a.totals.medianTurnaroundMinutes)}
-              note="created to completed"
+              label={t("medianTurnaround")}
+              value={duration(a.totals.medianTurnaroundMinutes, t)}
+              note={t("createdToCompleted")}
             />
             <Kpi
-              label="Claude confirmed by operators"
+              label={t("claudeConfirmed")}
               value={
                 a.totals.claudeConfirmedRate === null
                   ? "—"
                   : `${Math.round(a.totals.claudeConfirmedRate * 100)} %`
               }
-              note={`of ${a.totals.kernelsReviewed} flagged kernels checked`}
+              note={t("ofFlaggedChecked", {
+                count: a.totals.kernelsReviewed,
+              })}
             />
             <Kpi
-              label="Photo estimate vs scale"
+              label={t("estimateVsScale")}
               value={
                 a.estimateVsWeighed.meanAbsDiffTotalPct === null
                   ? "—"
                   : `±${a.estimateVsWeighed.meanAbsDiffTotalPct.toFixed(2)} pp`
               }
-              note={`mean difference in total defects, ${a.estimateVsWeighed.samples} weighed samples`}
+              note={t("meanDifference", {
+                count: a.estimateVsWeighed.samples,
+              })}
             />
             <Kpi
-              label="Claude cost (estimate)"
+              label={t("claudeCost")}
               value={usd(a.totals.estimatedClaudeCostUsd)}
               note={
                 a.totals.costPerCompletedSampleUsd === null
-                  ? "at list prices"
-                  : `${usd(a.totals.costPerCompletedSampleUsd)} per completed sample, list prices`
+                  ? t("atListPrices")
+                  : t("perCompletedSample", {
+                      cost: usd(a.totals.costPerCompletedSampleUsd),
+                    })
               }
             />
           </div>
 
-          <Card title="Samples completed per day">
+          <Card title={t("completedPerDay")}>
             <ColumnChart
-              unitLabel="Samples completed"
+              unitLabel={t("samplesCompleted")}
               data={a.perDay.map((d) => ({
                 label: shortDate(d.date),
                 value: d.completed,
-                detail: `${shortDate(d.date)} · ${d.created} created`,
+                detail: t("createdDetail", {
+                  date: shortDate(d.date),
+                  count: d.created,
+                }),
               }))}
-              format={(v) => `${v} completed`}
+              format={(v) => t("completedValue", { count: v })}
             />
           </Card>
 
-          <Card title="Average defects by group, per week">
+          <Card title={t("defectsByGroup")}>
             {a.groupTrend.length === 0 ? (
-              <p className="muted">No completed samples in this period.</p>
+              <p className="muted">{t("noCompletedPeriod")}</p>
             ) : (
               <div className="multiples">
                 {CLASS_GROUPS.map((g) => (
                   <LineChart
                     key={g}
-                    title={GROUP_LABELS[g]}
+                    title={groupLabel(g)}
                     maxHint={1}
                     format={p2}
                     data={a.groupTrend.map((w) => ({
                       label: shortDate(w.week),
                       value: w.byGroup[g],
-                      detail: `Week of ${shortDate(w.week)} · ${w.samples} samples`,
+                      detail: t("weekDetail", {
+                        date: shortDate(w.week),
+                        count: w.samples,
+                      }),
                     }))}
                   />
                 ))}
               </div>
             )}
-            <p className="muted small">
-              Mass % averaged over the samples completed each week. Each chart
-              has its own scale.
-            </p>
+            <p className="muted small">{t("groupTrendNote")}</p>
           </Card>
 
           <div className="grid-2">
-            <Card title="Grades">
+            <Card title={t("grades")}>
               {a.grades.length ? (
                 <BarList
                   data={a.grades.map((g) => ({
+                    // The API reports samples without a grade as "No grade".
                     label:
-                      g.grade === "No grade" ? g.grade : `Grade ${g.grade}`,
+                      g.grade === "No grade"
+                        ? t("noGrade")
+                        : t("grade", { grade: g.grade }),
                     value: g.count,
                   }))}
                 />
               ) : (
-                <p className="muted">No completed samples.</p>
+                <p className="muted">{t("noCompleted")}</p>
               )}
             </Card>
-            <Card title="Sources">
+            <Card title={t("sources")}>
               {a.sources.length ? (
                 <div className="table-scroll">
                   <table className="table small">
                     <thead>
                       <tr>
-                        <th>Source</th>
-                        <th className="num">Samples</th>
-                        <th className="num">Mean purity</th>
-                        <th className="num">Lowest</th>
+                        <th>{t("source")}</th>
+                        <th className="num">{t("samples")}</th>
+                        <th className="num">{t("meanPurity")}</th>
+                        <th className="num">{t("lowest")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -289,27 +306,22 @@ export function AnalyticsPage() {
                   </table>
                 </div>
               ) : (
-                <p className="muted">No completed samples.</p>
+                <p className="muted">{t("noCompleted")}</p>
               )}
             </Card>
           </div>
 
-          <Card title="Operator consistency">
-            <p className="muted small">
-              How often each person changed Claude&apos;s verdict when checking
-              flagged kernels. Large differences between operators on similar
-              grain suggest they read the defect definitions differently: worth
-              a calibration session with reference images.
-            </p>
+          <Card title={t("operatorConsistency")}>
+            <p className="muted small">{t("operatorNote")}</p>
             {a.operators.length ? (
               <div className="table-scroll">
                 <table className="table small">
                   <thead>
                     <tr>
-                      <th>Operator</th>
-                      <th className="num">Samples completed</th>
-                      <th className="num">Kernels checked</th>
-                      <th>Changed Claude&apos;s verdict</th>
+                      <th>{t("operator")}</th>
+                      <th className="num">{t("samplesCompleted")}</th>
+                      <th className="num">{t("kernelsChecked")}</th>
+                      <th>{t("changedVerdict")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -324,7 +336,10 @@ export function AnalyticsPage() {
                           ) : (
                             <Meter
                               value={o.correctionRate}
-                              label={`${o.name} changed ${o.corrected} verdicts`}
+                              label={t("changedVerdicts", {
+                                name: o.name,
+                                count: o.corrected,
+                              })}
                             />
                           )}
                         </td>
@@ -334,25 +349,21 @@ export function AnalyticsPage() {
                 </table>
               </div>
             ) : (
-              <p className="muted">No kernels checked in this period.</p>
+              <p className="muted">{t("noKernelsChecked")}</p>
             )}
           </Card>
 
-          <Card title="Claude against the operators, by class">
-            <p className="muted small">
-              For each class Claude chose, the share of checked kernels the
-              operator kept. Low rates show where Claude needs better
-              definitions or more reference images.
-            </p>
+          <Card title={t("claudeByClass")}>
+            <p className="muted small">{t("claudeByClassNote")}</p>
             {a.claudeByClass.length ? (
               <div className="table-scroll">
                 <table className="table small">
                   <thead>
                     <tr>
-                      <th>Claude said</th>
-                      <th className="num">Checked</th>
-                      <th>Operator agreed</th>
-                      <th>Most often changed to</th>
+                      <th>{t("claudeSaid")}</th>
+                      <th className="num">{t("checked")}</th>
+                      <th>{t("operatorAgreed")}</th>
+                      <th>{t("mostOftenChangedTo")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -363,7 +374,9 @@ export function AnalyticsPage() {
                         <td>
                           <Meter
                             value={c.confirmedRate}
-                            label={`${Math.round(c.confirmedRate * 100)} % agreed`}
+                            label={t("agreedPct", {
+                              pct: Math.round(c.confirmedRate * 100),
+                            })}
                           />
                         </td>
                         <td>
@@ -377,22 +390,22 @@ export function AnalyticsPage() {
                 </table>
               </div>
             ) : (
-              <p className="muted">No kernels checked in this period.</p>
+              <p className="muted">{t("noKernelsChecked")}</p>
             )}
           </Card>
 
-          <Card title="Claude usage">
+          <Card title={t("claudeUsage")}>
             {a.claude.length ? (
               <div className="table-scroll">
                 <table className="table small">
                   <thead>
                     <tr>
-                      <th>Model</th>
-                      <th className="num">Requests</th>
-                      <th className="num">Input tokens</th>
-                      <th className="num">Cached</th>
-                      <th className="num">Output tokens</th>
-                      <th className="num">Cost (list)</th>
+                      <th>{t("model")}</th>
+                      <th className="num">{t("requests")}</th>
+                      <th className="num">{t("inputTokens")}</th>
+                      <th className="num">{t("cached")}</th>
+                      <th className="num">{t("outputTokens")}</th>
+                      <th className="num">{t("costList")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -401,13 +414,13 @@ export function AnalyticsPage() {
                         <td>{c.model}</td>
                         <td className="num">{c.requests}</td>
                         <td className="num">
-                          {c.inputTokens.toLocaleString()}
+                          {c.inputTokens.toLocaleString(locale())}
                         </td>
                         <td className="num">
-                          {c.cacheReadTokens.toLocaleString()}
+                          {c.cacheReadTokens.toLocaleString(locale())}
                         </td>
                         <td className="num">
-                          {c.outputTokens.toLocaleString()}
+                          {c.outputTokens.toLocaleString(locale())}
                         </td>
                         <td className="num">
                           {c.estimatedCostUsd === null
@@ -420,12 +433,9 @@ export function AnalyticsPage() {
                 </table>
               </div>
             ) : (
-              <p className="muted">No Claude requests in this period.</p>
+              <p className="muted">{t("noRequests")}</p>
             )}
-            <p className="muted small">
-              Estimated from token counts at list prices; your invoice is the
-              reference.
-            </p>
+            <p className="muted small">{t("costNote")}</p>
           </Card>
         </div>
       )}

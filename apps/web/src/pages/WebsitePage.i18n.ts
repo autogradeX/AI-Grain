@@ -1,0 +1,73 @@
+import { defineMessages } from "../i18n";
+
+export const m = defineMessages({
+  website: { en: "Website", hi: "वेबसाइट" },
+  notOwner: {
+    en: "Only the organisation that runs the public website manages it.",
+    hi: "सार्वजनिक वेबसाइट को वही संस्था चलाती है जिसकी यह वेबसाइट है।",
+  },
+  intro: {
+    en: "Enquiries from the contact form, knowledge-hub articles and the contact details shown on {link}. Demo samples are published from a completed sample's page.",
+    hi: "संपर्क फ़ॉर्म से आई पूछताछ, ज्ञान केंद्र के लेख और {link} पर दिखने वाले संपर्क विवरण। डेमो नमूने किसी पूरे हुए नमूने के पेज से प्रकाशित किए जाते हैं।",
+  },
+  publicSite: { en: "the public site", hi: "सार्वजनिक साइट" },
+  enquiries: { en: "Enquiries", hi: "पूछताछ" },
+  articles: { en: "Articles", hi: "लेख" },
+  contactDetails: { en: "Contact details", hi: "संपर्क विवरण" },
+  noEnquiries: {
+    en: "No enquiries yet. They arrive from the website's contact page.",
+    hi: "अभी कोई पूछताछ नहीं। ये वेबसाइट के संपर्क पेज से आती हैं।",
+  },
+  status_new: { en: "new", hi: "नई" },
+  status_contacted: { en: "contacted", hi: "संपर्क किया" },
+  status_closed: { en: "closed", hi: "बंद" },
+  mark_new: { en: "Mark new", hi: "नई मार्क करें" },
+  mark_contacted: { en: "Mark contacted", hi: "संपर्क किया मार्क करें" },
+  mark_closed: { en: "Mark closed", hi: "बंद मार्क करें" },
+  newArticle: { en: "New article", hi: "नया लेख" },
+  title: { en: "Title", hi: "शीर्षक" },
+  kind: { en: "Kind", hi: "प्रकार" },
+  status: { en: "Status", hi: "स्थिति" },
+  updated: { en: "Updated", hi: "अपडेट" },
+  published: { en: "published", hi: "प्रकाशित" },
+  draft: { en: "draft", hi: "ड्राफ़्ट" },
+  kind_guide: { en: "Guides", hi: "मार्गदर्शिकाएँ" },
+  kind_glossary: { en: "Glossary", hi: "शब्दावली" },
+  kind_news: { en: "News", hi: "समाचार" },
+  kind_case_study: { en: "Case studies", hi: "केस स्टडी" },
+  editArticle: { en: "Edit “{title}”", hi: "“{title}” बदलें" },
+  address: { en: "Address", hi: "पता (URL)" },
+  summary: { en: "Summary", hi: "सारांश" },
+  summaryHint: {
+    en: "One or two sentences for the hub listing",
+    hi: "ज्ञान केंद्र की सूची के लिए एक-दो वाक्य",
+  },
+  write: { en: "Write", hi: "लिखें" },
+  preview: { en: "Preview", hi: "पूर्वावलोकन" },
+  nothingToPreview: {
+    en: "*Nothing to preview yet.*",
+    hi: "*अभी दिखाने के लिए कुछ नहीं।*",
+  },
+  body: { en: "Body", hi: "मुख्य पाठ" },
+  bodyHint: {
+    en: "Markdown: ## headings, **bold**, lists, links and tables",
+    hi: "Markdown: ## शीर्षक, **बोल्ड**, सूचियाँ, लिंक और तालिकाएँ",
+  },
+  publishedOnHub: {
+    en: "Published on the knowledge hub",
+    hi: "ज्ञान केंद्र पर प्रकाशित",
+  },
+  confirmDelete: { en: "Delete “{title}”?", hi: "“{title}” हटाएँ?" },
+  contactIntro: {
+    en: "Shown in the website footer and on the contact page. Enquiries are emailed to the contact email, or to the organisation's admins when it is empty.",
+    hi: "वेबसाइट के नीचे और संपर्क पेज पर दिखता है। पूछताछ संपर्क ईमेल पर भेजी जाती है; वह खाली हो तो संस्था के व्यवस्थापकों को।",
+  },
+  contactEmail: { en: "Contact email", hi: "संपर्क ईमेल" },
+  phone: { en: "Phone", hi: "फ़ोन" },
+  postalAddress: { en: "Address", hi: "पता" },
+  bookingLink: { en: "Meeting booking link", hi: "मीटिंग बुकिंग लिंक" },
+  bookingHint: {
+    en: "Optional, e.g. a calendar scheduling page",
+    hi: "वैकल्पिक, जैसे कैलेंडर से समय बुक करने का पेज",
+  },
+});

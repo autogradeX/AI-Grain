@@ -1,0 +1,132 @@
+import { defineMessages } from "../i18n";
+
+export const m = defineMessages({
+  title: { en: "Analytics", hi: "विश्लेषण" },
+  last7: { en: "Last 7 days", hi: "पिछले 7 दिन" },
+  last30: { en: "Last 30 days", hi: "पिछले 30 दिन" },
+  last90: { en: "Last 90 days", hi: "पिछले 90 दिन" },
+  last365: { en: "Last 12 months", hi: "पिछले 12 महीने" },
+  period: { en: "Period", hi: "अवधि" },
+  crop: { en: "Crop", hi: "फसल" },
+  allCrops: { en: "All crops", hi: "सभी फसलें" },
+  updating: { en: "Updating…", hi: "अपडेट हो रहा है…" },
+  minutes: { en: "{n} min", hi: "{n} मिनट" },
+  hours: { en: "{n} h", hi: "{n} घंटे" },
+  days: { en: "{n} days", hi: "{n} दिन" },
+  completedSamples: { en: "Completed samples", hi: "पूरे हुए नमूने" },
+  inProgress: { en: "{count} in progress", hi: "{count} जारी" },
+  averagePurity: { en: "Average purity", hi: "औसत शुद्धता" },
+  completedSamplesNote: { en: "completed samples", hi: "पूरे हुए नमूने" },
+  medianTurnaround: { en: "Median turnaround", hi: "औसत (माध्यिका) समय" },
+  createdToCompleted: {
+    en: "created to completed",
+    hi: "बनाने से पूरा होने तक",
+  },
+  claudeConfirmed: {
+    en: "Claude confirmed by operators",
+    hi: "ऑपरेटरों ने Claude को सही माना",
+  },
+  ofFlaggedChecked: {
+    en: "of {count} flagged kernels checked",
+    hi: "जाँचे गए {count} चिह्नित दानों में से",
+  },
+  estimateVsScale: {
+    en: "Photo estimate vs scale",
+    hi: "फ़ोटो अनुमान बनाम तराज़ू",
+  },
+  meanDifference: {
+    en: "mean difference in total defects, {count} weighed samples",
+    hi: "कुल दोषों में औसत अंतर, {count} तौले गए नमूने",
+  },
+  claudeCost: { en: "Claude cost (estimate)", hi: "Claude खर्च (अनुमान)" },
+  atListPrices: { en: "at list prices", hi: "सूची मूल्य पर" },
+  perCompletedSample: {
+    en: "{cost} per completed sample, list prices",
+    hi: "{cost} प्रति पूरा नमूना, सूची मूल्य पर",
+  },
+  completedPerDay: {
+    en: "Samples completed per day",
+    hi: "प्रति दिन पूरे हुए नमूने",
+  },
+  samplesCompleted: { en: "Samples completed", hi: "पूरे हुए नमूने" },
+  createdDetail: { en: "{date} · {count} created", hi: "{date} · {count} बने" },
+  completedValue: { en: "{count} completed", hi: "{count} पूरे" },
+  defectsByGroup: {
+    en: "Average defects by group, per week",
+    hi: "समूह के अनुसार औसत दोष, प्रति सप्ताह",
+  },
+  noCompletedPeriod: {
+    en: "No completed samples in this period.",
+    hi: "इस अवधि में कोई नमूना पूरा नहीं हुआ।",
+  },
+  weekDetail: {
+    en: "Week of {date} · {count} samples",
+    hi: "{date} वाला सप्ताह · {count} नमूने",
+  },
+  groupTrendNote: {
+    en: "Mass % averaged over the samples completed each week. Each chart has its own scale.",
+    hi: "हर सप्ताह पूरे हुए नमूनों का औसत द्रव्यमान %। हर चार्ट का पैमाना अलग है।",
+  },
+  grades: { en: "Grades", hi: "ग्रेड" },
+  noGrade: { en: "No grade", hi: "कोई ग्रेड नहीं" },
+  grade: { en: "Grade {grade}", hi: "ग्रेड {grade}" },
+  noCompleted: { en: "No completed samples.", hi: "कोई पूरा नमूना नहीं।" },
+  sources: { en: "Sources", hi: "स्रोत" },
+  source: { en: "Source", hi: "स्रोत" },
+  samples: { en: "Samples", hi: "नमूने" },
+  meanPurity: { en: "Mean purity", hi: "औसत शुद्धता" },
+  lowest: { en: "Lowest", hi: "सबसे कम" },
+  operatorConsistency: {
+    en: "Operator consistency",
+    hi: "ऑपरेटरों में एकरूपता",
+  },
+  operatorNote: {
+    en: "How often each person changed Claude's verdict when checking flagged kernels. Large differences between operators on similar grain suggest they read the defect definitions differently: worth a calibration session with reference images.",
+    hi: "चिह्नित दाने जाँचते समय हर व्यक्ति ने कितनी बार Claude का फ़ैसला बदला। मिलते-जुलते अनाज पर ऑपरेटरों में बड़ा अंतर बताता है कि वे दोषों की परिभाषाएँ अलग-अलग समझ रहे हैं: संदर्भ चित्रों के साथ एक मिलान सत्र करना ठीक रहेगा।",
+  },
+  operator: { en: "Operator", hi: "ऑपरेटर" },
+  kernelsChecked: { en: "Kernels checked", hi: "जाँचे गए दाने" },
+  changedVerdict: {
+    en: "Changed Claude's verdict",
+    hi: "Claude का फ़ैसला बदला",
+  },
+  changedVerdicts: {
+    en: "{name} changed {count} verdicts",
+    hi: "{name} ने {count} फ़ैसले बदले",
+  },
+  noKernelsChecked: {
+    en: "No kernels checked in this period.",
+    hi: "इस अवधि में कोई दाना नहीं जाँचा गया।",
+  },
+  claudeByClass: {
+    en: "Claude against the operators, by class",
+    hi: "वर्ग के अनुसार Claude बनाम ऑपरेटर",
+  },
+  claudeByClassNote: {
+    en: "For each class Claude chose, the share of checked kernels the operator kept. Low rates show where Claude needs better definitions or more reference images.",
+    hi: "Claude के चुने हर वर्ग के लिए, जाँचे गए दानों में से कितने ऑपरेटर ने वैसे ही रखे। कम दर बताती है कि कहाँ Claude को बेहतर परिभाषाएँ या ज़्यादा संदर्भ चित्र चाहिए।",
+  },
+  claudeSaid: { en: "Claude said", hi: "Claude ने कहा" },
+  checked: { en: "Checked", hi: "जाँचे गए" },
+  operatorAgreed: { en: "Operator agreed", hi: "ऑपरेटर सहमत" },
+  mostOftenChangedTo: {
+    en: "Most often changed to",
+    hi: "अक्सर बदलकर किया गया",
+  },
+  agreedPct: { en: "{pct} % agreed", hi: "{pct} % सहमत" },
+  claudeUsage: { en: "Claude usage", hi: "Claude उपयोग" },
+  model: { en: "Model", hi: "मॉडल" },
+  requests: { en: "Requests", hi: "अनुरोध" },
+  inputTokens: { en: "Input tokens", hi: "इनपुट टोकन" },
+  cached: { en: "Cached", hi: "कैश्ड" },
+  outputTokens: { en: "Output tokens", hi: "आउटपुट टोकन" },
+  costList: { en: "Cost (list)", hi: "खर्च (सूची मूल्य)" },
+  noRequests: {
+    en: "No Claude requests in this period.",
+    hi: "इस अवधि में Claude से कोई अनुरोध नहीं।",
+  },
+  costNote: {
+    en: "Estimated from token counts at list prices; your invoice is the reference.",
+    hi: "टोकन संख्या और सूची मूल्य से अनुमानित; असली खर्च आपके बिल में देखें।",
+  },
+});

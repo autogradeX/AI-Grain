@@ -10,12 +10,27 @@ import {
 } from "../api/types";
 import { useAuth, useCan } from "../auth/AuthContext";
 import { Badge, Card, ErrorNote, Field, formatDate } from "../components/ui";
+import { LanguageSelect, useT } from "../i18n";
+import { common } from "../i18n/common";
+import { m } from "./SettingsPage.i18n";
+
+const ROLE_NAME = {
+  admin: "roleAdmin",
+  grader: "roleGrader",
+  viewer: "roleViewer",
+} as const satisfies Record<CurrentUser["role"], keyof typeof common>;
 
 export function SettingsPage() {
   const can = useCan();
+  const t = useT(m);
   return (
     <div className="stack">
-      <h1>Settings</h1>
+      <h1>{t("settings")}</h1>
+      <Card title={t("language")}>
+        <Field label={t("language")} hint={t("languageHint")}>
+          <LanguageSelect />
+        </Field>
+      </Card>
       <ProfileCard />
       <PasswordCard />
       <SessionsCard />
@@ -27,6 +42,8 @@ export function SettingsPage() {
 
 function ProfileCard() {
   const { user, setUser } = useAuth();
+  const t = useT(m);
+  const tc = useT(common);
   const [name, setName] = useState(user?.name ?? "");
   const save = useMutation({
     mutationFn: () => api.patch<CurrentUser>("/auth/me", { name }),
@@ -36,7 +53,7 @@ function ProfileCard() {
     mutationFn: () => api.post("/auth/email/resend", { email: user?.email }),
   });
   return (
-    <Card title="Profile">
+    <Card title={t("profile")}>
       <form
         className="grid-2"
         onSubmit={(e) => {
@@ -44,20 +61,20 @@ function ProfileCard() {
           save.mutate();
         }}
       >
-        <Field label="Name">
+        <Field label={t("name")}>
           <input
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </Field>
-        <Field label="Email">
+        <Field label={t("email")}>
           <input value={user?.email ?? ""} disabled />
         </Field>
         <div className="row">
-          <Badge>{user?.role}</Badge>
+          {user && <Badge>{tc(ROLE_NAME[user.role])}</Badge>}
           {user?.emailVerified ? (
-            <Badge tone="good">email confirmed</Badge>
+            <Badge tone="good">{t("emailConfirmed")}</Badge>
           ) : (
             <button
               type="button"
@@ -66,8 +83,8 @@ function ProfileCard() {
               onClick={() => resend.mutate()}
             >
               {resend.isSuccess
-                ? "Confirmation email sent"
-                : "Resend confirmation email"}
+                ? t("confirmationSent")
+                : t("resendConfirmation")}
             </button>
           )}
         </div>
@@ -75,7 +92,7 @@ function ProfileCard() {
           className="primary"
           disabled={save.isPending || name === user?.name}
         >
-          Save
+          {tc("save")}
         </button>
       </form>
       <ErrorNote error={save.error ?? resend.error} />
@@ -85,6 +102,7 @@ function ProfileCard() {
 
 function PasswordCard() {
   const { signIn } = useAuth();
+  const t = useT(m);
   const [currentPassword, setCurrent] = useState("");
   const [newPassword, setNew] = useState("");
   const change = useMutation({
@@ -100,7 +118,7 @@ function PasswordCard() {
     },
   });
   return (
-    <Card title="Password">
+    <Card title={t("password")}>
       <form
         className="grid-2"
         onSubmit={(e) => {
@@ -108,7 +126,7 @@ function PasswordCard() {
           change.mutate();
         }}
       >
-        <Field label="Current password">
+        <Field label={t("currentPassword")}>
           <input
             type="password"
             autoComplete="current-password"
@@ -117,10 +135,7 @@ function PasswordCard() {
             onChange={(e) => setCurrent(e.target.value)}
           />
         </Field>
-        <Field
-          label="New password"
-          hint="At least 10 characters. Other devices will be signed out."
-        >
+        <Field label={t("newPassword")} hint={t("newPasswordHint")}>
           <input
             type="password"
             autoComplete="new-password"
@@ -131,11 +146,11 @@ function PasswordCard() {
           />
         </Field>
         <button className="primary" disabled={change.isPending}>
-          Change password
+          {t("changePassword")}
         </button>
       </form>
       <ErrorNote error={change.error} />
-      {change.isSuccess && <p className="good">Password changed.</p>}
+      {change.isSuccess && <p className="good">{t("passwordChanged")}</p>}
     </Card>
   );
 }
@@ -143,21 +158,20 @@ function PasswordCard() {
 function SessionsCard() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const t = useT(m);
   const all = useMutation({
     mutationFn: () => api.post("/auth/logout-all"),
     onSuccess: () => void signOut().then(() => navigate("/login")),
   });
   return (
-    <Card title="Sessions">
-      <p className="muted small">
-        Lost a phone? Sign out every device, including this one.
-      </p>
+    <Card title={t("sessions")}>
+      <p className="muted small">{t("lostPhone")}</p>
       <button
         className="danger"
         disabled={all.isPending}
         onClick={() => all.mutate()}
       >
-        Sign out everywhere
+        {t("signOutEverywhere")}
       </button>
       <ErrorNote error={all.error} />
     </Card>
@@ -166,6 +180,7 @@ function SessionsCard() {
 
 function OrgCard() {
   const can = useCan();
+  const t = useT(m);
   const qc = useQueryClient();
   const org = useQuery({
     queryKey: ["org"],
@@ -183,25 +198,19 @@ function OrgCard() {
   if (!org.data) return <ErrorNote error={org.error} />;
   const o = org.data;
   return (
-    <Card title="Organisation">
+    <Card title={t("organisation")}>
       {!o.claudeConfigured && (
-        <p className="warn small">
-          Claude is not configured on the server (ANTHROPIC_API_KEY).
-          Classification will fail.
-        </p>
+        <p className="warn small">{t("claudeMissing")}</p>
       )}
       <div className="grid-2">
-        <Field label="Name">
+        <Field label={t("name")}>
           <input
             disabled={!can.admin}
             value={name ?? o.name}
             onChange={(e) => setName(e.target.value)}
           />
         </Field>
-        <Field
-          label="Default AI model"
-          hint="Sonnet is the default. Haiku costs least. Opus is for difficult samples. A sample can override this."
-        >
+        <Field label={t("defaultModel")} hint={t("defaultModelHint")}>
           <select
             disabled={!can.admin}
             value={o.defaultModel ?? ""}
@@ -212,11 +221,11 @@ function OrgCard() {
             }
           >
             <option value="">
-              Server default ({MODEL_LABELS[o.effectiveModel]})
+              {t("serverDefault", { model: MODEL_LABELS[o.effectiveModel] })}
             </option>
-            {o.models.map((m) => (
-              <option key={m} value={m}>
-                {MODEL_LABELS[m]}
+            {o.models.map((model) => (
+              <option key={model} value={model}>
+                {MODEL_LABELS[model]}
               </option>
             ))}
           </select>
@@ -228,7 +237,7 @@ function OrgCard() {
           disabled={save.isPending}
           onClick={() => save.mutate({ name })}
         >
-          Save name
+          {t("saveName")}
         </button>
       )}
       <ErrorNote error={save.error} />
@@ -237,21 +246,22 @@ function OrgCard() {
 }
 
 function AuditCard() {
+  const t = useT(m);
   const audit = useQuery({
     queryKey: ["audit"],
     queryFn: () => api.get<AuditEntry[]>("/audit"),
   });
   return (
-    <Card title="Activity log">
+    <Card title={t("activityLog")}>
       <ErrorNote error={audit.error} />
       <div className="table-scroll">
         <table className="table small">
           <thead>
             <tr>
-              <th>When</th>
-              <th>Who</th>
-              <th>What</th>
-              <th>IP</th>
+              <th>{t("when")}</th>
+              <th>{t("who")}</th>
+              <th>{t("what")}</th>
+              <th>{t("ip")}</th>
             </tr>
           </thead>
           <tbody>

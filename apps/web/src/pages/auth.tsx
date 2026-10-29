@@ -9,6 +9,9 @@ import {
 import { api, ApiError, type Session } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorNote, Field, Spinner } from "../components/ui";
+import { LanguageSelect, useT, type Translate } from "../i18n";
+import { common } from "../i18n/common";
+import { m } from "./auth.i18n";
 
 function AuthFrame({
   title,
@@ -23,12 +26,23 @@ function AuthFrame({
         <div className="auth-brand">
           <img src="/icon.svg" alt="" width={40} height={40} />
           <span>AI-Grain</span>
+          <span style={{ marginLeft: "auto" }}>
+            <LanguageSelect />
+          </span>
         </div>
         <h1>{title}</h1>
         {children}
       </div>
     </div>
   );
+}
+
+/** The role name in the current language; unknown roles are shown as sent. */
+function roleLabel(tc: Translate<keyof typeof common>, role: string): string {
+  if (role === "admin") return tc("roleAdmin");
+  if (role === "grader") return tc("roleGrader");
+  if (role === "viewer") return tc("roleViewer");
+  return role;
 }
 
 /** Runs an async form action with busy and error state. */
@@ -51,8 +65,6 @@ function useAction<T>(action: () => Promise<T>) {
   return { busy, error, run };
 }
 
-const PASSWORD_HINT = "At least 10 characters. A short sentence works well.";
-
 export function LoginPage() {
   const { user, signIn } = useAuth();
   const navigate = useNavigate();
@@ -61,6 +73,7 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [needsVerify, setNeedsVerify] = useState(false);
+  const t = useT(m);
   const { busy, error, run } = useAction(async () => {
     try {
       signIn(await api.post<Session>("/auth/login", { email, password }));
@@ -73,9 +86,9 @@ export function LoginPage() {
   });
   if (user) return <Navigate to={from} replace />;
   return (
-    <AuthFrame title="Sign in">
+    <AuthFrame title={t("signIn")}>
       <form onSubmit={(e) => void run(e)} className="stack">
-        <Field label="Email">
+        <Field label={t("email")}>
           <input
             type="email"
             autoComplete="email"
@@ -84,7 +97,7 @@ export function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
           />
         </Field>
-        <Field label="Password">
+        <Field label={t("password")}>
           <input
             type="password"
             autoComplete="current-password"
@@ -101,19 +114,19 @@ export function LoginPage() {
             onClick={() =>
               void api
                 .post("/auth/email/resend", { email })
-                .then(() => alert("Confirmation email sent."))
+                .then(() => alert(t("confirmationSent")))
             }
           >
-            Resend the confirmation email
+            {t("resendConfirmation")}
           </button>
         )}
         <button className="primary" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? t("signingIn") : t("signIn")}
         </button>
       </form>
       <p className="auth-links">
-        <Link to="/forgot-password">Forgot password?</Link> ·{" "}
-        <Link to="/register">Create an organisation</Link>
+        <Link to="/forgot-password">{t("forgotPassword")}</Link> ·{" "}
+        <Link to="/register">{t("createOrg")}</Link>
       </p>
     </AuthFrame>
   );
@@ -129,6 +142,7 @@ export function RegisterPage() {
     password: "",
   });
   const [sentVerification, setSentVerification] = useState(false);
+  const t = useT(m);
   const { busy, error, run } = useAction(async () => {
     const res = await api.post<Session | { verificationRequired: true }>(
       "/auth/register",
@@ -147,24 +161,20 @@ export function RegisterPage() {
 
   if (sentVerification) {
     return (
-      <AuthFrame title="Check your email">
-        <p>
-          We sent a confirmation link to {form.email}. Open it, then sign in.
-        </p>
-        <Link to="/login">Back to sign in</Link>
+      <AuthFrame title={t("checkEmail")}>
+        <p>{t("sentConfirmation", { email: form.email })}</p>
+        <Link to="/login">{t("backToSignIn")}</Link>
       </AuthFrame>
     );
   }
   return (
-    <AuthFrame title="Create an organisation">
-      <p className="muted">
-        You'll be its admin and can invite graders and viewers.
-      </p>
+    <AuthFrame title={t("createOrg")}>
+      <p className="muted">{t("youllBeAdmin")}</p>
       <form onSubmit={(e) => void run(e)} className="stack">
-        <Field label="Farm, company or lab name">
+        <Field label={t("orgName")}>
           <input required value={form.orgName} onChange={set("orgName")} />
         </Field>
-        <Field label="Your name">
+        <Field label={t("yourName")}>
           <input
             required
             autoComplete="name"
@@ -172,7 +182,7 @@ export function RegisterPage() {
             onChange={set("name")}
           />
         </Field>
-        <Field label="Email">
+        <Field label={t("email")}>
           <input
             type="email"
             autoComplete="email"
@@ -181,7 +191,7 @@ export function RegisterPage() {
             onChange={set("email")}
           />
         </Field>
-        <Field label="Password" hint={PASSWORD_HINT}>
+        <Field label={t("password")} hint={t("passwordHint")}>
           <input
             type="password"
             autoComplete="new-password"
@@ -193,11 +203,13 @@ export function RegisterPage() {
         </Field>
         <ErrorNote error={error} />
         <button className="primary" disabled={busy}>
-          {busy ? "Creating…" : "Create account"}
+          {busy ? t("creating") : t("createAccount")}
         </button>
       </form>
       <p className="auth-links">
-        Already have an account? <Link to="/login">Sign in</Link>
+        {t.rich("haveAccount", {
+          link: <Link to="/login">{t("signIn")}</Link>,
+        })}
       </p>
     </AuthFrame>
   );
@@ -206,20 +218,18 @@ export function RegisterPage() {
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const t = useT(m);
   const { busy, error, run } = useAction(async () => {
     await api.post("/auth/password/forgot", { email });
     setSent(true);
   });
   return (
-    <AuthFrame title="Reset your password">
+    <AuthFrame title={t("resetTitle")}>
       {sent ? (
-        <p>
-          If an account exists for {email}, a reset link is on its way. It's
-          valid for one hour.
-        </p>
+        <p>{t("resetSent", { email })}</p>
       ) : (
         <form onSubmit={(e) => void run(e)} className="stack">
-          <Field label="Email">
+          <Field label={t("email")}>
             <input
               type="email"
               required
@@ -229,12 +239,12 @@ export function ForgotPasswordPage() {
           </Field>
           <ErrorNote error={error} />
           <button className="primary" disabled={busy}>
-            Send reset link
+            {t("sendResetLink")}
           </button>
         </form>
       )}
       <p className="auth-links">
-        <Link to="/login">Back to sign in</Link>
+        <Link to="/login">{t("backToSignIn")}</Link>
       </p>
     </AuthFrame>
   );
@@ -245,20 +255,22 @@ export function ResetPasswordPage() {
   const token = params.get("token") ?? "";
   const [password, setPassword] = useState("");
   const [done, setDone] = useState(false);
+  const t = useT(m);
   const { busy, error, run } = useAction(async () => {
     await api.post("/auth/password/reset", { token, password });
     setDone(true);
   });
   return (
-    <AuthFrame title="Choose a new password">
+    <AuthFrame title={t("newPasswordTitle")}>
       {done ? (
         <p>
-          Password changed, and you've been signed out everywhere.{" "}
-          <Link to="/login">Sign in</Link>
+          {t.rich("passwordChanged", {
+            link: <Link to="/login">{t("signIn")}</Link>,
+          })}
         </p>
       ) : (
         <form onSubmit={(e) => void run(e)} className="stack">
-          <Field label="New password" hint={PASSWORD_HINT}>
+          <Field label={t("newPassword")} hint={t("passwordHint")}>
             <input
               type="password"
               autoComplete="new-password"
@@ -270,7 +282,7 @@ export function ResetPasswordPage() {
           </Field>
           <ErrorNote error={error} />
           <button className="primary" disabled={busy || !token}>
-            Set password
+            {t("setPassword")}
           </button>
         </form>
       )}
@@ -284,6 +296,7 @@ export function VerifyEmailPage() {
   const { user, setUser } = useAuth();
   const [state, setState] = useState<"working" | "done" | "failed">("working");
   const [error, setError] = useState<unknown>(null);
+  const t = useT(m);
   useEffect(() => {
     api
       .post("/auth/email/verify", { token })
@@ -298,11 +311,11 @@ export function VerifyEmailPage() {
       setUser({ ...user, emailVerified: true });
   }, [state, user, setUser]);
   return (
-    <AuthFrame title="Confirm email">
-      {state === "working" && <Spinner label="Confirming…" />}
-      {state === "done" && <p>Your email address is confirmed.</p>}
+    <AuthFrame title={t("confirmEmailTitle")}>
+      {state === "working" && <Spinner label={t("confirming")} />}
+      {state === "done" && <p>{t("emailConfirmed")}</p>}
       {state === "failed" && <ErrorNote error={error} />}
-      <Link to={user ? "/app" : "/login"}>Continue</Link>
+      <Link to={user ? "/app" : "/login"}>{t("continue")}</Link>
     </AuthFrame>
   );
 }
@@ -320,6 +333,8 @@ export function AcceptInvitePage() {
   const [loadError, setLoadError] = useState<unknown>(null);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const t = useT(m);
+  const tc = useT(common);
   useEffect(() => {
     api
       .get<{ email: string; role: string; orgName: string }>(
@@ -335,16 +350,19 @@ export function AcceptInvitePage() {
     void navigate("/app", { replace: true });
   });
   return (
-    <AuthFrame title="Join your team">
+    <AuthFrame title={t("joinTeam")}>
       {loadError ? <ErrorNote error={loadError} /> : null}
       {!invite && !loadError && <Spinner />}
       {invite && (
         <form onSubmit={(e) => void run(e)} className="stack">
           <p>
-            You're invited to <strong>{invite.orgName}</strong> as{" "}
-            <strong>{invite.role}</strong>, with the email {invite.email}.
+            {t.rich("invited", {
+              org: <strong>{invite.orgName}</strong>,
+              role: <strong>{roleLabel(tc, invite.role)}</strong>,
+              email: invite.email,
+            })}
           </p>
-          <Field label="Your name">
+          <Field label={t("yourName")}>
             <input
               required
               autoComplete="name"
@@ -352,7 +370,7 @@ export function AcceptInvitePage() {
               onChange={(e) => setName(e.target.value)}
             />
           </Field>
-          <Field label="Password" hint={PASSWORD_HINT}>
+          <Field label={t("password")} hint={t("passwordHint")}>
             <input
               type="password"
               autoComplete="new-password"
@@ -364,7 +382,7 @@ export function AcceptInvitePage() {
           </Field>
           <ErrorNote error={error} />
           <button className="primary" disabled={busy}>
-            Create account
+            {t("createAccount")}
           </button>
         </form>
       )}

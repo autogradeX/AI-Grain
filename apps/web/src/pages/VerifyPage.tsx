@@ -1,4 +1,4 @@
-import { CLASS_GROUPS, GROUP_LABELS, type ClassGroup } from "@ai-grain/core";
+import { CLASS_GROUPS, type ClassGroup } from "@ai-grain/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -11,6 +11,9 @@ import {
   pct,
   Spinner,
 } from "../components/ui";
+import { useLang, useT } from "../i18n";
+import { presetLabel, useGrainLabels } from "../i18n/common";
+import { m } from "./VerifyPage.i18n";
 
 interface Verification {
   code: string;
@@ -55,6 +58,7 @@ export function VerifyPage() {
   const { code = "" } = useParams();
   const navigate = useNavigate();
   const [typed, setTyped] = useState("");
+  const t = useT(m);
   const v = useQuery({
     queryKey: ["verify", code],
     queryFn: () =>
@@ -72,34 +76,27 @@ export function VerifyPage() {
       }}
     >
       <input
-        aria-label="Certificate code"
+        aria-label={t("codeLabel")}
         placeholder="XXXX-XXXX-XXXX"
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
         style={{ maxWidth: 260 }}
       />
-      <button className="primary">Check</button>
+      <button className="primary">{t("check")}</button>
     </form>
   );
 
   return (
     <div className="site-page">
       <div className="site-section narrow stack">
-        <h1>Verify a grain report</h1>
-        <p className="muted">
-          Enter the code printed beside the QR code on the report, or scan the
-          QR code. This page shows the figures the report was issued with, so
-          you can check that a printout or PDF hasn't been changed.
-        </p>
+        <h1>{t("title")}</h1>
+        <p className="muted">{t("intro")}</p>
         {form}
-        {v.isFetching && <Spinner label="Checking…" />}
+        {v.isFetching && <Spinner label={t("checking")} />}
         {v.error instanceof ApiError && v.error.status === 404 ? (
           <Card>
-            <Badge tone="bad">Not found</Badge>
-            <p>
-              No report was issued with the code {code}. Check the code and try
-              again.
-            </p>
+            <Badge tone="bad">{t("notFound")}</Badge>
+            <p>{t("notFoundText", { code })}</p>
           </Card>
         ) : (
           <ErrorNote error={v.error} />
@@ -113,113 +110,119 @@ export function VerifyPage() {
 function Result({ v }: { v: Verification }) {
   const p = v.payload;
   const ok = v.status === "valid" && v.intact;
+  const t = useT(m);
+  const { lang } = useLang();
+  const { groupLabel, cropLabel } = useGrainLabels();
   return (
     <>
       <Card>
         <div className="verify-status">
           {!v.intact ? (
-            <Badge tone="bad">Record altered</Badge>
+            <Badge tone="bad">{t("altered")}</Badge>
           ) : v.status === "valid" ? (
-            <Badge tone="good">Valid</Badge>
+            <Badge tone="good">{t("valid")}</Badge>
           ) : (
-            <Badge tone="warn">Withdrawn</Badge>
+            <Badge tone="warn">{t("withdrawn")}</Badge>
           )}
           <strong>{v.code}</strong>
-          <span className="muted small">version {p.version}</span>
+          <span className="muted small">
+            {t("version", { version: p.version })}
+          </span>
         </div>
-        {ok && (
-          <p>
-            This report was issued by {p.organisation} and has not been
-            withdrawn.
-          </p>
-        )}
+        {ok && <p>{t("issuedBy", { organisation: p.organisation })}</p>}
         {!v.intact && (
           <p className="error">
-            The stored record no longer matches the fingerprint it was issued
-            with. Do not rely on this report; contact {p.organisation}.
+            {t("alteredText", { organisation: p.organisation })}
           </p>
         )}
         {v.status === "withdrawn" && (
           <p>
-            Withdrawn {formatDate(v.withdrawnAt)}
+            {t("withdrawnOn", { date: formatDate(v.withdrawnAt) })}
             {v.withdrawnReason && `: ${v.withdrawnReason}`}
             {v.newerVersion && (
               <>
                 {" "}
-                A newer version exists:{" "}
-                <Link to={`/verify/${v.newerVersion.code}`}>
-                  {v.newerVersion.code} (version {v.newerVersion.version})
-                </Link>
-                .
+                {t.rich("newerVersion", {
+                  link: (
+                    <Link to={`/verify/${v.newerVersion.code}`}>
+                      {t("newerLink", {
+                        code: v.newerVersion.code,
+                        version: v.newerVersion.version,
+                      })}
+                    </Link>
+                  ),
+                })}
               </>
             )}
           </p>
         )}
         <dl className="facts">
-          <dt>Issued</dt>
+          <dt>{t("issued")}</dt>
           <dd>{formatDate(v.issuedAt)}</dd>
-          <dt>Sample</dt>
+          <dt>{t("sample")}</dt>
           <dd>
-            #{p.sample.number} · {p.sample.crop}
+            #{p.sample.number} · {cropLabel(p.sample.crop)}
             {p.sample.source && ` · ${p.sample.source}`}
           </dd>
-          <dt>Standard</dt>
-          <dd>{p.sample.standard ?? "none"}</dd>
-          <dt>Grade</dt>
+          <dt>{t("standard")}</dt>
+          <dd>{p.sample.standard ?? t("none")}</dd>
+          <dt>{t("grade")}</dt>
           <dd>
             <strong>
-              {p.result.grade ?? (p.sample.standard ? "below all grades" : "—")}
+              {p.result.grade ?? (p.sample.standard ? t("belowAll") : "—")}
             </strong>
           </dd>
-          <dt>Purity</dt>
+          <dt>{t("purity")}</dt>
           <dd>{pct(p.result.purityPct)}</dd>
-          <dt>Method</dt>
+          <dt>{t("method")}</dt>
           <dd>
-            {p.result.source === "estimate"
-              ? "Estimated from photos (not weighed)"
-              : "Weighed"}
-            ; kernels flagged by {p.model}, {p.kernels.reviewed} of{" "}
-            {p.kernels.flagged} flagged kernels checked by{" "}
-            {p.operators.join(", ")}
+            {t("methodDetail", {
+              source:
+                p.result.source === "estimate" ? t("estimated") : t("weighed"),
+              model: p.model,
+              reviewed: p.kernels.reviewed,
+              flagged: p.kernels.flagged,
+              operators: p.operators.join(", "),
+            })}
           </dd>
           {p.measurements.sampleMassG !== null && (
             <>
-              <dt>Sample mass</dt>
+              <dt>{t("sampleMass")}</dt>
               <dd>{p.measurements.sampleMassG} g</dd>
             </>
           )}
           {p.measurements.moisturePct !== null && (
             <>
-              <dt>Moisture</dt>
+              <dt>{t("moisture")}</dt>
               <dd>{pct(p.measurements.moisturePct, 1)}</dd>
             </>
           )}
-          <dt>Fingerprint</dt>
+          <dt>{t("fingerprint")}</dt>
           <dd className="break small">SHA-256 {v.payloadHash}</dd>
         </dl>
       </Card>
-      <Card title="Composition (mass %)">
+      <Card title={t("composition")}>
         <table className="table">
           <tbody>
             {CLASS_GROUPS.map((g: ClassGroup) => (
               <tr key={g} className="group-row">
-                <td>{GROUP_LABELS[g]}</td>
+                <td>{groupLabel(g)}</td>
                 <td className="num">{pct(p.result.byGroupPct[g])}</td>
               </tr>
             ))}
             <tr className="total">
-              <td>Total defects</td>
+              <td>{t("totalDefects")}</td>
               <td className="num">{pct(p.result.totalDefectsPct)}</td>
             </tr>
           </tbody>
         </table>
         <details>
-          <summary className="small">Every class</summary>
+          <summary className="small">{t("everyClass")}</summary>
           <table className="table small">
             <tbody>
               {p.result.byClassPct.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.label}</td>
+                  <td>{presetLabel(c.label, lang)}</td>
                   <td className="num">{pct(c.pct)}</td>
                 </tr>
               ))}
@@ -227,10 +230,7 @@ function Result({ v }: { v: Verification }) {
           </table>
         </details>
       </Card>
-      <p className="muted small">
-        A screening and pre-check result, not an official trade grade unless the
-        issuer's method has been validated and approved.
-      </p>
+      <p className="muted small">{t("disclaimer")}</p>
     </>
   );
 }
