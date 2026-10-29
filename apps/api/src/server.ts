@@ -3,7 +3,7 @@ import { Storage as GcsClient } from "@google-cloud/storage";
 import { ClaudeClassifier, UnconfiguredClassifier } from "./ai/classifier.js";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
-import { createDb } from "./db/client.js";
+import { createDb, DatabaseUnreachableError } from "./db/client.js";
 import { JobRunner } from "./lib/jobs.js";
 import { LogMailer, SmtpMailer } from "./lib/mailer.js";
 import { DiskStorage, GcsStorage } from "./lib/storage.js";
@@ -11,8 +11,20 @@ import { DiskStorage, GcsStorage } from "./lib/storage.js";
 const config = loadConfig();
 const dbHandle = createDb(config.DATABASE_URL, config.DATA_DIR, {
   poolMax: config.DB_POOL_MAX,
+  onRetry: (attempt, error) => {
+    console.warn(
+      `Database not reachable yet (attempt ${attempt}): ${error.message || "connection closed"}. Retrying.`,
+    );
+  },
 });
-if (config.RUN_MIGRATIONS) await dbHandle.migrate();
+try {
+  await dbHandle.ready();
+  if (config.RUN_MIGRATIONS) await dbHandle.migrate();
+} catch (err) {
+  // A plain message instead of a stack trace, so the cause is the first thing in the logs.
+  console.error(err instanceof DatabaseUnreachableError ? err.message : err);
+  process.exit(1);
+}
 
 let jobs!: JobRunner;
 const { app } = await buildApp(

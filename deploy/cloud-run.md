@@ -112,3 +112,41 @@ The startup log warns when `ANTHROPIC_API_KEY`, `SMTP_URL`, `DATABASE_URL` or `S
 - Cloud Run with `--no-cpu-throttling` bills for the whole time an instance is up. With `--min-instances=0` it scales to zero when nobody is using the app.
 - Cloud SQL bills continuously; `db-g1-small` is a small shared-core instance. Use a larger tier and enable backups and high availability for production use.
 - Claude API usage per sample appears under the sample (`/api/samples/:id/usage`). Claude Haiku 5.5 is the lowest-cost model.
+
+## Troubleshooting
+
+### `Cloud SQL instance "…" is not reachable`, then the container exits
+
+Cloud Run's built-in Cloud SQL proxy could not reach the instance. It accepts the app's connection and closes it, so the app retries for about 30 seconds and then exits with `Could not connect to database …` and a checklist. Check these in order (replace the names with yours):
+
+```sh
+PROJECT=auto-481612; INSTANCE=autogradex; SERVICE=ai-grain; REGION=asia-southeast1
+
+# 1. The Cloud SQL Admin API is enabled
+gcloud services enable sqladmin.googleapis.com --project=$PROJECT
+
+# 2. The instance is PostgreSQL, running, and has a public IP (ipv4Enabled=True)
+gcloud sql instances describe $INSTANCE --project=$PROJECT \
+  --format="table(databaseVersion,state,settings.activationPolicy,settings.ipConfiguration.ipv4Enabled,region)"
+
+# 3. The service's account may connect. New projects often give the default
+#    compute service account no roles, so grant Cloud SQL Client explicitly.
+SA=$(gcloud run services describe $SERVICE --region=$REGION --project=$PROJECT \
+  --format="value(spec.template.spec.serviceAccountName)")
+gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$SA --role=roles/cloudsql.client
+
+# 4. The service has the instance as a Cloud SQL connection
+gcloud run services describe $SERVICE --region=$REGION --project=$PROJECT \
+  --format="value(spec.template.metadata.annotations['run.googleapis.com/cloudsql-instances'])"
+```
+
+- If `databaseVersion` is not `POSTGRES_…` (for example a MySQL instance), create a PostgreSQL instance: the app needs PostgreSQL.
+- If `state` is not `RUNNABLE` or the activation policy is `NEVER`, start the instance: `gcloud sql instances patch $INSTANCE --activation-policy=ALWAYS`.
+- If `ipv4Enabled` is `False` (private IP only), either add a public IP (`gcloud sql instances patch $INSTANCE --assign-ip`; the proxy authenticates with IAM, so no authorised networks are needed), or connect the service to the VPC with Direct VPC egress and set `DATABASE_URL=postgres://USER:PASSWORD@PRIVATE_IP:5432/DB`.
+- After any change to the service, deploy a new revision; IAM changes can take a minute to apply.
+
+Also check that the database and user in `DATABASE_URL` exist (`gcloud sql databases list --instance=$INSTANCE`, `gcloud sql users list --instance=$INSTANCE`).
+
+### Photos disappear or show "Image unavailable"
+
+Files are on the container disk. Set `STORAGE_BUCKET` (preferred), or mount the bucket as a Cloud Storage volume and point `DATA_DIR` at the mount path. With a volume mount, the bucket must be writable by the container user (uid 1000).
