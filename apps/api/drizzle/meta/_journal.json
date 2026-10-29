@@ -15,6 +15,13 @@
       "when": 1793287189474,
       "tag": "0001_batch_updated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793294577821,
+      "tag": "0002_crops",
+      "breakpoints": true
     }
   ]
 }

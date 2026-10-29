@@ -1,4 +1,4 @@
-import { KERNEL_CLASSES } from "@ai-grain/core";
+import { kernelClassIds } from "@ai-grain/core";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -23,6 +23,7 @@ import {
   requireRole,
   WRITE_ROLES,
 } from "../auth/guard.js";
+import { ensureCrop } from "../crops/service.js";
 import { loadSample } from "../samples/service.js";
 import {
   batchPrefix,
@@ -303,7 +304,7 @@ export function batchRoutes(ctx: AppContext) {
             .array(
               z.object({
                 kernelId: z.uuid(),
-                finalClass: z.enum(KERNEL_CLASSES).nullable(),
+                finalClass: z.string().max(40).nullable(),
               }),
             )
             .min(1)
@@ -320,8 +321,23 @@ export function batchRoutes(ctx: AppContext) {
         .from(kernels)
         .where(and(eq(kernels.orgId, me.orgId), inArray(kernels.id, ids)));
       if (found.length !== new Set(ids).size) throw notFound("Kernel");
+      // Each decision must be a class of that kernel's crop.
+      const allowed = new Map<string, Set<string>>();
       for (const sampleId of new Set(found.map((k) => k.sampleId))) {
-        await assertEditable(ctx, me.orgId, sampleId);
+        const sample = await assertEditable(ctx, me.orgId, sampleId);
+        const crop = await ensureCrop(ctx, me.orgId, sample.crop);
+        allowed.set(sampleId, new Set(kernelClassIds(crop.classes)));
+      }
+      const sampleOf = new Map(found.map((k) => [k.id, k.sampleId]));
+      for (const d of body.decisions) {
+        if (
+          d.finalClass !== null &&
+          !allowed.get(sampleOf.get(d.kernelId)!)?.has(d.finalClass)
+        ) {
+          throw badRequest(
+            `"${d.finalClass}" is not a class of this sample's crop`,
+          );
+        }
       }
       const ai = new Map(found.map((k) => [k.id, k.aiClass]));
       const now = new Date();

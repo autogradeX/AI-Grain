@@ -1,28 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { KERNEL_CLASSES, type KernelClass } from "@ai-grain/core";
+import { kernelClassIds, type ClassDef } from "@ai-grain/core";
 import { z } from "zod";
 import type { ClaudeModel } from "../config.js";
-import {
-  CLASSIFY_SYSTEM,
-  SUMMARY_SYSTEM,
-  classifyContext,
-  type Definitions,
-} from "./prompts.js";
+import { CLASSIFY_SYSTEM, SUMMARY_SYSTEM, classifyContext } from "./prompts.js";
 
 export type Confidence = "high" | "medium" | "low";
 
 export interface ReferenceExample {
-  cls: KernelClass;
+  cls: string;
   jpeg: Buffer;
   note: string | null;
 }
 
 export interface ClassifyRequest {
   model: ClaudeModel;
-  crop: string;
+  cropLabel: string;
   standardName: string | null;
-  definitions: Definitions;
+  /** The crop's defect classes, with the standard's definitions applied. */
+  classes: readonly ClassDef[];
   references: readonly ReferenceExample[];
   sheet: Buffer;
   numbers: readonly number[];
@@ -32,7 +28,7 @@ export interface ClassifyRequest {
 
 export interface KernelVerdict {
   number: number;
-  cls: KernelClass;
+  cls: string;
   confidence: Confidence;
   reason: string;
 }
@@ -58,16 +54,25 @@ export interface Classifier {
 
 export class ClassifierError extends Error {}
 
-const VerdictSheet = z.object({
-  kernels: z.array(
-    z.object({
-      number: z.number().int(),
-      class: z.enum(KERNEL_CLASSES),
-      confidence: z.enum(["high", "medium", "low"]),
-      reason: z.string(),
-    }),
-  ),
-});
+/**
+ * The answer's schema. Class ids are listed in the field's description rather
+ * than enforced: an unknown id becomes "unclear" below, so one bad verdict
+ * can't fail a whole sheet of 30 kernels.
+ */
+function verdictSheet(classes: readonly ClassDef[]) {
+  return z.object({
+    kernels: z.array(
+      z.object({
+        number: z.number().int(),
+        class: z
+          .string()
+          .describe(`One of: ${kernelClassIds(classes).join(", ")}`),
+        confidence: z.enum(["high", "medium", "low"]),
+        reason: z.string(),
+      }),
+    ),
+  });
+}
 
 /** Claude Haiku has no server-side refusal fallback; the others route a refusal to a fallback model. */
 function fallbackParams(model: ClaudeModel) {
@@ -161,7 +166,7 @@ export class ClaudeClassifier implements Classifier {
           ],
         },
       ],
-      output_config: { format: betaZodOutputFormat(VerdictSheet) },
+      output_config: { format: betaZodOutputFormat(verdictSheet(req.classes)) },
     });
 
     checkStop(message);
@@ -169,17 +174,27 @@ export class ClaudeClassifier implements Classifier {
     if (!parsed)
       throw new ClassifierError("Claude's answer was not valid JSON");
 
+    const known = new Set(kernelClassIds(req.classes));
     const wanted = new Set(req.numbers);
     const verdicts: KernelVerdict[] = [];
     for (const k of parsed.kernels) {
       if (!wanted.has(k.number)) continue;
       wanted.delete(k.number);
-      verdicts.push({
-        number: k.number,
-        cls: k.class,
-        confidence: k.confidence,
-        reason: k.reason,
-      });
+      verdicts.push(
+        known.has(k.class)
+          ? {
+              number: k.number,
+              cls: k.class,
+              confidence: k.confidence,
+              reason: k.reason,
+            }
+          : {
+              number: k.number,
+              cls: "unclear",
+              confidence: "low",
+              reason: `Claude answered "${k.class}", which is not a class of this crop: ${k.reason}`,
+            },
+      );
     }
     for (const n of wanted) {
       verdicts.push({

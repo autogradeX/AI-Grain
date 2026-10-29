@@ -1,4 +1,3 @@
-import { type KernelClass } from "@ai-grain/core";
 import {
   and,
   asc,
@@ -40,6 +39,7 @@ import {
   KERNELS_PER_SHEET,
 } from "../../imaging/sheets.js";
 import { mapLimit } from "../../lib/jobs.js";
+import { classesWithDefinitions, ensureCrop } from "../crops/service.js";
 import { MAX_REFERENCES_PER_REQUEST } from "../references/routes.js";
 
 /** A kernel the operator must look at: anything not confidently sound, and every cluster. */
@@ -50,7 +50,9 @@ export const needsReview: SQL<boolean> = sql<boolean>`(
 )`;
 
 /** The class that counts: the operator's decision, else Claude's. */
-export const effectiveClass = sql<KernelClass | null>`coalesce(${kernels.finalClass}, ${kernels.aiClass})`;
+export const effectiveClass = sql<
+  string | null
+>`coalesce(${kernels.finalClass}, ${kernels.aiClass})`;
 
 export const batchPrefix = (b: {
   orgId: string;
@@ -255,6 +257,8 @@ export async function classifyBatch(
       .from(kernels)
       .where(and(eq(kernels.batchId, batchId), isNull(kernels.aiClass)))
       .orderBy(asc(kernels.number));
+    const crop = await ensureCrop(ctx, sample.orgId, sample.crop);
+    const classes = classesWithDefinitions(crop.classes, standard?.definitions);
     const references = await loadReferences(ctx, sample.orgId, sample.crop);
     const chunks: (typeof todo)[] = [];
     for (let i = 0; i < todo.length; i += KERNELS_PER_SHEET) {
@@ -274,9 +278,9 @@ export async function classifyBatch(
           );
           const { verdicts, usage } = await ctx.classifier.classify({
             model,
-            crop: sample.crop,
+            cropLabel: crop.label,
             standardName: standard?.name ?? null,
-            definitions: standard?.definitions ?? {},
+            classes,
             references,
             sheet: await buildSheet(tiles),
             numbers: chunk.map((k) => k.number),

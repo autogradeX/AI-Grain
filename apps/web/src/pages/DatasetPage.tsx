@@ -1,16 +1,18 @@
-import { CLASS_LABELS, type KernelClass } from "@ai-grain/core";
+import { classLabel } from "@ai-grain/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, download } from "../api/client";
+import { useCrops } from "../api/crops";
 import { Card, ErrorNote, Spinner } from "../components/ui";
 
 interface Stat {
   crop: string;
-  cls: KernelClass;
+  cls: string;
   count: number;
   corrected: number;
 }
 
 export function DatasetPage() {
+  const cropProfiles = useCrops(true);
   const stats = useQuery({
     queryKey: ["dataset"],
     queryFn: () => api.get<Stat[]>("/dataset/stats"),
@@ -64,7 +66,13 @@ export function DatasetPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.cls}>
-                    <td>{CLASS_LABELS[r.cls]}</td>
+                    <td>
+                      {classLabel(
+                        cropProfiles.data?.find((c) => c.key === crop)
+                          ?.classes ?? [],
+                        r.cls,
+                      )}
+                    </td>
                     <td className="num">{r.count}</td>
                     <td className="num">{r.corrected}</td>
                   </tr>

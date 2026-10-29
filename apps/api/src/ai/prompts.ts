@@ -1,11 +1,17 @@
-import { CLASS_LABELS, DEFECT_CLASSES, type DefectClass } from "@ai-grain/core";
+import { CLASS_GROUPS, GROUP_LABELS, type ClassDef } from "@ai-grain/core";
 
-export type Definitions = Partial<Record<DefectClass, string>>;
-
-export function definitionLines(definitions: Definitions): string {
-  return DEFECT_CLASSES.map((cls) => {
-    const text = definitions[cls]?.trim();
-    return `- ${cls} (${CLASS_LABELS[cls]})${text ? `: ${text}` : ""}`;
+/** The crop's defect classes, grouped, with each class's definition. */
+export function classLines(classes: readonly ClassDef[]): string {
+  return CLASS_GROUPS.flatMap((g) => {
+    const inGroup = classes.filter((c) => c.group === g);
+    if (!inGroup.length) return [];
+    return [
+      `${GROUP_LABELS[g]}:`,
+      ...inGroup.map(
+        (c) =>
+          `- "${c.id}" (${c.label})${c.description?.trim() ? `: ${c.description.trim()}` : ""}`,
+      ),
+    ];
   }).join("\n");
 }
 
@@ -24,40 +30,41 @@ Also give a confidence (high, medium or low) and a short reason naming what you 
 Return one entry for every number on the sheet, and no other numbers.`;
 
 export function classifyContext(input: {
-  crop: string;
+  cropLabel: string;
   standardName: string | null;
-  definitions: Definitions;
+  classes: readonly ClassDef[];
 }): string {
-  return `Crop: ${input.crop}.
+  return `Crop: ${input.cropLabel}.
 Standard: ${input.standardName ?? "not specified"}.
 
-Defect classes and how this standard defines them:
-${definitionLines(input.definitions)}`;
+Defect classes by group, with how this grader defines them. Use the id in quotes:
+${classLines(input.classes)}`;
 }
 
 export const SUMMARY_SYSTEM = `You write short grain screening reports for farm and intake staff. Use plain language and the numbers given; do not invent measurements. The method is a screening and pre-check tool, not official grading: say so once. Mention any limit the sample fails, which defects drove the result, and anything the operator should double-check. At most 180 words, no headings, no tables.`;
 
 /** The Level 1 prompt: for graders who use the Claude app directly with a whole-board photo. */
 export function level1Prompt(input: {
-  crop: string;
+  cropLabel: string;
   standardName: string | null;
-  definitions: Definitions;
+  classes: readonly ClassDef[];
 }): string {
-  const classes = DEFECT_CLASSES.map((c) => CLASS_LABELS[c].toLowerCase()).join(
-    ", ",
-  );
-  const defined = DEFECT_CLASSES.filter((c) => input.definitions[c]?.trim());
-  const definitionsBlock = defined.length
-    ? `\nDefinitions from the standard:\n${defined
-        .map(
-          (c) => `- ${CLASS_LABELS[c]}: ${input.definitions[c]?.trim() ?? ""}`,
-        )
-        .join("\n")}\n`
-    : "";
-  return `You are assisting a grain grader. Crop: ${input.crop}. Standard: ${input.standardName ?? "[name of standard]"}.
+  return `You are assisting a grain grader. Crop: ${input.cropLabel}. Standard: ${input.standardName ?? "[name of standard]"}.
 The photo shows kernels on a dark board with a 1 cm grid: columns A-T, rows 1-28.
-Defect classes: ${classes}.
-${definitionsBlock}For every kernel that is NOT sound, list: grid cell, class, confidence
+Defect classes, by group:
+${
+  input.classes.length
+    ? CLASS_GROUPS.flatMap((g) => {
+        const c = input.classes.filter((x) => x.group === g);
+        return c.length
+          ? [
+              `${GROUP_LABELS[g]}: ${c.map((x) => (x.description?.trim() ? `${x.label} (${x.description.trim()})` : x.label)).join("; ")}`,
+            ]
+          : [];
+      }).join("\n")
+    : "[list your defect classes]"
+}
+For every kernel that is NOT sound, list: grid cell, class, confidence
 (high / medium / low) and a short reason.
 Then give the number of flagged kernels per class.
 If the image is too poor to judge a kernel, say so instead of guessing.

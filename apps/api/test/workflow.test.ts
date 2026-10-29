@@ -133,9 +133,11 @@ describe("a sample from photo to report", () => {
     expect(t.classifier.requests.map((r) => r.numbers.length).sort()).toEqual([
       10, 30,
     ]);
-    expect(t.classifier.requests[0]?.definitions.broken).toMatch(
-      /three quarters/,
+    const broken = t.classifier.requests[0]?.classes.find(
+      (c) => c.id === "broken",
     );
+    // The standard's definition replaces the crop's own description.
+    expect(broken?.description).toMatch(/Less than three quarters/);
 
     const batch = await api<{
       status: string;
@@ -318,10 +320,11 @@ describe("a sample from photo to report", () => {
       `/api/prompts/level1?standardId=${standardId}`,
     );
     expect(res.body.prompt).toMatch(
-      /Crop: wheat\. Standard: Test wheat standard\./,
+      /Crop: Wheat\. Standard: Test wheat standard\./,
     );
     expect(res.body.prompt).toMatch(/columns A-T, rows 1-28/);
-    expect(res.body.prompt).toMatch(/Broken: Less than three quarters/);
+    expect(res.body.prompt).toMatch(/Broken \(Less than three quarters/);
+    expect(res.body.prompt).toMatch(/Harmful & disease: Ergot/);
   });
 
   it("lets only admins delete a sample, and removes its files", async () => {

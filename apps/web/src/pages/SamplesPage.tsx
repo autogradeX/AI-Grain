@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, download } from "../api/client";
+import { CropSelect } from "../components/CropSelect";
 import type { SampleListItem, Standard } from "../api/types";
 import { useCan } from "../auth/AuthContext";
 import {
@@ -161,23 +162,21 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
     queryKey: ["standards"],
     queryFn: () => api.get<Standard[]>("/standards"),
   });
-  const crops = [...new Set(standards.data?.map((s) => s.crop) ?? [])];
-  const [crop, setCrop] = useState("");
+  const [crop, setCrop] = useState("wheat");
   const [standardId, setStandardId] = useState("");
   const [source, setSource] = useState("");
   const [mass, setMass] = useState("");
   const create = useMutation({
     mutationFn: () =>
       api.post<{ id: string }>("/samples", {
-        crop: crop || "wheat",
+        crop,
         standardId: standardId || null,
         source: source || null,
         sampleMassG: mass ? Number(mass) : null,
       }),
     onSuccess: (s) => navigate(`/samples/${s.id}`),
   });
-  const matching =
-    standards.data?.filter((s) => s.crop === (crop || "wheat")) ?? [];
+  const matching = standards.data?.filter((s) => s.crop === crop) ?? [];
 
   return (
     <Card title="New sample">
@@ -189,20 +188,13 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
         }}
       >
         <Field label="Crop">
-          <input
-            list="crop-options"
-            placeholder="wheat"
+          <CropSelect
             value={crop}
-            onChange={(e) => {
-              setCrop(e.target.value.toLowerCase());
+            onChange={(c) => {
+              setCrop(c);
               setStandardId("");
             }}
           />
-          <datalist id="crop-options">
-            {crops.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
         </Field>
         <Field
           label="Standard"

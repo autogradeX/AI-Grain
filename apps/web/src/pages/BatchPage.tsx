@@ -1,4 +1,4 @@
-import { CLASS_LABELS, type KernelClass } from "@ai-grain/core";
+import { classLabel, type ClassDef } from "@ai-grain/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -65,7 +65,7 @@ export function BatchPage() {
     onSuccess: refresh,
   });
   const review = useMutation({
-    mutationFn: (d: { kernelId: string; finalClass: KernelClass | null }) =>
+    mutationFn: (d: { kernelId: string; finalClass: string | null }) =>
       api.post("/kernels/review", { decisions: [d] }),
     onSuccess: refresh,
   });
@@ -80,6 +80,7 @@ export function BatchPage() {
   if (batch.isPending) return <Spinner />;
   if (batch.error) return <ErrorNote error={batch.error} />;
   const b = batch.data;
+  const classes = sample.data?.cropProfile.classes ?? [];
   const editable = can.write && sample.data?.status === "in_progress";
   const busy = BUSY.has(b.status);
   const kernel = b.kernels.find((k) => k.number === selected) ?? null;
@@ -163,6 +164,7 @@ export function BatchPage() {
             {kernel ? (
               <KernelPanel
                 kernel={kernel}
+                classes={classes}
                 editable={editable}
                 busy={review.isPending}
                 onPick={(cls) =>
@@ -267,15 +269,17 @@ function Legend() {
 
 function KernelPanel({
   kernel,
+  classes,
   editable,
   busy,
   onPick,
   onClear,
 }: {
   kernel: Kernel;
+  classes: readonly ClassDef[];
   editable: boolean;
   busy: boolean;
-  onPick: (cls: KernelClass) => void;
+  onPick: (cls: string) => void;
   onClear: () => void;
 }) {
   return (
@@ -294,7 +298,7 @@ function KernelPanel({
             </p>
           )}
           <div>
-            Claude: <ClassBadge cls={kernel.aiClass} />{" "}
+            Claude: <ClassBadge cls={kernel.aiClass} classes={classes} />{" "}
             {kernel.aiConfidence && (
               <span className="muted small">
                 {kernel.aiConfidence} confidence
@@ -307,7 +311,7 @@ function KernelPanel({
           <div>
             Your decision:{" "}
             {kernel.finalClass ? (
-              <ClassBadge cls={kernel.finalClass} />
+              <ClassBadge cls={kernel.finalClass} classes={classes} />
             ) : (
               <span className="muted">not checked</span>
             )}
@@ -317,6 +321,7 @@ function KernelPanel({
       {editable && (
         <>
           <ClassPicker
+            classes={classes}
             value={kernel.finalClass}
             suggested={kernel.aiClass}
             disabled={busy}
@@ -331,7 +336,7 @@ function KernelPanel({
       )}
       {kernel.finalClass && kernel.finalClass !== "sound" && (
         <p className="muted small">
-          Put this kernel in the “{CLASS_LABELS[kernel.finalClass]}” cup.
+          Put this kernel in the “{classLabel(classes, kernel.finalClass)}” cup.
         </p>
       )}
     </Card>

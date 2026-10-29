@@ -53,7 +53,11 @@ describe("adopting a schema created by running the SQL by hand", () => {
     const { rows } = await db.query<{ n: number }>(
       "select count(*)::int as n from drizzle.__drizzle_migrations",
     );
-    expect(rows[0]?.n).toBe(2);
+    // The two adopted, plus every later migration, which Drizzle then applied.
+    const journal = JSON.parse(
+      await readFile(`${folder}/meta/_journal.json`, "utf8"),
+    ) as { entries: unknown[] };
+    expect(rows[0]?.n).toBe(journal.entries.length);
   });
 
   it("does nothing once the app has recorded its migrations", async () => {

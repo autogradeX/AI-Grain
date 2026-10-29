@@ -1,4 +1,4 @@
-import { CLASS_LABELS, DEFECT_CLASSES, roundPct } from "@ai-grain/core";
+import { CLASS_GROUPS, roundPct, summarizePercentages } from "@ai-grain/core";
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -21,6 +21,7 @@ import {
   modelFor,
 } from "../batches/service.js";
 import { csvCell } from "../../lib/csv.js";
+import { ensureCrop, listCrops } from "../crops/service.js";
 import { getStandard } from "../standards/routes.js";
 import { loadSample } from "../samples/service.js";
 import { renderReport } from "./pdf.js";
@@ -88,6 +89,7 @@ export function reportRoutes(ctx: AppContext) {
         });
       }
 
+      const crop = await ensureCrop(ctx, me.orgId, sample.crop);
       const pdf = await renderReport({
         orgName: org?.name ?? "",
         sample,
@@ -96,6 +98,8 @@ export function reportRoutes(ctx: AppContext) {
           : null,
         createdByName: nameOf(sample.createdBy),
         completedByName: nameOf(sample.completedBy),
+        cropLabel: crop.label,
+        classes: crop.classes,
         model: await modelFor(ctx, id),
         kernels: await kernelSummary(ctx, { sampleId: id }),
         boards,
@@ -133,6 +137,13 @@ export function reportRoutes(ctx: AppContext) {
         .where(and(...conditions))
         .orderBy(desc(samples.createdAt))
         .limit(10_000);
+      // One column per class of every crop in the export, prefixed by crop.
+      const cropList = await listCrops(ctx, me.orgId);
+      const classesOf = new Map(cropList.map((c) => [c.key, c.classes]));
+      const usedCrops = [...new Set(rows.map((r) => r.sample.crop))];
+      const classColumns = usedCrops.flatMap((crop) =>
+        (classesOf.get(crop) ?? []).map((c) => ({ crop, id: c.id })),
+      );
       const header = [
         "number",
         "created",
@@ -145,11 +156,19 @@ export function reportRoutes(ctx: AppContext) {
         "sample_mass_g",
         "moisture_pct",
         "test_weight_kg_hl",
+        "purity_pct",
         "total_defects_pct",
-        ...DEFECT_CLASSES.map((c) => `${c}_pct`),
+        ...CLASS_GROUPS.map((g) => `${g}_pct`),
+        ...classColumns.map((c) => `${c.crop}:${c.id}_pct`),
       ];
       const lines = [header.join(",")];
       for (const { sample: s, standardName } of rows) {
+        const pct = s.result
+          ? summarizePercentages(
+              s.result.byClassPct,
+              classesOf.get(s.crop) ?? [],
+            )
+          : null;
         lines.push(
           [
             s.number,
@@ -163,9 +182,15 @@ export function reportRoutes(ctx: AppContext) {
             s.sampleMassG,
             s.moisturePct,
             s.testWeightKgPerHl,
-            s.result ? roundPct(s.result.totalDefectsPct, 3) : null,
-            ...DEFECT_CLASSES.map((c) =>
-              s.result ? roundPct(s.result.byClassPct[c], 3) : null,
+            pct ? roundPct(pct.purityPct, 3) : null,
+            pct ? roundPct(pct.totalDefectsPct, 3) : null,
+            ...CLASS_GROUPS.map((g) =>
+              pct ? roundPct(pct.byGroup[g], 3) : null,
+            ),
+            ...classColumns.map((c) =>
+              pct && c.crop === s.crop
+                ? roundPct(pct.byClass[c.id] ?? 0, 3)
+                : null,
             ),
           ]
             .map(csvCell)
@@ -177,12 +202,5 @@ export function reportRoutes(ctx: AppContext) {
         .header("content-disposition", 'attachment; filename="samples.csv"');
       return lines.join("\n") + "\n";
     });
-
-    app.get("/classes", () =>
-      ["sound", ...DEFECT_CLASSES, "unclear"].map((c) => ({
-        id: c,
-        label: CLASS_LABELS[c as keyof typeof CLASS_LABELS],
-      })),
-    );
   };
 }

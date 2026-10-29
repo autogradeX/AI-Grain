@@ -842,3 +842,46 @@ button.link {
   border-radius: 4px;
   box-shadow: 0 0 0 9999px rgb(0 0 0 / 35%);
 }
+
+.class-picker {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
+.class-picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.class-picker-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.class-picker-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.table tr.group-row td {
+  font-weight: 600;
+  background: var(--bg);
+}
+
+.table td.indent {
+  padding-left: 1.2rem;
+}
+
+.class-row {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

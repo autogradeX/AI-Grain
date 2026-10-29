@@ -1,8 +1,8 @@
 import type {
-  DefectClass,
+  ClassDef,
+  ClassGroup,
   GradeResult,
   GradeSpec,
-  KernelClass,
 } from "@ai-grain/core";
 
 export type Role = "admin" | "grader" | "viewer";
@@ -30,9 +30,23 @@ export interface Standard {
   crop: string;
   description: string | null;
   grades: GradeSpec[];
-  definitions: Partial<Record<DefectClass, string>>;
+  definitions: Partial<Record<string, string>>;
   archived: boolean;
   updatedAt: string;
+}
+
+export interface Crop {
+  id: string;
+  key: string;
+  label: string;
+  classes: ClassDef[];
+  archived: boolean;
+}
+
+export interface CropProfile {
+  key: string;
+  label: string;
+  classes: ClassDef[];
 }
 
 export interface SampleListItem {
@@ -50,14 +64,16 @@ export interface SampleListItem {
 }
 
 export interface SampleResult {
-  byClassPct: Record<DefectClass, number>;
+  byClassPct: Record<string, number>;
+  byGroupPct: Record<ClassGroup, number>;
+  purityPct: number;
   totalDefectsPct: number;
   grade: GradeResult;
   computedAt: string;
 }
 
 export interface ReferenceResult {
-  byClassPct: Partial<Record<DefectClass, number>>;
+  byClassPct: Partial<Record<string, number>>;
   grade: string | null;
   graderName?: string;
   gradedOn?: string;
@@ -94,12 +110,13 @@ export interface Sample {
   sampleMassG: number | null;
   moisturePct: number | null;
   testWeightKgPerHl: number | null;
-  cupMassG: Partial<Record<DefectClass, number>>;
+  cupMassG: Partial<Record<string, number>>;
   result: SampleResult | null;
   reference: ReferenceResult | null;
   aiSummary: string | null;
   createdAt: string;
   completedAt: string | null;
+  cropProfile: CropProfile;
   standard: Standard | null;
   batches: {
     id: string;
@@ -121,10 +138,10 @@ export interface Kernel {
   h: number;
   cell: string;
   isCluster: boolean;
-  aiClass: KernelClass | null;
+  aiClass: string | null;
   aiConfidence: "high" | "medium" | "low" | null;
   aiReason: string | null;
-  finalClass: KernelClass | null;
+  finalClass: string | null;
   reviewStatus: "pending" | "confirmed" | "corrected";
   needsReview: boolean;
 }
@@ -152,10 +169,10 @@ export interface ReviewKernel {
   number: number;
   cell: string;
   isCluster: boolean;
-  aiClass: KernelClass | null;
+  aiClass: string | null;
   aiConfidence: "high" | "medium" | "low" | null;
   aiReason: string | null;
-  finalClass: KernelClass | null;
+  finalClass: string | null;
   reviewStatus: "pending" | "confirmed" | "corrected";
 }
 
@@ -181,7 +198,7 @@ export interface Invite {
 export interface ReferenceImage {
   id: string;
   crop: string;
-  cls: KernelClass;
+  cls: string;
   note: string | null;
   createdAt: string;
 }
@@ -193,7 +210,7 @@ export interface ValidationReport {
     gradeAgreement: number | null;
     gradeComparable: number;
     byClass: {
-      cls: DefectClass;
+      cls: string;
       n: number;
       meanMethodPct: number;
       meanReferencePct: number;

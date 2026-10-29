@@ -1,4 +1,4 @@
-import { KERNEL_CLASSES } from "@ai-grain/core";
+import { kernelClassIds } from "@ai-grain/core";
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -14,6 +14,7 @@ import {
   WRITE_ROLES,
 } from "../auth/guard.js";
 import { readUpload } from "../batches/upload.js";
+import { ensureCrop } from "../crops/service.js";
 
 /** At most this many reference images per crop go into each Claude request. */
 export const MAX_REFERENCES_PER_REQUEST = 12;
@@ -60,10 +61,14 @@ export function referenceRoutes(ctx: AppContext) {
         const fields = z
           .object({
             crop: z.string().trim().toLowerCase().min(1).max(60),
-            cls: z.enum(KERNEL_CLASSES),
+            cls: z.string().trim().max(40),
             note: z.string().max(200).optional(),
           })
           .parse(upload.fields);
+        const crop = await ensureCrop(ctx, me.orgId, fields.crop);
+        if (!kernelClassIds(crop.classes).includes(fields.cls)) {
+          throw badRequest(`"${fields.cls}" is not a class of ${crop.label}`);
+        }
         let jpeg: Buffer;
         try {
           // A single kernel, cropped by the user. Square it at tile size like the sheet crops.

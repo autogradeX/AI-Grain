@@ -12,6 +12,7 @@ import {
 } from "./pages/auth";
 import { BatchPage } from "./pages/BatchPage";
 import { CapturePage } from "./pages/CapturePage";
+import { CropEditPage, CropsPage } from "./pages/CropsPage";
 import { DatasetPage } from "./pages/DatasetPage";
 import { PromptPage } from "./pages/PromptPage";
 import { ReferencesPage } from "./pages/ReferencesPage";
@@ -53,6 +54,8 @@ export function App() {
         <Route path="samples/:id/capture" element={<CapturePage />} />
         <Route path="samples/:id/review" element={<ReviewPage />} />
         <Route path="batches/:id" element={<BatchPage />} />
+        <Route path="crops" element={<CropsPage />} />
+        <Route path="crops/:key" element={<CropEditPage />} />
         <Route path="standards" element={<StandardsPage />} />
         <Route path="standards/:id" element={<StandardEditPage />} />
         <Route path="references" element={<ReferencesPage />} />

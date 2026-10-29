@@ -1,7 +1,9 @@
-import { CLASS_LABELS, KERNEL_CLASSES, type KernelClass } from "@ai-grain/core";
+import { classLabel, kernelClassIds } from "@ai-grain/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { api } from "../api/client";
+import { useCrop } from "../api/crops";
+import { CropSelect } from "../components/CropSelect";
 import type { ReferenceImage } from "../api/types";
 import { useCan } from "../auth/AuthContext";
 import { AuthImage, Card, ErrorNote, Field, Spinner } from "../components/ui";
@@ -21,7 +23,9 @@ export function ReferencesPage() {
     mutationFn: (id: string) => api.delete(`/reference-images/${id}`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["references"] }),
   });
-  const byClass = new Map<KernelClass, ReferenceImage[]>();
+  const cropProfile = useCrop(crop);
+  const classes = cropProfile?.classes ?? [];
+  const byClass = new Map<string, ReferenceImage[]>();
   for (const r of refs.data ?? [])
     byClass.set(r.cls, [...(byClass.get(r.cls) ?? []), r]);
 
@@ -36,40 +40,51 @@ export function ReferencesPage() {
         kernel.
       </p>
       <Field label="Crop">
-        <input
-          value={crop}
-          onChange={(e) => setCrop(e.target.value.toLowerCase())}
-        />
+        <CropSelect value={crop} onChange={setCrop} />
       </Field>
       {can.write && <UploadReference crop={crop} />}
       {refs.isPending && <Spinner />}
       <ErrorNote error={refs.error ?? remove.error} />
-      {KERNEL_CLASSES.filter((c) => byClass.has(c)).map((c) => (
-        <Card key={c} title={`${CLASS_LABELS[c]} (${byClass.get(c)!.length})`}>
-          <div className="thumb-grid">
-            {byClass.get(c)!.map((r) => (
-              <figure key={r.id}>
-                <AuthImage
-                  path={`/reference-images/${r.id}/image`}
-                  alt={CLASS_LABELS[c]}
-                  className="crop"
-                />
-                {r.note && <figcaption className="small">{r.note}</figcaption>}
-                {can.write && (
-                  <button
-                    className="link small"
-                    onClick={() => remove.mutate(r.id)}
-                  >
-                    Remove
-                  </button>
-                )}
-              </figure>
-            ))}
-          </div>
-        </Card>
-      ))}
+      {[
+        ...kernelClassIds(classes),
+        ...[...byClass.keys()].filter(
+          (k) => !kernelClassIds(classes).includes(k),
+        ),
+      ]
+        .filter((c) => byClass.has(c))
+        .map((c) => (
+          <Card
+            key={c}
+            title={`${classLabel(classes, c)} (${byClass.get(c)!.length})`}
+          >
+            <div className="thumb-grid">
+              {byClass.get(c)!.map((r) => (
+                <figure key={r.id}>
+                  <AuthImage
+                    path={`/reference-images/${r.id}/image`}
+                    alt={classLabel(classes, c)}
+                    className="crop"
+                  />
+                  {r.note && (
+                    <figcaption className="small">{r.note}</figcaption>
+                  )}
+                  {can.write && (
+                    <button
+                      className="link small"
+                      onClick={() => remove.mutate(r.id)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </figure>
+              ))}
+            </div>
+          </Card>
+        ))}
       {refs.data?.length === 0 && (
-        <p className="muted">No reference images for {crop} yet.</p>
+        <p className="muted">
+          No reference images for {cropProfile?.label ?? crop} yet.
+        </p>
       )}
     </div>
   );
@@ -78,7 +93,8 @@ export function ReferencesPage() {
 function UploadReference({ crop }: { crop: string }) {
   const qc = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
-  const [cls, setCls] = useState<KernelClass>("broken");
+  const classes = useCrop(crop)?.classes ?? [];
+  const [cls, setCls] = useState("broken");
   const [note, setNote] = useState("");
   const upload = useMutation({
     mutationFn: (file: File) => {
@@ -102,13 +118,10 @@ function UploadReference({ crop }: { crop: string }) {
       </p>
       <div className="grid-3">
         <Field label="Class">
-          <select
-            value={cls}
-            onChange={(e) => setCls(e.target.value as KernelClass)}
-          >
-            {KERNEL_CLASSES.map((c) => (
+          <select value={cls} onChange={(e) => setCls(e.target.value)}>
+            {kernelClassIds(classes).map((c) => (
               <option key={c} value={c}>
-                {CLASS_LABELS[c]}
+                {classLabel(classes, c)}
               </option>
             ))}
           </select>

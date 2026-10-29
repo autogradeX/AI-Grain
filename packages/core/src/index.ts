@@ -1,14 +1,21 @@
 export {
-  CLASS_LABELS,
-  DEFECT_CLASSES,
-  KERNEL_CLASSES,
-  isDefectClass,
-  isKernelClass,
+  CLASS_GROUPS,
+  GROUP_LABELS,
+  SOUND,
+  UNCLEAR,
+  classLabel,
+  groupOf,
+  isClassGroup,
+  kernelClassIds,
+  slugifyClassId,
+  validateClasses,
 } from "./classes.js";
-export type { DefectClass, KernelClass } from "./classes.js";
+export type { ClassDef, ClassGroup, CropProfile } from "./classes.js";
+export { CROP_PRESETS, presetFor } from "./presets.js";
 export {
   massPercentages,
   roundPct,
+  summarizePercentages,
   validateMeasurement,
 } from "./measurement.js";
 export type { MassPercentages, Measurement } from "./measurement.js";
@@ -18,7 +25,7 @@ export type {
   GradeResult,
   GradeSpec,
   LimitFailure,
-  LimitName,
+  LimitScope,
 } from "./grading.js";
 export { summarizeValidation } from "./validation.js";
 export type {

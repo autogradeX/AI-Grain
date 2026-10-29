@@ -4,6 +4,7 @@ import { level1Prompt } from "../../ai/prompts.js";
 import type { AppContext } from "../../context.js";
 import { notFound } from "../../lib/errors.js";
 import { authenticate, authOf } from "../auth/guard.js";
+import { classesWithDefinitions, ensureCrop } from "../crops/service.js";
 import { getStandard } from "../standards/routes.js";
 
 /** Level 1: a prompt to paste into the Claude app, for graders working without this app's camera flow. */
@@ -22,19 +23,21 @@ export function promptRoutes(ctx: AppContext) {
       if (q.standardId) {
         const std = await getStandard(ctx, me.orgId, q.standardId);
         if (!std) throw notFound("Standard");
+        const crop = await ensureCrop(ctx, me.orgId, std.crop);
         return {
           prompt: level1Prompt({
-            crop: std.crop,
+            cropLabel: crop.label,
             standardName: std.name,
-            definitions: std.definitions,
+            classes: classesWithDefinitions(crop.classes, std.definitions),
           }),
         };
       }
+      const crop = await ensureCrop(ctx, me.orgId, q.crop ?? "wheat");
       return {
         prompt: level1Prompt({
-          crop: q.crop ?? "wheat",
+          cropLabel: crop.label,
           standardName: null,
-          definitions: {},
+          classes: crop.classes,
         }),
       };
     });

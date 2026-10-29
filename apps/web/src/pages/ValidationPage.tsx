@@ -1,8 +1,10 @@
-import { CLASS_LABELS } from "@ai-grain/core";
+import { classLabel } from "@ai-grain/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { useCrop } from "../api/crops";
+import { CropSelect } from "../components/CropSelect";
 import type { ValidationReport } from "../api/types";
 import { Badge, Card, ErrorNote, Field, Spinner } from "../components/ui";
 
@@ -15,6 +17,7 @@ export function ValidationPage() {
     queryFn: () =>
       api.get<ValidationReport>(`/validation?crop=${encodeURIComponent(crop)}`),
   });
+  const classes = useCrop(crop)?.classes ?? [];
   const r = report.data;
   const n = r?.summary.samples ?? 0;
 
@@ -28,10 +31,7 @@ export function ValidationPage() {
         sample, and compare per class here before relying on the results.
       </p>
       <Field label="Crop">
-        <input
-          value={crop}
-          onChange={(e) => setCrop(e.target.value.toLowerCase())}
-        />
+        <CropSelect value={crop} onChange={setCrop} />
       </Field>
       {report.isPending && <Spinner />}
       <ErrorNote error={report.error} />
@@ -84,7 +84,7 @@ export function ValidationPage() {
                   <tbody>
                     {r.summary.byClass.map((c) => (
                       <tr key={c.cls}>
-                        <td>{CLASS_LABELS[c.cls]}</td>
+                        <td>{classLabel(classes, c.cls)}</td>
                         <td className="num">{c.n}</td>
                         <td className="num">{f(c.meanMethodPct)}</td>
                         <td className="num">{f(c.meanReferencePct)}</td>

@@ -1,4 +1,4 @@
-import { DEFECT_CLASSES, type DefectClass } from "./classes.js";
+import { CLASS_GROUPS, type ClassGroup } from "./classes.js";
 import type { MassPercentages } from "./measurement.js";
 
 /**
@@ -8,17 +8,22 @@ import type { MassPercentages } from "./measurement.js";
  */
 export interface GradeSpec {
   grade: string;
-  /** Maximum mass % per defect class. Classes left out are not limited. */
-  maxDefectPct: Partial<Record<DefectClass, number>>;
+  /** Maximum mass % per defect class id. Classes left out are not limited. */
+  maxDefectPct: Partial<Record<string, number>>;
+  /** Maximum mass % per defect group. */
+  maxGroupPct?: Partial<Record<ClassGroup, number>> | undefined;
   maxTotalDefectsPct?: number | undefined;
   maxMoisturePct?: number | undefined;
   minTestWeightKgPerHl?: number | undefined;
 }
 
-export type LimitName = DefectClass | "total" | "moisture" | "testWeight";
+export type LimitScope =
+  "class" | "group" | "total" | "moisture" | "testWeight";
 
 export interface LimitFailure {
-  limit: LimitName;
+  scope: LimitScope;
+  /** Class id or group for those scopes; otherwise the same as scope. */
+  limit: string;
   value: number | null;
   allowed: number;
   /** "max" when the value must not exceed `allowed`, "min" when it must reach it. */
@@ -47,18 +52,31 @@ export function failedLimits(
   spec: GradeSpec,
 ): LimitFailure[] {
   const failed: LimitFailure[] = [];
-  for (const cls of DEFECT_CLASSES) {
-    const allowed = spec.maxDefectPct[cls];
-    const value = input.percentages.byClass[cls];
-    if (allowed !== undefined && value > allowed) {
-      failed.push({ limit: cls, value, allowed, kind: "max" });
-    }
+  for (const [cls, allowed] of Object.entries(spec.maxDefectPct)) {
+    if (allowed === undefined) continue;
+    const value = input.percentages.byClass[cls] ?? 0;
+    if (value > allowed)
+      failed.push({ scope: "class", limit: cls, value, allowed, kind: "max" });
+  }
+  for (const group of CLASS_GROUPS) {
+    const allowed = spec.maxGroupPct?.[group];
+    if (allowed === undefined) continue;
+    const value = input.percentages.byGroup[group];
+    if (value > allowed)
+      failed.push({
+        scope: "group",
+        limit: group,
+        value,
+        allowed,
+        kind: "max",
+      });
   }
   if (
     spec.maxTotalDefectsPct !== undefined &&
     input.percentages.totalDefectsPct > spec.maxTotalDefectsPct
   ) {
     failed.push({
+      scope: "total",
       limit: "total",
       value: input.percentages.totalDefectsPct,
       allowed: spec.maxTotalDefectsPct,
@@ -69,6 +87,7 @@ export function failedLimits(
     const value = input.moisturePct;
     if (value === undefined || value > spec.maxMoisturePct) {
       failed.push({
+        scope: "moisture",
         limit: "moisture",
         value: value ?? null,
         allowed: spec.maxMoisturePct,
@@ -80,6 +99,7 @@ export function failedLimits(
     const value = input.testWeightKgPerHl;
     if (value === undefined || value < spec.minTestWeightKgPerHl) {
       failed.push({
+        scope: "testWeight",
         limit: "testWeight",
         value: value ?? null,
         allowed: spec.minTestWeightKgPerHl,

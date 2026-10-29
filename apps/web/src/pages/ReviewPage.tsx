@@ -1,4 +1,4 @@
-import { CLASS_LABELS, type KernelClass } from "@ai-grain/core";
+import { classLabel, type ClassDef } from "@ai-grain/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -28,7 +28,7 @@ export function ReviewPage() {
       api.get<ReviewKernel[]>(`/samples/${id}/review?scope=${scope}`),
   });
   const decide = useMutation({
-    mutationFn: (d: { kernelId: string; finalClass: KernelClass }) =>
+    mutationFn: (d: { kernelId: string; finalClass: string }) =>
       api.post("/kernels/review", { decisions: [d] }),
     onMutate: (d) => {
       // Update the list at once so the operator can move straight to the next kernel.
@@ -93,6 +93,7 @@ export function ReviewPage() {
           <ReviewCard
             key={k.id}
             kernel={k}
+            classes={sample.data?.cropProfile.classes ?? []}
             editable={editable}
             onPick={(cls) => decide.mutate({ kernelId: k.id, finalClass: cls })}
           />
@@ -104,12 +105,14 @@ export function ReviewPage() {
 
 function ReviewCard({
   kernel,
+  classes,
   editable,
   onPick,
 }: {
   kernel: ReviewKernel;
+  classes: readonly ClassDef[];
   editable: boolean;
-  onPick: (cls: KernelClass) => void;
+  onPick: (cls: string) => void;
 }) {
   const [correcting, setCorrecting] = useState(false);
   const saveRef = useMutation({
@@ -134,7 +137,7 @@ function ReviewCard({
           </span>
           {kernel.isCluster && <Badge tone="info">Touching kernels</Badge>}
           <div>
-            <ClassBadge cls={kernel.aiClass} />{" "}
+            <ClassBadge cls={kernel.aiClass} classes={classes} />{" "}
             {kernel.aiConfidence && (
               <span className="muted small">{kernel.aiConfidence}</span>
             )}
@@ -144,7 +147,7 @@ function ReviewCard({
           )}
           {kernel.finalClass && (
             <span className="small">
-              Decided: <ClassBadge cls={kernel.finalClass} />
+              Decided: <ClassBadge cls={kernel.finalClass} classes={classes} />
             </span>
           )}
         </div>
@@ -158,7 +161,7 @@ function ReviewCard({
                 className="primary"
                 onClick={() => onPick(kernel.aiClass!)}
               >
-                Confirm {CLASS_LABELS[kernel.aiClass].toLowerCase()}
+                Confirm {classLabel(classes, kernel.aiClass).toLowerCase()}
               </button>
             )}
           <button onClick={() => setCorrecting(true)}>
@@ -170,6 +173,7 @@ function ReviewCard({
       )}
       {editable && correcting && (
         <ClassPicker
+          classes={classes}
           value={kernel.finalClass}
           suggested={kernel.aiClass}
           onPick={(cls) => {

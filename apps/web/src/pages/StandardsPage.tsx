@@ -1,13 +1,14 @@
 import {
-  CLASS_LABELS,
-  DEFECT_CLASSES,
-  type DefectClass,
+  CLASS_GROUPS,
+  GROUP_LABELS,
+  type ClassGroup,
   type GradeSpec,
 } from "@ai-grain/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { useCrops } from "../api/crops";
 import type { Standard } from "../api/types";
 import { useCan } from "../auth/AuthContext";
 import {
@@ -85,20 +86,25 @@ export function StandardsPage() {
 
 interface GradeForm {
   grade: string;
-  maxDefectPct: Partial<Record<DefectClass, string>>;
+  maxDefectPct: Partial<Record<string, string>>;
+  maxGroupPct: Partial<Record<ClassGroup, string>>;
   maxTotalDefectsPct: string;
   maxMoisturePct: string;
   minTestWeightKgPerHl: string;
 }
 
 const s = (v: number | undefined) => (v === undefined ? "" : String(v));
-const n = (v: string) => (v.trim() === "" ? undefined : Number(v));
+const n = (v: string | undefined) =>
+  v === undefined || v.trim() === "" ? undefined : Number(v);
 
 function toForm(g: GradeSpec): GradeForm {
   return {
     grade: g.grade,
     maxDefectPct: Object.fromEntries(
-      DEFECT_CLASSES.map((c) => [c, s(g.maxDefectPct[c])]),
+      Object.entries(g.maxDefectPct).map(([k, v]) => [k, s(v)]),
+    ),
+    maxGroupPct: Object.fromEntries(
+      Object.entries(g.maxGroupPct ?? {}).map(([k, v]) => [k, s(v)]),
     ),
     maxTotalDefectsPct: s(g.maxTotalDefectsPct),
     maxMoisturePct: s(g.maxMoisturePct),
@@ -106,17 +112,22 @@ function toForm(g: GradeSpec): GradeForm {
   };
 }
 
-function fromForm(g: GradeForm): GradeSpec {
+/** Keeps only limits for classes of the chosen crop, so switching crop can't send stale ones. */
+function fromForm(g: GradeForm, classIds: readonly string[]): GradeSpec {
   const spec: GradeSpec = {
     grade: g.grade.trim(),
     maxDefectPct: Object.fromEntries(
-      DEFECT_CLASSES.flatMap((c) =>
-        n(g.maxDefectPct[c] ?? "") === undefined
-          ? []
-          : [[c, n(g.maxDefectPct[c] ?? "")]],
+      classIds.flatMap((c) =>
+        n(g.maxDefectPct[c]) === undefined ? [] : [[c, n(g.maxDefectPct[c])]],
       ),
     ),
   };
+  const groups = Object.fromEntries(
+    CLASS_GROUPS.flatMap((grp) =>
+      n(g.maxGroupPct[grp]) === undefined ? [] : [[grp, n(g.maxGroupPct[grp])]],
+    ),
+  );
+  if (Object.keys(groups).length) spec.maxGroupPct = groups;
   const total = n(g.maxTotalDefectsPct);
   const moisture = n(g.maxMoisturePct);
   const tw = n(g.minTestWeightKgPerHl);
@@ -151,8 +162,12 @@ function StandardForm({ standard }: { standard: Standard | null }) {
   const [crop, setCrop] = useState(standard?.crop ?? "wheat");
   const [description, setDescription] = useState(standard?.description ?? "");
   const [definitions, setDefinitions] = useState<
-    Partial<Record<DefectClass, string>>
+    Partial<Record<string, string>>
   >(standard?.definitions ?? {});
+  const crops = useCrops();
+  const cropProfile = crops.data?.find((c) => c.key === crop);
+  const classes = cropProfile?.classes ?? [];
+  const classIds = classes.map((c) => c.id);
   const [grades, setGrades] = useState<GradeForm[]>(
     standard?.grades.map(toForm) ?? [emptyGrade("1"), emptyGrade("2")],
   );
@@ -164,9 +179,11 @@ function StandardForm({ standard }: { standard: Standard | null }) {
         crop,
         description: description || null,
         definitions: Object.fromEntries(
-          Object.entries(definitions).filter(([, v]) => v?.trim()),
+          Object.entries(definitions).filter(
+            ([k, v]) => v?.trim() && classIds.includes(k),
+          ),
         ),
-        grades: grades.map(fromForm),
+        grades: grades.map((g) => fromForm(g, classIds)),
       };
       return standard
         ? api.put<Standard>(`/standards/${standard.id}`, body)
@@ -235,13 +252,25 @@ function StandardForm({ standard }: { standard: Standard | null }) {
               onChange={(e) => setName(e.target.value)}
             />
           </Field>
-          <Field label="Crop">
-            <input
+          <Field
+            label="Crop"
+            hint={<Link to="/crops">Edit crops and their classes</Link>}
+          >
+            <select
               required
-              disabled={readOnly}
+              disabled={readOnly || !!standard}
               value={crop}
-              onChange={(e) => setCrop(e.target.value.toLowerCase())}
-            />
+              onChange={(e) => setCrop(e.target.value)}
+            >
+              {!crops.data?.some((c) => c.key === crop) && (
+                <option value={crop}>{crop}</option>
+              )}
+              {crops.data?.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
         <Field label="Description">
@@ -271,8 +300,9 @@ function StandardForm({ standard }: { standard: Standard | null }) {
       >
         <p className="muted small">
           Strictest grade first. A sample gets the first grade whose limits it
-          meets. Leave a box empty for no limit. A moisture or test-weight limit
-          fails when that value wasn't measured.
+          meets. Limits apply per class and per group. Leave a box empty for no
+          limit. A moisture or test-weight limit fails when that value wasn't
+          measured.
         </p>
         <div className="table-scroll">
           <table className="table">
@@ -305,23 +335,49 @@ function StandardForm({ standard }: { standard: Standard | null }) {
               </tr>
             </thead>
             <tbody>
-              {DEFECT_CLASSES.map((c) => (
-                <tr key={c}>
-                  <td>{CLASS_LABELS[c]} max %</td>
-                  {grades.map((g, i) => (
-                    <td key={i}>
-                      {limitInput(
-                        g.maxDefectPct[c] ?? "",
-                        (v) =>
-                          setGrade(i, {
-                            maxDefectPct: { ...g.maxDefectPct, [c]: v },
-                          }),
-                        `${CLASS_LABELS[c]} grade ${g.grade}`,
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {CLASS_GROUPS.map((grp) => {
+                const inGroup = classes.filter((c) => c.group === grp);
+                if (!inGroup.length) return null;
+                return (
+                  <Fragment key={grp}>
+                    <tr className="group-row">
+                      <td>{GROUP_LABELS[grp]} max %</td>
+                      {grades.map((g, i) => (
+                        <td key={i}>
+                          {limitInput(
+                            g.maxGroupPct[grp] ?? "",
+                            (v) =>
+                              setGrade(i, {
+                                maxGroupPct: { ...g.maxGroupPct, [grp]: v },
+                              }),
+                            `${GROUP_LABELS[grp]} grade ${g.grade}`,
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                    {inGroup.map((c) => (
+                      <tr key={c.id}>
+                        <td className="indent">{c.label} max %</td>
+                        {grades.map((g, i) => (
+                          <td key={i}>
+                            {limitInput(
+                              g.maxDefectPct[c.id] ?? "",
+                              (v) =>
+                                setGrade(i, {
+                                  maxDefectPct: {
+                                    ...g.maxDefectPct,
+                                    [c.id]: v,
+                                  },
+                                }),
+                              `${c.label} grade ${g.grade}`,
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </Fragment>
+                );
+              })}
               <tr className="total">
                 <td>Total defects max %</td>
                 {grades.map((g, i) => (
@@ -365,19 +421,21 @@ function StandardForm({ standard }: { standard: Standard | null }) {
 
       <Card title="Defect definitions for Claude">
         <p className="muted small">
-          Claude reads these with every request. Paste the standard's own
-          wording, plus any local guidance (for example how to tell Fusarium
-          from weather bleaching in your region).
+          Claude reads these with every request. Leave a box empty to use the
+          crop's own description (shown greyed). Paste the standard's wording
+          where it differs, plus any local guidance (for example how to tell
+          Fusarium from weather bleaching in your region).
         </p>
         <div className="grid-2">
-          {DEFECT_CLASSES.map((c) => (
-            <Field key={c} label={CLASS_LABELS[c]}>
+          {classes.map((c) => (
+            <Field key={c.id} label={c.label}>
               <textarea
                 rows={2}
                 disabled={readOnly}
-                value={definitions[c] ?? ""}
+                placeholder={c.description ?? ""}
+                value={definitions[c.id] ?? ""}
                 onChange={(e) =>
-                  setDefinitions({ ...definitions, [c]: e.target.value })
+                  setDefinitions({ ...definitions, [c.id]: e.target.value })
                 }
               />
             </Field>

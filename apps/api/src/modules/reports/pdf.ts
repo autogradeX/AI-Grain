@@ -1,7 +1,11 @@
 import {
-  CLASS_LABELS,
-  DEFECT_CLASSES,
+  CLASS_GROUPS,
+  GROUP_LABELS,
+  classLabel,
   roundPct,
+  summarizePercentages,
+  type ClassDef,
+  type ClassGroup,
   type GradeSpec,
   type LimitFailure,
 } from "@ai-grain/core";
@@ -11,6 +15,8 @@ import type { SampleRow } from "../samples/service.js";
 export interface ReportData {
   orgName: string;
   sample: SampleRow;
+  cropLabel: string;
+  classes: ClassDef[];
   standard: { name: string; grades: GradeSpec[] } | null;
   createdByName: string | null;
   completedByName: string | null;
@@ -27,15 +33,19 @@ export interface ReportData {
 const fmt = (n: number | null | undefined, digits = 2) =>
   n === null || n === undefined ? "—" : n.toFixed(digits);
 
-function limitText(f: LimitFailure): string {
-  const name =
-    f.limit === "total"
-      ? "Total defects"
-      : f.limit === "moisture"
-        ? "Moisture"
-        : f.limit === "testWeight"
-          ? "Test weight"
-          : CLASS_LABELS[f.limit];
+export function limitName(
+  f: LimitFailure,
+  classes: readonly ClassDef[],
+): string {
+  if (f.scope === "class") return classLabel(classes, f.limit);
+  if (f.scope === "group") return GROUP_LABELS[f.limit as ClassGroup];
+  if (f.scope === "total") return "Total defects";
+  if (f.scope === "moisture") return "Moisture";
+  return "Test weight";
+}
+
+function limitText(f: LimitFailure, classes: readonly ClassDef[]): string {
+  const name = limitName(f, classes);
   const value = f.value === null ? "not measured" : fmt(f.value);
   return `${name}: ${value} (${f.kind === "max" ? "max" : "min"} ${fmt(f.allowed)})`;
 }
@@ -54,6 +64,9 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     doc.on("error", reject);
   });
 
+  const pct = sample.result
+    ? summarizePercentages(sample.result.byClassPct, data.classes)
+    : null;
   const left = doc.page.margins.left;
   const width = doc.page.width - left - doc.page.margins.right;
 
@@ -83,6 +96,7 @@ export function renderReport(data: ReportData): Promise<Buffer> {
       .text(`${label}: `, { continued: true });
     doc.font("Helvetica").text(value);
   };
+  line("Crop", data.cropLabel);
   line("Standard", standard?.name ?? "none selected");
   line("Sample mass", `${fmt(sample.sampleMassG)} g`);
   line(
@@ -124,14 +138,16 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     doc
       .font("Helvetica")
       .fontSize(10)
-      .text(`Total defects ${fmt(sample.result.totalDefectsPct)} % by mass`);
+      .text(
+        `Purity ${fmt(pct!.purityPct)} % · total defects ${fmt(pct!.totalDefectsPct)} % by mass`,
+      );
   }
 
   // Per-class table
   const gradeSpec =
     standard?.grades.find((g) => g.grade === grade) ?? standard?.grades[0];
   doc.moveDown(0.8);
-  const cols = [0, 150, 230, 310, 410];
+  const cols = [0, 195, 255, 315, 425];
   const header = [
     "Class",
     "Cup (g)",
@@ -149,20 +165,52 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     .strokeColor("#999")
     .stroke();
   doc.font("Helvetica");
-  for (const cls of DEFECT_CLASSES) {
-    const pct = sample.result?.byClassPct[cls];
-    const limit = gradeSpec?.maxDefectPct[cls];
-    const over = pct !== undefined && limit !== undefined && pct > limit;
-    doc.fillColor(over ? "#b00020" : "#000");
-    const cells = [
-      CLASS_LABELS[cls],
-      fmt(sample.cupMassG[cls] ?? 0),
-      pct === undefined ? "—" : fmt(roundPct(pct)),
-      limit === undefined ? "—" : `max ${fmt(limit)}`,
-      String(data.kernels.byClass[cls] ?? 0),
-    ];
-    cells.forEach((c, i) => doc.text(c, left + cols[i]!, y));
+  const row = (cells: string[], bold: boolean, over: boolean) => {
+    if (y > doc.page.height - doc.page.margins.bottom - 20) {
+      doc.addPage();
+      y = doc.page.margins.top;
+    }
+    doc
+      .font(bold ? "Helvetica-Bold" : "Helvetica")
+      .fillColor(over ? "#b00020" : "#000");
+    cells.forEach((c, i) =>
+      doc.text(c, left + cols[i]!, y, { lineBreak: false }),
+    );
     y += 13;
+  };
+  for (const group of CLASS_GROUPS) {
+    const inGroup = data.classes.filter((c) => c.group === group);
+    if (!inGroup.length) continue;
+    const gPct = pct?.byGroup[group];
+    const gLimit = gradeSpec?.maxGroupPct?.[group];
+    row(
+      [
+        GROUP_LABELS[group],
+        fmt(inGroup.reduce((n, c) => n + (sample.cupMassG[c.id] ?? 0), 0)),
+        gPct === undefined ? "—" : fmt(roundPct(gPct)),
+        gLimit === undefined ? "" : `max ${fmt(gLimit)}`,
+        String(
+          inGroup.reduce((n, c) => n + (data.kernels.byClass[c.id] ?? 0), 0),
+        ),
+      ],
+      true,
+      gPct !== undefined && gLimit !== undefined && gPct > gLimit,
+    );
+    for (const c of inGroup) {
+      const value = pct?.byClass[c.id];
+      const limit = gradeSpec?.maxDefectPct[c.id];
+      row(
+        [
+          `   ${c.label}`,
+          fmt(sample.cupMassG[c.id] ?? 0),
+          value === undefined ? "—" : fmt(roundPct(value)),
+          limit === undefined ? "—" : `max ${fmt(limit)}`,
+          String(data.kernels.byClass[c.id] ?? 0),
+        ],
+        false,
+        value !== undefined && limit !== undefined && value > limit,
+      );
+    }
   }
   doc.fillColor("#000");
   doc.y = y + 6;
@@ -177,7 +225,10 @@ export function renderReport(data: ReportData): Promise<Buffer> {
       .text("Why stricter grades were not met");
     doc.font("Helvetica").fontSize(9);
     for (const [g, list] of failures) {
-      doc.text(`Grade ${g}: ${list.map(limitText).join("; ")}`, { width });
+      doc.text(
+        `Grade ${g}: ${list.map((f) => limitText(f, data.classes)).join("; ")}`,
+        { width },
+      );
     }
   }
 

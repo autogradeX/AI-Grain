@@ -1,8 +1,8 @@
 import type {
-  DefectClass,
+  ClassDef,
+  ClassGroup,
   GradeResult,
   GradeSpec,
-  KernelClass,
 } from "@ai-grain/core";
 import { sql } from "drizzle-orm";
 import {
@@ -117,6 +117,27 @@ export const auditLog = pgTable(
   (t) => [index("audit_log_org_idx").on(t.orgId, t.createdAt)],
 );
 
+/** An organisation's crops and their defect classes. Samples, standards and references refer to a crop by key. */
+export const crops = pgTable(
+  "crops",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    classes: jsonb("classes").$type<ClassDef[]>().notNull(),
+    archived: boolean("archived").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("crops_org_key_idx").on(t.orgId, t.key)],
+);
+
 export const standards = pgTable("standards", {
   id: id(),
   orgId: uuid("org_id")
@@ -129,7 +150,7 @@ export const standards = pgTable("standards", {
   grades: jsonb("grades").$type<GradeSpec[]>().notNull(),
   /** How this standard describes each defect class, given to Claude as definitions. */
   definitions: jsonb("definitions")
-    .$type<Partial<Record<DefectClass, string>>>()
+    .$type<Partial<Record<string, string>>>()
     .notNull(),
   archived: boolean("archived").notNull().default(false),
   createdAt: createdAt(),
@@ -145,7 +166,7 @@ export const referenceImages = pgTable("reference_images", {
     .notNull()
     .references(() => organizations.id, { onDelete: "cascade" }),
   crop: text("crop").notNull(),
-  cls: text("cls").$type<KernelClass>().notNull(),
+  cls: text("cls").notNull(),
   storageKey: text("storage_key").notNull(),
   note: text("note"),
   createdBy: uuid("created_by").references(() => users.id, {
@@ -160,15 +181,18 @@ export const sampleStatusEnum = pgEnum("sample_status", [
 ]);
 
 export interface SampleResult {
-  byClassPct: Record<DefectClass, number>;
+  byClassPct: Record<string, number>;
+  /** Missing on results computed before groups existed. */
+  byGroupPct?: Record<ClassGroup, number>;
   totalDefectsPct: number;
+  purityPct?: number;
   grade: GradeResult;
   computedAt: string;
 }
 
 /** Results from a certified grader for the same sample, used to validate this method. */
 export interface ReferenceResult {
-  byClassPct: Partial<Record<DefectClass, number>>;
+  byClassPct: Partial<Record<string, number>>;
   grade: string | null;
   graderName?: string | undefined;
   gradedOn?: string | undefined;
@@ -195,7 +219,7 @@ export const samples = pgTable(
     moisturePct: doublePrecision("moisture_pct"),
     testWeightKgPerHl: doublePrecision("test_weight_kg_per_hl"),
     cupMassG: jsonb("cup_mass_g")
-      .$type<Partial<Record<DefectClass, number>>>()
+      .$type<Partial<Record<string, number>>>()
       .notNull()
       .default({}),
     result: jsonb("result").$type<SampleResult>(),
@@ -298,10 +322,10 @@ export const kernels = pgTable(
     /** Unusually large blob: probably kernels touching. The operator should separate them. */
     isCluster: boolean("is_cluster").notNull().default(false),
     cropKey: text("crop_key").notNull(),
-    aiClass: text("ai_class").$type<KernelClass>(),
+    aiClass: text("ai_class"),
     aiConfidence: text("ai_confidence").$type<"high" | "medium" | "low">(),
     aiReason: text("ai_reason"),
-    finalClass: text("final_class").$type<KernelClass>(),
+    finalClass: text("final_class"),
     reviewStatus: reviewStatusEnum("review_status")
       .notNull()
       .default("pending"),

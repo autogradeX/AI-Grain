@@ -11,6 +11,7 @@ import type { AppContext } from "./context.js";
 import { HttpError } from "./lib/errors.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { batchRoutes } from "./modules/batches/routes.js";
+import { cropRoutes } from "./modules/crops/routes.js";
 import { datasetRoutes } from "./modules/dataset/routes.js";
 import { promptRoutes } from "./modules/prompts/routes.js";
 import { referenceRoutes } from "./modules/references/routes.js";
@@ -92,6 +93,7 @@ export async function buildApp(
     async (api) => {
       await api.register(authRoutes(ctx), { prefix: "/auth" });
       await api.register(userRoutes(ctx));
+      await api.register(cropRoutes(ctx));
       await api.register(standardRoutes(ctx));
       await api.register(referenceRoutes(ctx));
       await api.register(sampleRoutes(ctx));

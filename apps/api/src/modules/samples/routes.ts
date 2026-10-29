@@ -1,7 +1,9 @@
 import {
-  CLASS_LABELS,
-  DEFECT_CLASSES,
+  CLASS_GROUPS,
+  GROUP_LABELS,
+  classLabel,
   roundPct,
+  summarizePercentages,
   validateMeasurement,
 } from "@ai-grain/core";
 import { and, asc, count, desc, eq, ilike, or, sql } from "drizzle-orm";
@@ -30,6 +32,7 @@ import {
   kernelSummary,
   modelFor,
 } from "../batches/service.js";
+import { ensureCrop, normalizeCropKey } from "../crops/service.js";
 import { getStandard } from "../standards/routes.js";
 import { loadSample, measurementOf, refreshResult } from "./service.js";
 
@@ -122,8 +125,10 @@ export function sampleRoutes(ctx: AppContext) {
     app.post("/samples", write, async (request, reply) => {
       const me = authOf(request);
       const body = SampleFields.extend({
-        crop: z.string().trim().toLowerCase().min(1).max(60),
+        crop: z.string().trim().min(1).max(60).transform(normalizeCropKey),
       }).parse(request.body);
+      // Creates the crop from its preset the first time it is used.
+      await ensureCrop(ctx, me.orgId, body.crop);
       if (body.standardId) {
         const std = await getStandard(ctx, me.orgId, body.standardId);
         if (!std) throw badRequest("Unknown standard");
@@ -185,8 +190,30 @@ export function sampleRoutes(ctx: AppContext) {
         kernelSummary(ctx, { sampleId: id }),
         modelFor(ctx, id),
       ]);
+      const crop = await ensureCrop(ctx, me.orgId, sample.crop);
+      // Results saved before classes had groups lack the group totals and purity.
+      const result = sample.result && {
+        ...sample.result,
+        ...(() => {
+          const p = summarizePercentages(
+            sample.result.byClassPct,
+            crop.classes,
+          );
+          return {
+            byGroupPct: p.byGroup,
+            purityPct: p.purityPct,
+            totalDefectsPct: p.totalDefectsPct,
+          };
+        })(),
+      };
       return {
         ...sample,
+        result,
+        cropProfile: {
+          key: crop.key,
+          label: crop.label,
+          classes: crop.classes,
+        },
         standard: standard ?? null,
         effectiveModel: model,
         batches: batchRows,
@@ -218,8 +245,8 @@ export function sampleRoutes(ctx: AppContext) {
       const body = z
         .object({
           sampleMassG: Mass.optional(),
-          cupMassG: z.partialRecord(
-            z.enum(DEFECT_CLASSES),
+          cupMassG: z.record(
+            z.string().max(40),
             z.number().min(0).max(100_000),
           ),
         })
@@ -227,10 +254,11 @@ export function sampleRoutes(ctx: AppContext) {
       const sample = await editable(me.orgId, id);
       const sampleMassG = body.sampleMassG ?? sample.sampleMassG;
       if (sampleMassG === null) throw badRequest("Enter the sample mass first");
-      const errors = validateMeasurement({
-        sampleMassG,
-        cupMassG: body.cupMassG,
-      });
+      const crop = await ensureCrop(ctx, me.orgId, sample.crop);
+      const errors = validateMeasurement(
+        { sampleMassG, cupMassG: body.cupMassG },
+        crop.classes,
+      );
       if (errors.length) throw badRequest(errors.join("; "));
       await ctx.db
         .update(samples)
@@ -323,7 +351,7 @@ export function sampleRoutes(ctx: AppContext) {
       const { id } = z.object({ id: z.uuid() }).parse(request.params);
       const body = z
         .object({
-          byClassPct: z.partialRecord(z.enum(DEFECT_CLASSES), Pct),
+          byClassPct: z.record(z.string().max(40), Pct),
           grade: z.string().trim().max(40).nullable(),
           graderName: z.string().trim().max(120).optional(),
           gradedOn: z.iso.date().optional(),
@@ -352,28 +380,36 @@ export function sampleRoutes(ctx: AppContext) {
         : null;
       const kernels = await kernelSummary(ctx, { sampleId: id });
       const model = await modelFor(ctx, id);
+      const crop = await ensureCrop(ctx, me.orgId, sample.crop);
+      const pct = summarizePercentages(sample.result.byClassPct, crop.classes);
       const started = Date.now();
       const facts = {
         sample: `#${sample.number}`,
-        crop: sample.crop,
+        crop: crop.label,
         source: sample.source,
         standard: standard?.name ?? null,
         sampleMassG: sample.sampleMassG,
         moisturePct: sample.moisturePct,
         testWeightKgPerHl: sample.testWeightKgPerHl,
         massPctByClass: Object.fromEntries(
-          DEFECT_CLASSES.map((c) => [
-            CLASS_LABELS[c],
-            roundPct(sample.result!.byClassPct[c]),
-          ]),
+          crop.classes.map((c) => [c.label, roundPct(pct.byClass[c.id] ?? 0)]),
         ),
-        totalDefectsPct: roundPct(sample.result.totalDefectsPct),
+        massPctByGroup: Object.fromEntries(
+          CLASS_GROUPS.map((g) => [GROUP_LABELS[g], roundPct(pct.byGroup[g])]),
+        ),
+        totalDefectsPct: roundPct(pct.totalDefectsPct),
+        purityPct: roundPct(pct.purityPct),
         grade: sample.result.grade.grade,
         failedLimitsPerGrade: sample.result.grade.failures,
         gradeLimits: standard?.grades ?? null,
         kernelsPhotographed: kernels.total,
         kernelsFlaggedByClaude: kernels.flagged,
-        kernelCountsByClass: kernels.byClass,
+        kernelCountsByClass: Object.fromEntries(
+          Object.entries(kernels.byClass).map(([id, n]) => [
+            classLabel(crop.classes, id),
+            n,
+          ]),
+        ),
       };
       try {
         const { text, usage } = await ctx.classifier.summarize({

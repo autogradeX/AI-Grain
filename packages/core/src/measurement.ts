@@ -1,9 +1,10 @@
-import { DEFECT_CLASSES, type DefectClass } from "./classes.js";
+import { CLASS_GROUPS, type ClassDef, type ClassGroup } from "./classes.js";
 
 /** What the operator weighed: the whole working sample and one cup per defect class. */
 export interface Measurement {
   sampleMassG: number;
-  cupMassG: Partial<Record<DefectClass, number>>;
+  /** Cup mass in grams per class id. */
+  cupMassG: Partial<Record<string, number>>;
   /** From a separate moisture meter, if one was used. */
   moisturePct?: number | undefined;
   /** From a separate test-weight measurement, if one was taken. */
@@ -11,19 +12,31 @@ export interface Measurement {
 }
 
 export interface MassPercentages {
-  byClass: Record<DefectClass, number>;
+  /** Mass % per defect class id. */
+  byClass: Record<string, number>;
+  /** Mass % per defect group. */
+  byGroup: Record<ClassGroup, number>;
   totalDefectsPct: number;
+  /** The sound fraction: 100 − total defects. */
+  purityPct: number;
 }
 
-export function validateMeasurement(m: Measurement): string[] {
+export function validateMeasurement(
+  m: Measurement,
+  classes?: readonly ClassDef[],
+): string[] {
   const errors: string[] = [];
   if (!Number.isFinite(m.sampleMassG) || m.sampleMassG <= 0) {
     errors.push("sampleMassG must be a positive number");
   }
+  const known = classes ? new Set(classes.map((c) => c.id)) : null;
   let cupTotal = 0;
-  for (const cls of DEFECT_CLASSES) {
-    const mass = m.cupMassG[cls];
+  for (const [cls, mass] of Object.entries(m.cupMassG)) {
     if (mass === undefined) continue;
+    if (known && !known.has(cls)) {
+      errors.push(`"${cls}" is not a class of this crop`);
+      continue;
+    }
     if (!Number.isFinite(mass) || mass < 0) {
       errors.push(`cupMassG.${cls} must be zero or more`);
     } else {
@@ -50,16 +63,40 @@ export function validateMeasurement(m: Measurement): string[] {
   return errors;
 }
 
-/** Mass % per class = cup mass ÷ sample mass × 100. Classes with no cup count as 0. */
-export function massPercentages(m: Measurement): MassPercentages {
-  const byClass = {} as Record<DefectClass, number>;
+/** Sums class percentages into groups, total defects and purity. */
+export function summarizePercentages(
+  byClass: Record<string, number>,
+  classes: readonly ClassDef[],
+): MassPercentages {
+  const byGroup = Object.fromEntries(CLASS_GROUPS.map((g) => [g, 0])) as Record<
+    ClassGroup,
+    number
+  >;
+  const full: Record<string, number> = {};
   let total = 0;
-  for (const cls of DEFECT_CLASSES) {
-    const pct = ((m.cupMassG[cls] ?? 0) / m.sampleMassG) * 100;
-    byClass[cls] = pct;
+  for (const c of classes) {
+    const pct = byClass[c.id] ?? 0;
+    full[c.id] = pct;
+    byGroup[c.group] += pct;
     total += pct;
   }
-  return { byClass, totalDefectsPct: total };
+  return {
+    byClass: full,
+    byGroup,
+    totalDefectsPct: total,
+    purityPct: Math.max(0, 100 - total),
+  };
+}
+
+/** Mass % per class = cup mass ÷ sample mass × 100. Classes with no cup count as 0. */
+export function massPercentages(
+  m: Measurement,
+  classes: readonly ClassDef[],
+): MassPercentages {
+  const byClass: Record<string, number> = {};
+  for (const c of classes)
+    byClass[c.id] = ((m.cupMassG[c.id] ?? 0) / m.sampleMassG) * 100;
+  return summarizePercentages(byClass, classes);
 }
 
 export function roundPct(value: number, digits = 2): number {

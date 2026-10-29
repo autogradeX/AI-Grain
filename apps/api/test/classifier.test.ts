@@ -43,9 +43,17 @@ const message = (text: string, stop_reason = "end_turn") => ({
 });
 
 const request = {
-  crop: "wheat",
+  cropLabel: "Wheat",
   standardName: "Test",
-  definitions: { broken: "Pieces of kernel." },
+  classes: [
+    {
+      id: "broken",
+      label: "Broken",
+      group: "broken_defective" as const,
+      description: "Pieces of kernel.",
+    },
+    { id: "ergot", label: "Ergot", group: "harmful" as const },
+  ],
   references: [
     {
       cls: "broken" as const,
@@ -87,6 +95,12 @@ describe("ClaudeClassifier", () => {
                 confidence: "high",
                 reason: "not on this sheet",
               },
+              {
+                number: 3,
+                class: "gold_nugget",
+                confidence: "high",
+                reason: "shiny",
+              },
             ],
           }),
         ),
@@ -104,7 +118,8 @@ describe("ClaudeClassifier", () => {
         number: 3,
         cls: "unclear",
         confidence: "low",
-        reason: "Claude returned no verdict for this kernel",
+        reason:
+          'Claude answered "gold_nugget", which is not a class of this crop: shiny',
       },
     ]);
     expect(result.usage).toEqual({
@@ -130,6 +145,12 @@ describe("ClaudeClassifier", () => {
     const cached = content.findIndex((b) => b.cache_control);
     expect(content[cached]?.type).toBe("image");
     expect(content[0]?.text).toMatch(/Pieces of kernel/);
+    expect(content[0]?.text).toMatch(/Harmful & disease:\n- "ergot" \(Ergot\)/);
+    // The answer may only use this crop's classes.
+    const format = sent.body.output_config as { format: { schema: unknown } };
+    expect(JSON.stringify(format.format.schema)).toContain(
+      "One of: sound, broken, ergot, unclear",
+    );
     expect(content.at(-1)?.text).toMatch(/Numbers on this sheet: 1, 2, 3/);
   });
 

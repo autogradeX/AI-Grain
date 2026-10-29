@@ -16,6 +16,7 @@ export function Layout() {
           <NavLink to="/" end>
             Samples
           </NavLink>
+          <NavLink to="/crops">Crops</NavLink>
           <NavLink to="/standards">Standards</NavLink>
           <NavLink to="/references">References</NavLink>
           <NavLink to="/validation">Validation</NavLink>
@@ -67,6 +68,7 @@ export function MorePage() {
     <div className="stack">
       <h1>More</h1>
       <nav className="menu">
+        <NavLink to="/crops">Crops and classes</NavLink>
         <NavLink to="/references">Reference images</NavLink>
         <NavLink to="/prompt">Claude app prompt (Level 1)</NavLink>
         {can.admin && <NavLink to="/dataset">Training dataset</NavLink>}

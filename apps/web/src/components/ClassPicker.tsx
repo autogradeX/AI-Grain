@@ -1,39 +1,59 @@
-import { CLASS_LABELS, KERNEL_CLASSES, type KernelClass } from "@ai-grain/core";
+import {
+  CLASS_GROUPS,
+  GROUP_LABELS,
+  SOUND,
+  UNCLEAR,
+  type ClassDef,
+} from "@ai-grain/core";
 
-/** One button per class; the current choice is highlighted. */
+/** Buttons for every class of the crop, grouped like the report; the current choice is highlighted. */
 export function ClassPicker({
+  classes,
   value,
   suggested,
   disabled,
   onPick,
 }: {
-  value: KernelClass | null;
-  suggested?: KernelClass | null;
+  classes: readonly ClassDef[];
+  value: string | null;
+  suggested?: string | null;
   disabled?: boolean;
-  onPick: (cls: KernelClass) => void;
+  onPick: (cls: string) => void;
 }) {
+  const chip = (id: string, label: string, tone: "good" | "warn" | "bad") => (
+    <button
+      key={id}
+      type="button"
+      disabled={disabled}
+      className={[
+        "chip",
+        `chip-${tone}`,
+        value === id ? "selected" : "",
+        suggested === id && value !== id ? "suggested" : "",
+      ].join(" ")}
+      onClick={() => onPick(id)}
+    >
+      {label}
+    </button>
+  );
   return (
     <div className="class-picker" role="group" aria-label="Class">
-      {KERNEL_CLASSES.map((c) => (
-        <button
-          key={c}
-          type="button"
-          disabled={disabled}
-          className={[
-            "chip",
-            c === "sound"
-              ? "chip-good"
-              : c === "unclear"
-                ? "chip-warn"
-                : "chip-bad",
-            value === c ? "selected" : "",
-            suggested === c && value !== c ? "suggested" : "",
-          ].join(" ")}
-          onClick={() => onPick(c)}
-        >
-          {CLASS_LABELS[c]}
-        </button>
-      ))}
+      <div className="class-picker-row">
+        {chip(SOUND, "Sound", "good")}
+        {chip(UNCLEAR, "Unclear", "warn")}
+      </div>
+      {CLASS_GROUPS.map((g) => {
+        const inGroup = classes.filter((c) => c.group === g);
+        if (!inGroup.length) return null;
+        return (
+          <div key={g} className="class-picker-group">
+            <span className="class-picker-label">{GROUP_LABELS[g]}</span>
+            <div className="class-picker-row">
+              {inGroup.map((c) => chip(c.id, c.label, "bad"))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

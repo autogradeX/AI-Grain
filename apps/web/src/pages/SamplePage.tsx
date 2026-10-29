@@ -1,13 +1,15 @@
 import {
-  CLASS_LABELS,
-  DEFECT_CLASSES,
+  CLASS_GROUPS,
+  GROUP_LABELS,
+  classLabel,
   massPercentages,
   validateMeasurement,
-  type DefectClass,
+  type ClassDef,
+  type ClassGroup,
   type LimitFailure,
 } from "@ai-grain/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, openFile } from "../api/client";
 import {
@@ -438,21 +440,24 @@ function ReviewCard({ sample }: { sample: Sample }) {
 
 function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
   const update = useSampleUpdate(sample.id);
-  const [cups, setCups] = useState<Partial<Record<DefectClass, string>>>(() =>
-    Object.fromEntries(DEFECT_CLASSES.map((c) => [c, str(sample.cupMassG[c])])),
+  const classes = sample.cropProfile.classes;
+  const [cups, setCups] = useState<Partial<Record<string, string>>>(() =>
+    Object.fromEntries(classes.map((c) => [c.id, str(sample.cupMassG[c.id])])),
   );
 
   const cupMassG = Object.fromEntries(
-    DEFECT_CLASSES.flatMap((c) =>
-      cups[c]?.trim() ? [[c, Number(cups[c])]] : [],
+    classes.flatMap((c) =>
+      cups[c.id]?.trim() ? [[c.id, Number(cups[c.id])]] : [],
     ),
-  ) as Partial<Record<DefectClass, number>>;
+  ) as Partial<Record<string, number>>;
   const measurement = sample.sampleMassG
     ? { sampleMassG: sample.sampleMassG, cupMassG }
     : null;
-  const problems = measurement ? validateMeasurement(measurement) : [];
+  const problems = measurement ? validateMeasurement(measurement, classes) : [];
   const live =
-    measurement && problems.length === 0 ? massPercentages(measurement) : null;
+    measurement && problems.length === 0
+      ? massPercentages(measurement, classes)
+      : null;
 
   const save = useMutation({
     mutationFn: () =>
@@ -473,49 +478,72 @@ function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
         >
           <p className="muted small">
             Mass % per class = cup weight ÷ sample weight ({sample.sampleMassG}{" "}
-            g) × 100.
+            g) × 100. Leave classes you found nothing for empty.
           </p>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Class</th>
-                <th>Kernels</th>
-                <th>Cup (g)</th>
-                <th>Mass %</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DEFECT_CLASSES.map((c) => (
-                <tr key={c}>
-                  <td>{CLASS_LABELS[c]}</td>
-                  <td className="num">{sample.kernels.byClass[c] ?? 0}</td>
-                  <td>
-                    <input
-                      className="input-sm"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      min="0"
-                      disabled={!editable}
-                      value={cups[c] ?? ""}
-                      onChange={(e) =>
-                        setCups({ ...cups, [c]: e.target.value })
-                      }
-                    />
-                  </td>
-                  <td className="num">{live ? pct(live.byClass[c]) : "—"}</td>
+          <div className="table-scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Class</th>
+                  <th>Kernels</th>
+                  <th>Cup (g)</th>
+                  <th>Mass %</th>
                 </tr>
-              ))}
-              <tr className="total">
-                <td>Total defects</td>
-                <td />
-                <td />
-                <td className="num">
-                  {live ? pct(live.totalDefectsPct) : "—"}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {CLASS_GROUPS.map((g) => {
+                  const inGroup = classes.filter((c) => c.group === g);
+                  if (!inGroup.length) return null;
+                  return (
+                    <Fragment key={g}>
+                      <tr className="group-row">
+                        <td colSpan={3}>{GROUP_LABELS[g]}</td>
+                        <td className="num">
+                          {live ? pct(live.byGroup[g]) : "—"}
+                        </td>
+                      </tr>
+                      {inGroup.map((c) => (
+                        <tr key={c.id}>
+                          <td className="indent">{c.label}</td>
+                          <td className="num">
+                            {sample.kernels.byClass[c.id] ?? 0}
+                          </td>
+                          <td>
+                            <input
+                              className="input-sm"
+                              type="number"
+                              inputMode="decimal"
+                              step="0.01"
+                              min="0"
+                              aria-label={`${c.label} cup (g)`}
+                              disabled={!editable}
+                              value={cups[c.id] ?? ""}
+                              onChange={(e) =>
+                                setCups({ ...cups, [c.id]: e.target.value })
+                              }
+                            />
+                          </td>
+                          <td className="num">
+                            {live ? pct(live.byClass[c.id]) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  );
+                })}
+                <tr className="total">
+                  <td colSpan={3}>Total defects</td>
+                  <td className="num">
+                    {live ? pct(live.totalDefectsPct) : "—"}
+                  </td>
+                </tr>
+                <tr className="total">
+                  <td colSpan={3}>Purity (sound grain)</td>
+                  <td className="num">{live ? pct(live.purityPct) : "—"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           {problems.length > 0 && (
             <p className="error">{problems.join("; ")}</p>
           )}
@@ -534,11 +562,12 @@ function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
   );
 }
 
-function limitName(f: LimitFailure) {
-  if (f.limit === "total") return "Total defects";
-  if (f.limit === "moisture") return "Moisture";
-  if (f.limit === "testWeight") return "Test weight";
-  return CLASS_LABELS[f.limit];
+function limitName(f: LimitFailure, classes: readonly ClassDef[]) {
+  if (f.scope === "class") return classLabel(classes, f.limit);
+  if (f.scope === "group") return GROUP_LABELS[f.limit as ClassGroup];
+  if (f.scope === "total") return "Total defects";
+  if (f.scope === "moisture") return "Moisture";
+  return "Test weight";
 }
 
 function ResultCard({ sample }: { sample: Sample }) {
@@ -590,7 +619,7 @@ function ResultCard({ sample }: { sample: Sample }) {
                     {list
                       .map(
                         (f) =>
-                          `${limitName(f)} ${f.value === null ? "not measured" : f.value.toFixed(2)} (${f.kind} ${f.allowed})`,
+                          `${limitName(f, sample.cropProfile.classes)} ${f.value === null ? "not measured" : f.value.toFixed(2)} (${f.kind} ${f.allowed})`,
                       )
                       .join("; ")}
                   </li>
@@ -663,8 +692,8 @@ function ReferenceCard({ sample }: { sample: Sample }) {
     graderName: ref?.graderName ?? "",
     gradedOn: ref?.gradedOn ?? "",
     pct: Object.fromEntries(
-      DEFECT_CLASSES.map((c) => [c, str(ref?.byClassPct[c])]),
-    ) as Record<DefectClass, string>,
+      sample.cropProfile.classes.map((c) => [c.id, str(ref?.byClassPct[c.id])]),
+    ),
   }));
   const save = useMutation({
     mutationFn: () =>
@@ -673,8 +702,8 @@ function ReferenceCard({ sample }: { sample: Sample }) {
         ...(form.graderName && { graderName: form.graderName }),
         ...(form.gradedOn && { gradedOn: form.gradedOn }),
         byClassPct: Object.fromEntries(
-          DEFECT_CLASSES.flatMap((c) =>
-            form.pct[c].trim() ? [[c, Number(form.pct[c])]] : [],
+          sample.cropProfile.classes.flatMap(({ id: c }) =>
+            form.pct[c]?.trim() ? [[c, Number(form.pct[c])]] : [],
           ),
         ),
       }),
@@ -740,15 +769,15 @@ function ReferenceCard({ sample }: { sample: Sample }) {
             </Field>
           </div>
           <div className="grid-3">
-            {DEFECT_CLASSES.map((c) => (
-              <Field key={c} label={`${CLASS_LABELS[c]} (%)`}>
+            {sample.cropProfile.classes.map(({ id: c, label }) => (
+              <Field key={c} label={`${label} (%)`}>
                 <input
                   type="number"
                   inputMode="decimal"
                   step="0.01"
                   min="0"
                   max="100"
-                  value={form.pct[c]}
+                  value={form.pct[c] ?? ""}
                   onChange={(e) =>
                     setForm({
                       ...form,

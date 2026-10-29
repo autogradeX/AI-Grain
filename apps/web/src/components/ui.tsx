@@ -1,4 +1,4 @@
-import { CLASS_LABELS, type KernelClass } from "@ai-grain/core";
+import { SOUND, UNCLEAR, classLabel, type ClassDef } from "@ai-grain/core";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api/client";
 
@@ -78,10 +78,16 @@ export function Badge({
   return <span className={`badge badge-${tone}`}>{children}</span>;
 }
 
-export function ClassBadge({ cls }: { cls: KernelClass | null }) {
+export function ClassBadge({
+  cls,
+  classes,
+}: {
+  cls: string | null;
+  classes: readonly ClassDef[];
+}) {
   if (!cls) return <Badge>not classified</Badge>;
-  const tone = cls === "sound" ? "good" : cls === "unclear" ? "warn" : "bad";
-  return <Badge tone={tone}>{CLASS_LABELS[cls]}</Badge>;
+  const tone = cls === SOUND ? "good" : cls === UNCLEAR ? "warn" : "bad";
+  return <Badge tone={tone}>{classLabel(classes, cls)}</Badge>;
 }
 
 export const CLASS_COLORS: Record<string, string> = {

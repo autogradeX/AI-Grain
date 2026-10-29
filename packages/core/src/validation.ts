@@ -1,15 +1,13 @@
-import { DEFECT_CLASSES, type DefectClass } from "./classes.js";
-
 /** One sample graded both ways: by this method and by a certified grader. */
 export interface ComparisonPair {
-  method: Partial<Record<DefectClass, number>>;
-  reference: Partial<Record<DefectClass, number>>;
+  method: Partial<Record<string, number>>;
+  reference: Partial<Record<string, number>>;
   methodGrade?: string | null | undefined;
   referenceGrade?: string | null | undefined;
 }
 
 export interface ClassAgreement {
-  cls: DefectClass;
+  cls: string;
   n: number;
   meanMethodPct: number;
   meanReferencePct: number;
@@ -27,11 +25,19 @@ export interface ValidationSummary {
   gradeComparable: number;
 }
 
+/** Compares every class that appears in both results of at least one sample. */
 export function summarizeValidation(
   pairs: readonly ComparisonPair[],
 ): ValidationSummary {
+  const classes: string[] = [];
+  for (const pair of pairs) {
+    for (const cls of Object.keys(pair.reference)) {
+      if (pair.method[cls] !== undefined && !classes.includes(cls))
+        classes.push(cls);
+    }
+  }
   const byClass: ClassAgreement[] = [];
-  for (const cls of DEFECT_CLASSES) {
+  for (const cls of classes) {
     let n = 0;
     let sumMethod = 0;
     let sumRef = 0;
@@ -48,7 +54,6 @@ export function summarizeValidation(
       sumAbs += abs;
       maxAbs = Math.max(maxAbs, abs);
     }
-    if (n === 0) continue;
     byClass.push({
       cls,
       n,
