@@ -4,6 +4,8 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
 import { api } from "../../api/client";
 import { ErrorNote, formatDate, Spinner } from "../../components/ui";
+import { useLang, useT } from "../../i18n";
+import { m } from "./HubPage.i18n";
 
 export const KIND_LABELS = {
   guide: "Guides",
@@ -12,6 +14,24 @@ export const KIND_LABELS = {
   case_study: "Case studies",
 } as const;
 export type Kind = keyof typeof KIND_LABELS;
+
+const KIND_KEYS = {
+  guide: "kindGuide",
+  glossary: "kindGlossary",
+  news: "kindNews",
+  case_study: "kindCaseStudy",
+} as const;
+
+/** Article kind names in the current language. KIND_LABELS stays English for code that needs it. */
+export function useKindLabels(): Record<Kind, string> {
+  const t = useT(m);
+  return {
+    guide: t(KIND_KEYS.guide),
+    glossary: t(KIND_KEYS.glossary),
+    news: t(KIND_KEYS.news),
+    case_study: t(KIND_KEYS.case_study),
+  };
+}
 
 export interface ArticleItem {
   slug: string;
@@ -30,12 +50,16 @@ export function HubPage() {
       api.get<ArticleItem[]>(`/public/articles${kind ? `?kind=${kind}` : ""}`),
   });
   const shown = list.data ?? [];
+  const t = useT(m);
+  const kinds = useKindLabels();
+  const { lang } = useLang();
 
   return (
     <div className="site-page">
       <section className="hero compact">
-        <span className="eyebrow">Knowledge hub</span>
-        <h1>Guides and glossary for grain screening</h1>
+        <span className="eyebrow">{t("eyebrow")}</span>
+        <h1>{t("title")}</h1>
+        {lang !== "en" && <p className="muted small">{t("contentNote")}</p>}
       </section>
       <section className="site-section">
         <div className="segmented" role="tablist">
@@ -45,7 +69,7 @@ export function HubPage() {
             className={!kind ? "active" : ""}
             onClick={() => setParams({})}
           >
-            All
+            {t("all")}
           </button>
           {(Object.keys(KIND_LABELS) as Kind[]).map((k) => (
             <button
@@ -55,14 +79,14 @@ export function HubPage() {
               className={kind === k ? "active" : ""}
               onClick={() => setParams({ kind: k })}
             >
-              {KIND_LABELS[k]}
+              {kinds[k]}
             </button>
           ))}
         </div>
         {list.isPending && <Spinner />}
         <ErrorNote error={list.error} />
         {list.data && shown.length === 0 && (
-          <p className="muted">Nothing here yet.</p>
+          <p className="muted">{t("empty")}</p>
         )}
         {kind === "glossary" ? (
           <dl className="glossary">
@@ -81,7 +105,7 @@ export function HubPage() {
                 to={`/hub/${a.slug}`}
                 className="card article-card"
               >
-                <span className="eyebrow">{KIND_LABELS[a.kind]}</span>
+                <span className="eyebrow">{kinds[a.kind]}</span>
                 <strong>{a.title}</strong>
                 {a.summary && <span className="muted small">{a.summary}</span>}
               </Link>
@@ -103,22 +127,26 @@ export function ArticlePage() {
       ),
   });
   const a = article.data;
+  const t = useT(m);
+  const kinds = useKindLabels();
   return (
     <div className="site-page">
       <section className="site-section narrow">
         <Link to="/hub" className="muted small">
-          ← Knowledge hub
+          {t("back")}
         </Link>
         {article.isPending && <Spinner />}
         <ErrorNote error={article.error} />
         {a && (
           <article className="article">
-            <span className="eyebrow">{KIND_LABELS[a.kind]}</span>
+            <span className="eyebrow">{kinds[a.kind]}</span>
             <h1>{a.title}</h1>
             {a.summary && <p className="hero-lead">{a.summary}</p>}
             {/* Markdown without raw HTML: article text can't inject markup or scripts. */}
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{a.body}</ReactMarkdown>
-            <p className="muted small">Updated {formatDate(a.updatedAt)}</p>
+            <p className="muted small">
+              {t("updated", { date: formatDate(a.updatedAt) })}
+            </p>
           </article>
         )}
       </section>

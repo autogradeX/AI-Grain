@@ -1,9 +1,7 @@
 import {
   CLASS_GROUPS,
-  GROUP_LABELS,
   SOUND,
   UNCLEAR,
-  classLabel,
   groupOf,
   type ClassDef,
   type ClassGroup,
@@ -13,6 +11,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { Badge, ErrorNote, pct, Spinner } from "../../components/ui";
+import { useT } from "../../i18n";
+import { useGrainLabels } from "../../i18n/common";
+import { m } from "./DemoPage.i18n";
 import { CategorySection } from "./HomePage";
 
 interface DemoListItem {
@@ -78,50 +79,37 @@ function colorOf(cls: string | null): string {
 
 type Step = "select" | "capture" | "analyze";
 
-const SETUP: [string, string][] = [
-  [
-    "Grid board",
-    "A matte dark board with a printed 1 cm grid. Its corners let the app straighten the photo and measure each kernel.",
-  ],
-  [
-    "Phone on a stand",
-    "Photographs the board from 20–25 cm with even light. Kernels are found by classic image processing, not AI.",
-  ],
-  [
-    "Claude",
-    "Classifies a close-up of each kernel against the crop's class definitions and reference images, with a confidence and a reason.",
-  ],
-  [
-    "Operator and scale",
-    "The operator checks every flagged kernel, sorts the defects into cups and weighs them on a 0.01 g scale.",
-  ],
-];
+const SETUP = [
+  ["setup1Title", "setup1Text"],
+  ["setup2Title", "setup2Text"],
+  ["setup3Title", "setup3Text"],
+  ["setup4Title", "setup4Text"],
+] as const;
 
-const DEMO_FAQ: [string, string][] = [
-  [
-    "What is AI grain impurity analysis?",
-    "Finding and classifying the objects in a grain sample that are not sound kernels: broken and damaged kernels, other cereals, weed seeds, debris and harmful material such as ergot. Here, Claude does the first pass on a photo and a person confirms it.",
-  ],
-  [
-    "Is the demo a real sample?",
-    "Yes. It is a sample analysed in the app and published by our team, with the kernel images, Claude's verdicts and the operator's decisions as they were recorded.",
-  ],
-  [
-    "Why do the result and the photo estimate differ?",
-    "The estimate weighs each kernel by its area in the photo. The verified result comes from weighing the sorted cups on a scale. Where both exist, the scale wins.",
-  ],
-  [
-    "Does it replace EN 15587 or manual grading?",
-    "No. It follows the same categories, but it is a screening and pre-check tool, not an official grading method unless validated and approved for that use.",
-  ],
-  [
-    "How reliable is it?",
-    "Measure it on your own grain: grade 30–50 samples both ways and compare them class by class on the Validation page. Subtle defects agree least, which is why a person checks every flagged kernel.",
-  ],
-];
+const DEMO_FAQ = [
+  ["faq1Q", "faq1A"],
+  ["faq2Q", "faq2A"],
+  ["faq3Q", "faq3A"],
+  ["faq4Q", "faq4A"],
+  ["faq5Q", "faq5A"],
+] as const;
+
+const STEP_LABELS = {
+  select: "stepSelect",
+  capture: "stepCapture",
+  analyze: "stepAnalyze",
+} as const;
+
+const CONFIDENCE: Partial<Record<string, keyof typeof m>> = {
+  high: "confidenceHigh",
+  medium: "confidenceMedium",
+  low: "confidenceLow",
+};
 
 /** Public interactive demo: a real, reviewed sample the site owner published. */
 export function DemoPage() {
+  const t = useT(m);
+  const { classLabel, cropLabel } = useGrainLabels();
   const list = useQuery({
     queryKey: ["demos"],
     queryFn: () => api.get<DemoListItem[]>("/public/demos"),
@@ -146,12 +134,9 @@ export function DemoPage() {
   return (
     <div className="site-page">
       <section className="hero compact">
-        <span className="eyebrow">Interactive demo</span>
-        <h1>AI grain impurity analysis</h1>
-        <p className="hero-lead">
-          A real sample, photographed, classified by Claude and checked by an
-          operator. Open it and explore every kernel the system found.
-        </p>
+        <span className="eyebrow">{t("eyebrow")}</span>
+        <h1>{t("title")}</h1>
+        <p className="hero-lead">{t("lead")}</p>
       </section>
 
       {list.isPending && <Spinner />}
@@ -159,9 +144,9 @@ export function DemoPage() {
       {list.data?.length === 0 && (
         <section className="site-section narrow">
           <div className="card">
-            <p>No demo sample has been published yet.</p>
+            <p>{t("noDemo")}</p>
             <Link to="/contact" className="button primary">
-              Ask for a live walkthrough
+              {t("askWalkthrough")}
             </Link>
           </div>
         </section>
@@ -171,22 +156,17 @@ export function DemoPage() {
         <section className="site-section">
           <div className="demo">
             <div className="demo-side">
-              <ol className="demo-steps" aria-label="Steps">
+              <ol className="demo-steps" aria-label={t("steps")}>
                 {(["select", "capture", "analyze"] as const).map((s, i) => (
                   <li key={s} className={step === s ? "active" : ""}>
-                    <span>{i + 1}</span>{" "}
-                    {s === "select"
-                      ? "Select"
-                      : s === "capture"
-                        ? "Capture"
-                        : "Analyze"}
+                    <span>{i + 1}</span> {t(STEP_LABELS[s])}
                   </li>
                 ))}
               </ol>
               <div
                 className="demo-samples"
                 role="radiogroup"
-                aria-label="Sample"
+                aria-label={t("sample")}
               >
                 {list.data.map((s) => (
                   <button
@@ -201,12 +181,12 @@ export function DemoPage() {
                       setKernelId(null);
                     }}
                   >
-                    <strong>{s.cropLabel}</strong>
+                    <strong>{cropLabel(s.cropLabel)}</strong>
                     <span className="small">
-                      {s.title ?? `Sample #${s.number}`}
+                      {s.title ?? t("sampleNumber", { number: s.number })}
                     </span>
                     <span className="small muted">
-                      {s.kernels} kernels
+                      {t.n("kernelCount", s.kernels)}
                       {s.sampleMassG ? ` · ${s.sampleMassG} g` : ""}
                     </span>
                   </button>
@@ -218,12 +198,12 @@ export function DemoPage() {
                   disabled={!d}
                   onClick={() => setStep("capture")}
                 >
-                  Capture image
+                  {t("captureImage")}
                 </button>
               )}
               {step === "capture" && (
                 <button className="primary" onClick={() => setStep("analyze")}>
-                  Analyze
+                  {t("analyze")}
                 </button>
               )}
               {step === "analyze" && d && (
@@ -232,13 +212,15 @@ export function DemoPage() {
             </div>
 
             <div className="demo-stage">
-              {!d && <Spinner label="Loading sample…" />}
+              {!d && <Spinner label={t("loadingSample")} />}
               {d && step === "select" && (
                 <div className="demo-placeholder">
-                  <strong>Imaging station ready</strong>
+                  <strong>{t("stationReady")}</strong>
                   <span className="muted small">
-                    {d.crop.label} sample loaded on the board. Press{" "}
-                    <em>Capture image</em>.
+                    {t.rich("sampleLoaded", {
+                      crop: cropLabel(d.crop.label),
+                      button: <em>{t("captureImage")}</em>,
+                    })}
                   </span>
                 </div>
               )}
@@ -252,7 +234,7 @@ export function DemoPage() {
                 >
                   <img
                     src={`/api/public/demos/${d.id}/batches/${batch.id}/image`}
-                    alt={`${d.crop.label} sample on the grid board`}
+                    alt={t("boardAlt", { crop: cropLabel(d.crop.label) })}
                   />
                   {step === "analyze" && (
                     <svg
@@ -277,7 +259,10 @@ export function DemoPage() {
                           className="demo-mark"
                           tabIndex={0}
                           role="button"
-                          aria-label={`Kernel ${k.number}, ${classLabel(classes, k.cls)}`}
+                          aria-label={t("kernelAria", {
+                            number: k.number,
+                            cls: classLabel(classes, k.cls),
+                          })}
                           onClick={() => setKernelId(k.id)}
                           onKeyDown={(e) =>
                             e.key === "Enter" && setKernelId(k.id)
@@ -298,7 +283,7 @@ export function DemoPage() {
                       }
                       onClick={() => setBatchIdx(i)}
                     >
-                      Photo {i + 1}
+                      {t("photo", { number: i + 1 })}
                     </button>
                   ))}
                 </div>
@@ -318,38 +303,36 @@ export function DemoPage() {
       <CategorySection />
 
       <section className="site-section">
-        <h2>What produces the result</h2>
-        <p className="muted">
-          No dedicated machine: the demo sample was imaged with this setup.
-        </p>
+        <h2>{t("setupTitle")}</h2>
+        <p className="muted">{t("setupLead")}</p>
         <ol className="steps-grid">
           {SETUP.map(([title, text], i) => (
             <li key={title} className="card">
               <span className="step-number">{i + 1}</span>
-              <strong>{title}</strong>
-              <p className="muted small">{text}</p>
+              <strong>{t(title)}</strong>
+              <p className="muted small">{t(text)}</p>
             </li>
           ))}
         </ol>
       </section>
 
       <section className="site-section narrow">
-        <h2>Grain impurity analysis, answered</h2>
+        <h2>{t("faqTitle")}</h2>
         <div className="faq">
           {DEMO_FAQ.map(([q, a]) => (
             <details key={q} className="card">
-              <summary>{q}</summary>
-              <p>{a}</p>
+              <summary>{t(q)}</summary>
+              <p>{t(a)}</p>
             </details>
           ))}
         </div>
       </section>
 
       <section className="site-band">
-        <h2>Want to see it on your grain?</h2>
-        <p>Book a short walkthrough with our grain analysis team.</p>
+        <h2>{t("bandTitle")}</h2>
+        <p>{t("bandText")}</p>
         <Link to="/contact" className="button">
-          Book a live walkthrough
+          {t("bookWalkthrough")}
         </Link>
       </section>
     </div>
@@ -368,25 +351,27 @@ function Legend({
       .filter((c) => c.group === g)
       .reduce((n, c) => n + (counts[c.id] ?? 0), 0);
   const defects = CLASS_GROUPS.reduce((n, g) => n + groupCount(g), 0);
+  const t = useT(m);
+  const { groupLabel } = useGrainLabels();
   return (
     <ul className="demo-legend small">
       <li>
-        <i style={{ borderColor: RING.sound }} /> Sound{" "}
+        <i style={{ borderColor: RING.sound }} /> {t("sound")}{" "}
         <span className="muted">{counts.sound ?? 0}</span>
       </li>
       <li>
-        <i style={{ borderColor: RING.defect }} /> Defect or impurity{" "}
+        <i style={{ borderColor: RING.defect }} /> {t("defectOrImpurity")}{" "}
         <span className="muted">{defects}</span>
         <ul>
           {CLASS_GROUPS.map((g) => (
             <li key={g}>
-              {GROUP_LABELS[g]} <span className="muted">{groupCount(g)}</span>
+              {groupLabel(g)} <span className="muted">{groupCount(g)}</span>
             </li>
           ))}
         </ul>
       </li>
       <li>
-        <i style={{ borderColor: RING.unclear }} /> Unclear{" "}
+        <i style={{ borderColor: RING.unclear }} /> {t("unclear")}{" "}
         <span className="muted">{counts.unclear ?? 0}</span>
       </li>
     </ul>
@@ -402,13 +387,12 @@ function KernelDetail({
   kernel: DemoKernel | null;
   classes: readonly ClassDef[];
 }) {
+  const t = useT(m);
+  const { classLabel, groupLabel } = useGrainLabels();
   if (!kernel) {
     return (
       <div className="card">
-        <p className="muted">
-          Tap any kernel on the photo to see what Claude saw and what the
-          operator decided.
-        </p>
+        <p className="muted">{t("tapKernel")}</p>
       </div>
     );
   }
@@ -417,11 +401,11 @@ function KernelDetail({
       <img
         className="crop"
         src={`/api/public/demos/${demoId}/kernels/${kernel.id}/crop`}
-        alt={`Kernel ${kernel.number}`}
+        alt={t("kernelAlt", { number: kernel.number })}
       />
       <div className="stack-sm">
         <strong>
-          Kernel #{kernel.number} · cell {kernel.cell}
+          {t("kernelTitle", { number: kernel.number, cell: kernel.cell })}
         </strong>
         <div>
           <Badge
@@ -437,21 +421,25 @@ function KernelDetail({
           </Badge>{" "}
           {kernel.cls !== SOUND && groupOf(classes, kernel.cls ?? "") && (
             <span className="muted small">
-              {GROUP_LABELS[groupOf(classes, kernel.cls ?? "")!]}
+              {groupLabel(groupOf(classes, kernel.cls ?? "")!)}
             </span>
           )}
         </div>
         <div className="small">
-          Claude: {classLabel(classes, kernel.aiClass)}
-          {kernel.aiConfidence && ` (${kernel.aiConfidence} confidence)`}
+          {kernel.aiConfidence
+            ? t("claudeSaidConfidence", {
+                cls: classLabel(classes, kernel.aiClass),
+                confidence: CONFIDENCE[kernel.aiConfidence]
+                  ? t(CONFIDENCE[kernel.aiConfidence]!)
+                  : kernel.aiConfidence,
+              })
+            : t("claudeSaid", { cls: classLabel(classes, kernel.aiClass) })}
         </div>
         {kernel.aiReason && (
           <div className="small muted">“{kernel.aiReason}”</div>
         )}
         <div className="small">
-          {kernel.reviewed
-            ? "Checked by the operator"
-            : "Not flagged for checking"}
+          {kernel.reviewed ? t("checked") : t("notFlagged")}
         </div>
       </div>
     </div>
@@ -460,29 +448,31 @@ function KernelDetail({
 
 function Results({ d }: { d: Demo }) {
   const weighed = d.result && d.result.source !== "estimate" ? d.result : null;
+  const t = useT(m);
+  const { cropLabel, groupLabel } = useGrainLabels();
   return (
     <div className="card">
       <strong>
-        {d.crop.label} sample #{d.number}
-        {d.result?.grade.grade && ` · grade ${d.result.grade.grade}`}
+        {t("resultsTitle", { crop: cropLabel(d.crop.label), number: d.number })}
+        {d.result?.grade.grade && t("grade", { grade: d.result.grade.grade })}
       </strong>
       <table className="table">
         <thead>
           <tr>
-            <th>Category</th>
-            <th className="num">Photo estimate</th>
-            {weighed && <th className="num">Weighed</th>}
+            <th>{t("category")}</th>
+            <th className="num">{t("photoEstimate")}</th>
+            {weighed && <th className="num">{t("weighed")}</th>}
           </tr>
         </thead>
         <tbody>
           <tr className="total">
-            <td>Purity (sound grain)</td>
+            <td>{t("purity")}</td>
             <td className="num">{pct(d.estimate.purityPct)}</td>
             {weighed && <td className="num">{pct(weighed.purityPct)}</td>}
           </tr>
           {CLASS_GROUPS.map((g) => (
             <tr key={g}>
-              <td>{GROUP_LABELS[g]}</td>
+              <td>{groupLabel(g)}</td>
               <td className="num">{pct(d.estimate.byGroup[g])}</td>
               {weighed && (
                 <td className="num">{pct(weighed.byGroupPct?.[g])}</td>
@@ -494,14 +484,11 @@ function Results({ d }: { d: Demo }) {
       {d.certificate && (
         <p className="small">
           <Link to={`/verify/${d.certificate}`}>
-            See this sample&apos;s verified report ({d.certificate})
+            {t("seeReport", { code: d.certificate })}
           </Link>
         </p>
       )}
-      <p className="muted small">
-        The estimate comes from kernel areas in the photos; the weighed column
-        from the operator&apos;s scale.
-      </p>
+      <p className="muted small">{t("resultsNote")}</p>
     </div>
   );
 }

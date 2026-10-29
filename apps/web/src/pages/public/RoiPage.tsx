@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { locale, useT } from "../../i18n";
+import { m } from "./RoiPage.i18n";
 
 /**
  * Rough Claude cost per ~500-kernel sample: about 17–20 sheets of 30 kernels,
@@ -7,15 +9,9 @@ import { Link } from "react-router-dom";
  * with the model's thinking; the Analytics page shows actual cost per sample.
  */
 const MODEL_COST = {
-  "claude-sonnet-5-5": { label: "Claude Sonnet 5.5 (default)", perSample: 0.7 },
-  "claude-haiku-5-5": {
-    label: "Claude Haiku 5.5 (lowest cost)",
-    perSample: 0.04,
-  },
-  "claude-opus-5-5": {
-    label: "Claude Opus 5.5 (difficult samples)",
-    perSample: 1.4,
-  },
+  "claude-sonnet-5-5": { label: "modelSonnet", perSample: 0.7 },
+  "claude-haiku-5-5": { label: "modelHaiku", perSample: 0.04 },
+  "claude-opus-5-5": { label: "modelOpus", perSample: 1.4 },
 } as const;
 type Model = keyof typeof MODEL_COST;
 
@@ -53,9 +49,10 @@ function NumberField({
 }
 
 const money = (v: number) =>
-  `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0 })}`;
+  `${v < 0 ? "−" : ""}$${Math.abs(v).toLocaleString(locale(), { maximumFractionDigits: Math.abs(v) < 100 ? 2 : 0 })}`;
 
 export function RoiPage() {
+  const t = useT(m);
   const [samplesPerDay, setSamplesPerDay] = useState(20);
   const [days, setDays] = useState(250);
   const [manualMin, setManualMin] = useState(20);
@@ -78,73 +75,70 @@ export function RoiPage() {
   return (
     <div className="site-page">
       <section className="hero compact">
-        <span className="eyebrow">ROI calculator</span>
-        <h1>What would screening with AI-Grain save?</h1>
-        <p className="hero-lead">
-          Enter your own figures. Every number here is an assumption you can
-          change; none is a promise.
-        </p>
+        <span className="eyebrow">{t("eyebrow")}</span>
+        <h1>{t("title")}</h1>
+        <p className="hero-lead">{t("lead")}</p>
       </section>
       <section className="site-section roi">
         <div className="card stack">
-          <h2>Your figures</h2>
+          <h2>{t("yourFigures")}</h2>
           <div className="grid-2">
             <NumberField
-              label="Samples per day"
+              label={t("samplesPerDay")}
               value={samplesPerDay}
               onChange={setSamplesPerDay}
             />
             <NumberField
-              label="Working days per year"
+              label={t("daysPerYear")}
               value={days}
               onChange={setDays}
             />
             <NumberField
-              label="Minutes per sample today"
-              hint="Your current manual impurity analysis, including sorting and weighing."
+              label={t("manualMin")}
+              hint={t("manualMinHint")}
               value={manualMin}
               onChange={setManualMin}
             />
             <NumberField
-              label="Minutes per sample with AI-Grain"
-              hint="Spreading and photographing, checking flagged kernels, weighing cups. Measure it on a few samples."
+              label={t("aiMin")}
+              hint={t("aiMinHint")}
               value={aiMin}
               onChange={setAiMin}
             />
             <NumberField
-              label="Labour cost per hour (USD)"
+              label={t("hourly")}
               value={hourly}
               onChange={setHourly}
               step={0.5}
             />
             <NumberField
-              label="Equipment, one-off (USD)"
-              hint="Scale, board, stand, light, tweezers."
+              label={t("equipment")}
+              hint={t("equipmentHint")}
               value={equipment}
               onChange={setEquipment}
             />
             <div className="field">
               <label className="field">
-                <span className="field-label">Claude model</span>
+                <span className="field-label">{t("model")}</span>
                 <select
                   value={model}
                   onChange={(e) => {
-                    const m = e.target.value as Model;
-                    setModel(m);
-                    setClaudeCost(MODEL_COST[m].perSample);
+                    const next = e.target.value as Model;
+                    setModel(next);
+                    setClaudeCost(MODEL_COST[next].perSample);
                   }}
                 >
-                  {Object.entries(MODEL_COST).map(([id, m]) => (
+                  {Object.entries(MODEL_COST).map(([id, cost]) => (
                     <option key={id} value={id}>
-                      {m.label}
+                      {t(cost.label)}
                     </option>
                   ))}
                 </select>
               </label>
             </div>
             <NumberField
-              label="Claude cost per sample (USD)"
-              hint="A rough estimate for about 500 kernels at list prices. Signed-in users see their real cost on the Analytics page."
+              label={t("claudeCost")}
+              hint={t("claudeCostHint")}
               value={claudeCost}
               onChange={setClaudeCost}
               step={0.01}
@@ -152,33 +146,33 @@ export function RoiPage() {
           </div>
         </div>
         <div className="card stack roi-results" aria-live="polite">
-          <h2>Per year</h2>
+          <h2>{t("perYear")}</h2>
           <dl className="facts">
-            <dt>Samples</dt>
-            <dd>{samples.toLocaleString()}</dd>
-            <dt>Hours saved</dt>
-            <dd>{Math.round(hoursSaved).toLocaleString()} h</dd>
-            <dt>Labour saved</dt>
+            <dt>{t("samples")}</dt>
+            <dd>{samples.toLocaleString(locale())}</dd>
+            <dt>{t("hoursSaved")}</dt>
+            <dd>
+              {t("hours", {
+                hours: Math.round(hoursSaved).toLocaleString(locale()),
+              })}
+            </dd>
+            <dt>{t("labourSaved")}</dt>
             <dd>{money(labour)}</dd>
-            <dt>Claude cost</dt>
+            <dt>{t("claudeCostTotal")}</dt>
             <dd>{money(claude)}</dd>
           </dl>
           <div>
-            <div className="muted small">Net saving per year</div>
+            <div className="muted small">{t("netSaving")}</div>
             <div className="result-grade">{money(net)}</div>
           </div>
           <p className="small">
             {paybackDays === null
-              ? "With these figures the method doesn't pay for itself; check the minutes per sample."
-              : `The equipment pays for itself in about ${paybackDays} working day${paybackDays === 1 ? "" : "s"}.`}
+              ? t("noPayback")
+              : t.n("payback", paybackDays)}
           </p>
-          <p className="muted small">
-            Not counted: the value of documented, verifiable reports, of
-            catching problem lots earlier, and the time for validating the
-            method against a certified grader before relying on it.
-          </p>
+          <p className="muted small">{t("notCounted")}</p>
           <Link to="/contact" className="button primary">
-            Talk about your numbers
+            {t("talk")}
           </Link>
         </div>
       </section>

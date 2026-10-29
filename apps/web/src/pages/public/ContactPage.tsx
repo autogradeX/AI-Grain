@@ -2,10 +2,13 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../api/client";
 import { ErrorNote, Field } from "../../components/ui";
+import { useT } from "../../i18n";
+import { m } from "./ContactPage.i18n";
 import { usePublicSite } from "./PublicLayout";
 
 export function ContactPage() {
   const site = usePublicSite();
+  const t = useT(m);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -35,28 +38,23 @@ export function ContactPage() {
   return (
     <div className="site-page">
       <section className="hero compact">
-        <span className="eyebrow">Contact</span>
-        <h1>Talk to our grain analysis team</h1>
-        <p className="hero-lead">
-          Tell us about your crops, standards and volumes, or book a time to
-          talk.
-        </p>
+        <span className="eyebrow">{t("eyebrow")}</span>
+        <h1>{t("title")}</h1>
+        <p className="hero-lead">{t("lead")}</p>
       </section>
       <section className="site-section contact">
         <div className="stack">
           {site.data?.bookingUrl && (
             <div className="card">
-              <strong>Book a meeting</strong>
-              <p className="muted small">
-                Pick a slot for a live walkthrough on your grain.
-              </p>
+              <strong>{t("bookMeeting")}</strong>
+              <p className="muted small">{t("bookText")}</p>
               <a
                 className="button primary"
                 href={site.data.bookingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Book a meeting
+                {t("bookMeeting")}
               </a>
             </div>
           )}
@@ -79,10 +77,7 @@ export function ContactPage() {
         </div>
         <div className="card">
           {send.isSuccess ? (
-            <p>
-              Thank you, {form.name}. Your message has been sent and we&apos;ll
-              reply to {form.email}.
-            </p>
+            <p>{t("thanks", { name: form.name, email: form.email })}</p>
           ) : (
             <form
               className="stack"
@@ -92,7 +87,7 @@ export function ContactPage() {
               }}
             >
               <div className="grid-2">
-                <Field label="Name">
+                <Field label={t("name")}>
                   <input
                     required
                     autoComplete="name"
@@ -100,7 +95,7 @@ export function ContactPage() {
                     onChange={set("name")}
                   />
                 </Field>
-                <Field label="Email">
+                <Field label={t("email")}>
                   <input
                     required
                     type="email"
@@ -109,14 +104,14 @@ export function ContactPage() {
                     onChange={set("email")}
                   />
                 </Field>
-                <Field label="Company (optional)">
+                <Field label={t("company")}>
                   <input
                     autoComplete="organization"
                     value={form.company}
                     onChange={set("company")}
                   />
                 </Field>
-                <Field label="Phone (optional)">
+                <Field label={t("phone")}>
                   <input
                     type="tel"
                     autoComplete="tel"
@@ -125,7 +120,7 @@ export function ContactPage() {
                   />
                 </Field>
               </div>
-              <Field label="Message">
+              <Field label={t("message")}>
                 <textarea
                   required
                   rows={5}
@@ -151,11 +146,11 @@ export function ContactPage() {
                   checked={consent}
                   onChange={(e) => setConsent(e.target.checked)}
                 />{" "}
-                I agree that my details are stored to answer this message.
+                {t("consent")}
               </label>
               <ErrorNote error={send.error} />
               <button className="primary" disabled={send.isPending}>
-                {send.isPending ? "Sending…" : "Send message"}
+                {send.isPending ? t("sending") : t("send")}
               </button>
             </form>
           )}
