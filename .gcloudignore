@@ -1,0 +1,8 @@
+# Files Cloud Build should not upload (gcloud builds submit).
+.git
+node_modules
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+data
+.env

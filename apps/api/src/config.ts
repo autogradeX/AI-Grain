@@ -19,8 +19,19 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().default(3000),
   /** Public URL of the app, used in emailed links. */
   APP_URL: z.url().default("http://localhost:5173"),
-  /** Postgres connection string. Leave empty to use an embedded PGlite database in DATA_DIR. */
+  /**
+   * Postgres connection string. Leave empty to use an embedded PGlite database in DATA_DIR.
+   * For Cloud SQL on Cloud Run: postgres://USER:PASSWORD@/DB?host=/cloudsql/PROJECT:REGION:INSTANCE
+   */
   DATABASE_URL: z.string().optional(),
+  /** Connections per instance. Keep instances × this under the database's connection limit. */
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+  /** Apply database migrations at start-up. Set to false when a separate job runs them. */
+  RUN_MIGRATIONS: bool.default(true),
+  /** Google Cloud Storage bucket for photos and crops. Leave empty to store files in DATA_DIR. */
+  STORAGE_BUCKET: z.string().optional(),
+  /** Folder inside the bucket, e.g. "production". */
+  STORAGE_PREFIX: z.string().default(""),
   DATA_DIR: z.string().default("./data"),
   /** At least 32 characters. Signs access tokens. */
   JWT_SECRET: z.string().min(32),

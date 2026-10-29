@@ -1,5 +1,16 @@
 import { type KernelClass } from "@ai-grain/core";
-import { and, asc, desc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lt,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import type {
   ClassifierError,
   KernelVerdict,
@@ -46,6 +57,35 @@ export const batchPrefix = (b: {
   sampleId: string;
   id: string;
 }) => `orgs/${b.orgId}/samples/${b.sampleId}/batches/${b.id}`;
+
+/** Busy batches with no progress for this long are treated as interrupted. */
+export const STALE_AFTER_MS = 10 * 60 * 1000;
+
+/**
+ * Marks batches failed when their background job was cut off, for example
+ * when Cloud Run stopped the instance. The operator can then retry.
+ */
+export async function expireStaleBatches(
+  ctx: AppContext,
+  where: { sampleId: string } | { batchId: string },
+): Promise<void> {
+  await ctx.db
+    .update(batches)
+    .set({
+      status: "failed",
+      error:
+        "Processing stopped before it finished, probably because the server restarted. Retry to continue.",
+    })
+    .where(
+      and(
+        "sampleId" in where
+          ? eq(batches.sampleId, where.sampleId)
+          : eq(batches.id, where.batchId),
+        inArray(batches.status, ["detecting", "classifying"]),
+        lt(batches.updatedAt, new Date(Date.now() - STALE_AFTER_MS)),
+      ),
+    );
+}
 
 async function setBatch(
   ctx: AppContext,
@@ -249,6 +289,8 @@ export async function classifyBatch(
           total.cacheReadTokens += usage.cacheReadTokens;
           total.cacheWriteTokens += usage.cacheWriteTokens;
           await saveVerdicts(ctx, batchId, verdicts);
+          // Heartbeat: shows the job is still alive.
+          await setBatch(ctx, batchId, { status: "classifying" });
           return null;
         } catch (err) {
           return (err as ClassifierError).message || String(err);
@@ -332,6 +374,7 @@ export async function kernelSummary(
 
 /** Batches still being processed in the background for a sample. */
 export async function busyBatches(ctx: AppContext, sampleId: string) {
+  await expireStaleBatches(ctx, { sampleId });
   return ctx.db
     .select({ id: batches.id })
     .from(batches)

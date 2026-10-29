@@ -24,7 +24,12 @@ import {
   requireRole,
   WRITE_ROLES,
 } from "../auth/guard.js";
-import { busyBatches, kernelSummary, modelFor } from "../batches/service.js";
+import {
+  busyBatches,
+  expireStaleBatches,
+  kernelSummary,
+  modelFor,
+} from "../batches/service.js";
 import { getStandard } from "../standards/routes.js";
 import { loadSample, measurementOf, refreshResult } from "./service.js";
 
@@ -160,6 +165,7 @@ export function sampleRoutes(ctx: AppContext) {
       const me = authOf(request);
       const { id } = z.object({ id: z.uuid() }).parse(request.params);
       const sample = await loadSample(ctx, me.orgId, id);
+      await expireStaleBatches(ctx, { sampleId: id });
       const [standard, batchRows, summary, model] = await Promise.all([
         sample.standardId
           ? getStandard(ctx, me.orgId, sample.standardId)

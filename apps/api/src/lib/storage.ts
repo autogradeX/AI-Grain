@@ -56,3 +56,56 @@ export class MemoryStorage implements Storage {
     return Promise.resolve();
   }
 }
+
+/** The part of a Cloud Storage bucket this app uses, so tests can pass a fake. */
+export interface BucketLike {
+  file(name: string): {
+    save(
+      data: Buffer,
+      options: { resumable: boolean; contentType: string },
+    ): Promise<unknown>;
+    download(): Promise<[Buffer]>;
+    delete(options: { ignoreNotFound: boolean }): Promise<unknown>;
+  };
+  deleteFiles(query: { prefix: string }): Promise<unknown>;
+}
+
+/**
+ * Stores files in a Google Cloud Storage bucket. Use this on Cloud Run, where
+ * the container's disk is temporary and not shared between instances.
+ */
+export class GcsStorage implements Storage {
+  constructor(
+    private readonly bucket: BucketLike,
+    private readonly prefix = "",
+  ) {}
+
+  private name(key: string): string {
+    if (key.includes("..") || key.startsWith("/"))
+      throw new Error(`Invalid storage key: ${key}`);
+    return this.prefix ? `${this.prefix.replace(/\/+$/, "")}/${key}` : key;
+  }
+
+  async put(key: string, data: Buffer): Promise<void> {
+    await this.bucket.file(this.name(key)).save(data, {
+      resumable: false,
+      contentType: key.endsWith(".jpg")
+        ? "image/jpeg"
+        : "application/octet-stream",
+    });
+  }
+
+  async get(key: string): Promise<Buffer> {
+    const [data] = await this.bucket.file(this.name(key)).download();
+    return data;
+  }
+
+  /** Removes the object named `prefix` and everything under `prefix/`. */
+  async remove(prefix: string): Promise<void> {
+    const name = this.name(prefix);
+    await Promise.all([
+      this.bucket.file(name).delete({ ignoreNotFound: true }),
+      this.bucket.deleteFiles({ prefix: `${name}/` }),
+    ]);
+  }
+}

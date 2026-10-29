@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+import pg from "pg";
 import type { KernelVerdict } from "../src/ai/classifier.js";
 import type {
   Classifier,
@@ -61,6 +63,24 @@ export class FakeClassifier implements Classifier {
   }
 }
 
+/**
+ * With TEST_DATABASE_URL set (a Postgres server URL), each test app gets its
+ * own new database there, so the suite also runs against real Postgres.
+ * Otherwise tests use an in-memory PGlite database.
+ */
+async function testDatabaseUrl(): Promise<string | undefined> {
+  const server = process.env.TEST_DATABASE_URL;
+  if (!server) return undefined;
+  const name = `aigrain_test_${randomBytes(6).toString("hex")}`;
+  const admin = new pg.Client({ connectionString: server });
+  await admin.connect();
+  await admin.query(`create database ${name}`);
+  await admin.end();
+  const url = new URL(server);
+  url.pathname = `/${name}`;
+  return url.toString();
+}
+
 export async function createTestApp(env: Record<string, string> = {}) {
   const config = loadConfig({
     NODE_ENV: "test",
@@ -69,7 +89,7 @@ export async function createTestApp(env: Record<string, string> = {}) {
     AUTH_RATE_LIMIT_PER_MINUTE: "1000",
     ...env,
   });
-  const handle = createDb(undefined, null);
+  const handle = createDb(await testDatabaseUrl(), null);
   await handle.migrate();
   const mailer = new MemoryMailer();
   const storage = new MemoryStorage();

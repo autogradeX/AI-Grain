@@ -76,7 +76,18 @@ docker compose up -d --build
 
 This runs the app on port 3000 with Postgres. Put it behind an HTTPS reverse proxy: the refresh cookie is `Secure` in production, and phones need HTTPS for the live camera. Migrations run on start-up. Photos and crops are stored in the `files` volume.
 
-Background work (kernel detection and Claude requests) runs inside the API process, so run a single instance.
+### Google Cloud Run and Cloud SQL
+
+See [deploy/cloud-run.md](deploy/cloud-run.md): Cloud SQL for PostgreSQL, photos in a Cloud Storage bucket, secrets in Secret Manager, migrations as a Cloud Run job. Deploy with `--no-cpu-throttling`, because kernel detection and Claude requests run after the upload request returns.
+
+### Database migrations
+
+SQL migrations are in [`apps/api/drizzle`](apps/api/drizzle), generated from `apps/api/src/db/schema.ts`. They are applied in order and recorded in the `drizzle.__drizzle_migrations` table:
+
+- at start-up (default; a database lock keeps several instances from migrating at once), or
+- with `npm run db:migrate`, or `node apps/api/dist/src/db/migrate-cli.js` in the container, and `RUN_MIGRATIONS=false` on the server.
+
+The `.sql` files also run as-is in `psql`, but the app then doesn't know they were applied; prefer the commands above.
 
 ## Development
 
@@ -92,7 +103,7 @@ apps/api        Fastify API, organised by module under src/modules
 apps/web        React web app for phones and desktops
 ```
 
-Tests cover the grading logic, the imaging pipeline on synthetic board photos, the auth flows, the request sent to Claude, and a full sample from photo to report. They use an in-memory database and a fake classifier, so they need no API key.
+Tests cover the grading logic, the imaging pipeline on synthetic board photos, the auth flows, the request sent to Claude, file storage, recovery of interrupted jobs, and a full sample from photo to report. They use an in-memory database and a fake classifier, so they need no API key. To run the API tests against a real Postgres server, set `TEST_DATABASE_URL` (for example `postgres://postgres@localhost:5432/postgres`); each test file gets its own new database there.
 
 ## Limits, and how to check them
 

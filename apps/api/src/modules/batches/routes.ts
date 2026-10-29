@@ -27,6 +27,7 @@ import { loadSample } from "../samples/service.js";
 import {
   batchPrefix,
   classifyBatch,
+  expireStaleBatches,
   kernelSummary,
   needsReview,
   processBatch,
@@ -39,6 +40,7 @@ const CornersSchema = z.tuple([Point, Point, Point, Point]);
 const BUSY = ["detecting", "classifying"] as const;
 
 async function loadBatch(ctx: AppContext, orgId: string, id: string) {
+  await expireStaleBatches(ctx, { batchId: id });
   const [batch] = await ctx.db
     .select()
     .from(batches)

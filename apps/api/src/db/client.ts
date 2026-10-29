@@ -29,16 +29,36 @@ const migrationsFolder = fileURLToPath(
  * Connects to Postgres when a URL is given. Otherwise opens an embedded
  * PGlite database: in `dataDir`, or in memory when `dataDir` is null.
  */
+/** Any fixed number; instances agree on it so only one migrates at a time. */
+const MIGRATION_LOCK = 4_202_611;
+
 export function createDb(
   databaseUrl: string | undefined,
   dataDir: string | null,
+  options: { poolMax?: number } = {},
 ): DbHandle {
   if (databaseUrl) {
-    const pool = new pg.Pool({ connectionString: databaseUrl });
+    const pool = new pg.Pool({
+      connectionString: databaseUrl,
+      max: options.poolMax ?? 10,
+    });
     const db = drizzlePg(pool, { schema });
     return {
       db,
-      migrate: () => migratePg(db, { migrationsFolder }),
+      // Several instances can start at once (Cloud Run scaling). The advisory lock
+      // makes the others wait, then find the migrations already applied.
+      migrate: async () => {
+        const client = await pool.connect();
+        try {
+          await client.query("select pg_advisory_lock($1)", [MIGRATION_LOCK]);
+          await migratePg(drizzlePg(client), { migrationsFolder });
+        } finally {
+          await client
+            .query("select pg_advisory_unlock($1)", [MIGRATION_LOCK])
+            .catch(() => undefined);
+          client.release();
+        }
+      },
       close: () => pool.end(),
     };
   }

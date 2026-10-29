@@ -261,6 +261,11 @@ export const batches = pgTable("batches", {
     onDelete: "set null",
   }),
   createdAt: createdAt(),
+  /** Changes on every update. A busy batch that stops changing was cut off by a restart. */
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 });
 
 export const reviewStatusEnum = pgEnum("review_status", [
