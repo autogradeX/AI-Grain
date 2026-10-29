@@ -34,7 +34,14 @@ import {
 } from "../batches/service.js";
 import { ensureCrop, normalizeCropKey } from "../crops/service.js";
 import { getStandard } from "../standards/routes.js";
-import { loadSample, measurementOf, refreshResult } from "./service.js";
+import {
+  estimateFor,
+  estimateResult,
+  gradeFor,
+  loadSample,
+  measurementOf,
+  refreshResult,
+} from "./service.js";
 
 const Mass = z.number().positive().max(100_000);
 const Pct = z.number().min(0).max(100);
@@ -191,6 +198,7 @@ export function sampleRoutes(ctx: AppContext) {
         modelFor(ctx, id),
       ]);
       const crop = await ensureCrop(ctx, me.orgId, sample.crop);
+      const estimate = await estimateFor(ctx, id, crop.classes);
       // Results saved before classes had groups lack the group totals and purity.
       const result = sample.result && {
         ...sample.result,
@@ -214,6 +222,14 @@ export function sampleRoutes(ctx: AppContext) {
           label: crop.label,
           classes: crop.classes,
         },
+        // Live while kernels are classified and reviewed; null until any kernel counts.
+        estimate:
+          estimate.counted > 0
+            ? {
+                ...estimate,
+                grade: gradeFor(estimate, sample, standard?.grades ?? null),
+              }
+            : null,
         standard: standard ?? null,
         effectiveModel: model,
         batches: batchRows,
@@ -267,15 +283,39 @@ export function sampleRoutes(ctx: AppContext) {
       return refreshResult(ctx, id);
     });
 
+    /**
+     * Completes a sample. The result comes from the scale when the sample was
+     * weighed. Without a sample mass, it can come from the photo estimate if
+     * the sample's standard allows that. Flagged kernels must be reviewed either way.
+     */
     app.post("/samples/:id/complete", write, async (request) => {
       const me = authOf(request);
       const { id } = z.object({ id: z.uuid() }).parse(request.params);
       const sample = await editable(me.orgId, id);
+      const standard = sample.standardId
+        ? await getStandard(ctx, me.orgId, sample.standardId)
+        : null;
+      const summary = await kernelSummary(ctx, { sampleId: id });
+      const weighed = measurementOf(sample) !== null;
+      const onEstimate = !weighed && standard?.allowEstimate === true;
       const problems: string[] = [];
-      if (!measurementOf(sample)) problems.push("enter the sample mass");
+      if (!weighed && !onEstimate) {
+        problems.push(
+          standard
+            ? "enter the sample mass (this standard doesn't allow completing on the photo estimate)"
+            : "enter the sample mass",
+        );
+      }
+      if (
+        onEstimate &&
+        (summary.total === 0 || summary.classified < summary.total)
+      ) {
+        problems.push(
+          "photograph the sample and classify every kernel, for the photo estimate",
+        );
+      }
       if ((await busyBatches(ctx, id)).length)
         problems.push("wait for photos to finish processing");
-      const summary = await kernelSummary(ctx, { sampleId: id });
       if (summary.pendingReview > 0) {
         problems.push(
           `check the ${summary.pendingReview} flagged kernel(s) still waiting for review`,
@@ -283,11 +323,23 @@ export function sampleRoutes(ctx: AppContext) {
       }
       if (problems.length)
         throw badRequest(`Before completing: ${problems.join(", ")}.`);
-      const refreshed = await refreshResult(ctx, id);
+
+      let result;
+      if (weighed) {
+        result = (await refreshResult(ctx, id)).result;
+      } else {
+        const crop = await ensureCrop(ctx, me.orgId, sample.crop);
+        result = estimateResult(
+          await estimateFor(ctx, id, crop.classes),
+          sample,
+          standard?.grades ?? null,
+        );
+      }
       const [row] = await ctx.db
         .update(samples)
         .set({
           status: "completed",
+          result,
           completedAt: new Date(),
           completedBy: me.id,
         })
@@ -300,7 +352,8 @@ export function sampleRoutes(ctx: AppContext) {
         detail: {
           id,
           number: sample.number,
-          grade: refreshed.result?.grade.grade ?? null,
+          grade: result?.grade.grade ?? null,
+          source: result?.source ?? "weighed",
         },
       });
       return row;
@@ -309,10 +362,16 @@ export function sampleRoutes(ctx: AppContext) {
     app.post("/samples/:id/reopen", write, async (request) => {
       const me = authOf(request);
       const { id } = z.object({ id: z.uuid() }).parse(request.params);
-      await loadSample(ctx, me.orgId, id);
+      const sample = await loadSample(ctx, me.orgId, id);
       const [row] = await ctx.db
         .update(samples)
-        .set({ status: "in_progress", completedAt: null, completedBy: null })
+        .set({
+          status: "in_progress",
+          completedAt: null,
+          completedBy: null,
+          // An estimate-based result is shown live again while the sample is open.
+          ...(sample.result?.source === "estimate" && { result: null }),
+        })
         .where(eq(samples.id, id))
         .returning();
       await audit(ctx.db, {

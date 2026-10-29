@@ -141,6 +141,16 @@ export function renderReport(data: ReportData): Promise<Buffer> {
       .text(
         `Purity ${fmt(pct!.purityPct)} % · total defects ${fmt(pct!.totalDefectsPct)} % by mass`,
       );
+    if (sample.result.source === "estimate") {
+      doc
+        .fillColor("#8a4b00")
+        .fontSize(9)
+        .text(
+          "Estimated from the photos (kernel areas), not weighed. The standard allows completing on the estimate.",
+          { width },
+        )
+        .fillColor("#000");
+    }
   }
 
   // Per-class table

@@ -79,6 +79,7 @@ export function SamplePage() {
       <MassCard sample={s} editable={editable} />
       <PhotosCard sample={s} editable={editable} />
       <ReviewCard sample={s} />
+      <EstimateCard sample={s} />
       {/* Keyed by the saved weights, so the form resets when they change on the server. */}
       <CupsCard
         key={JSON.stringify(s.cupMassG)}
@@ -570,6 +571,88 @@ function limitName(f: LimitFailure, classes: readonly ClassDef[]) {
   return "Test weight";
 }
 
+/** Mass % estimated from kernel areas in the photos, with the weighed result beside it when there is one. */
+function EstimateCard({ sample }: { sample: Sample }) {
+  const e = sample.estimate;
+  const classes = sample.cropProfile.classes;
+  const weighed =
+    sample.result && sample.result.source !== "estimate" ? sample.result : null;
+  if (!e) return null;
+  const pendingNote =
+    sample.kernels.pendingReview > 0
+      ? `Uses Claude's classes for the ${sample.kernels.pendingReview} flagged kernel(s) not checked yet.`
+      : "Uses your decisions for every flagged kernel.";
+  const top = classes
+    .filter((c) => (e.byClass[c.id] ?? 0) > 0)
+    .sort((a, b) => (e.byClass[b.id] ?? 0) - (e.byClass[a.id] ?? 0))
+    .slice(0, 6);
+  return (
+    <Card title="Instant estimate from the photos">
+      <div className="estimate-head">
+        <div>
+          <div className="result-grade">{pct(e.purityPct, 1)}</div>
+          <div className="muted small">estimated purity</div>
+        </div>
+        {sample.standard && (
+          <div>
+            <div className="result-grade">
+              {e.grade.grade ? `Grade ${e.grade.grade}` : "Below all grades"}
+            </div>
+            <div className="muted small">on the estimate</div>
+          </div>
+        )}
+      </div>
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th className="num">Estimate</th>
+              {weighed && <th className="num">Weighed</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {CLASS_GROUPS.map((g) => (
+              <tr key={g}>
+                <td>{GROUP_LABELS[g]}</td>
+                <td className="num">{pct(e.byGroup[g])}</td>
+                {weighed && (
+                  <td className="num">{pct(weighed.byGroupPct[g])}</td>
+                )}
+              </tr>
+            ))}
+            <tr className="total">
+              <td>Total defects</td>
+              <td className="num">{pct(e.totalDefectsPct)}</td>
+              {weighed && (
+                <td className="num">{pct(weighed.totalDefectsPct)}</td>
+              )}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {top.length > 0 && (
+        <p className="small">
+          Largest classes:{" "}
+          {top
+            .map(
+              (c) =>
+                `${c.label} ${pct(e.byClass[c.id], 2)} (${e.countByClass[c.id] ?? 0} objects)`,
+            )
+            .join(" · ")}
+        </p>
+      )}
+      <p className="muted small">
+        Weight is estimated from each object's area in the photo and its class's
+        mass factor, over {e.counted} of {e.objects} objects
+        {e.unclear + e.unclassified > 0 &&
+          ` (${e.unclear + e.unclassified} unclear or not yet classified are left out)`}
+        . {pendingNote} Weighing the cups gives the verified result.
+      </p>
+    </Card>
+  );
+}
+
 function ResultCard({ sample }: { sample: Sample }) {
   const can = useCan();
   const update = useSampleUpdate(sample.id);
@@ -594,7 +677,12 @@ function ResultCard({ sample }: { sample: Sample }) {
   return (
     <Card title="5. Result and report">
       {!r ? (
-        <p className="muted">Enter the cup weights to see the result.</p>
+        <p className="muted">
+          Enter the cup weights to see the result
+          {sample.standard?.allowEstimate
+            ? ", or complete the sample on the photo estimate (this standard allows it)."
+            : "."}
+        </p>
       ) : (
         <>
           <div className="result">
@@ -606,8 +694,14 @@ function ResultCard({ sample }: { sample: Sample }) {
                 : "No standard"}
             </div>
             <div className="muted">
-              Total defects {pct(r.totalDefectsPct)} by mass
+              Purity {pct(r.purityPct)} · total defects {pct(r.totalDefectsPct)}{" "}
+              by mass
             </div>
+            {r.source === "estimate" ? (
+              <Badge tone="warn">Estimated from photos, not weighed</Badge>
+            ) : (
+              <Badge tone="good">Weighed</Badge>
+            )}
           </div>
           {Object.entries(r.grade.failures).length > 0 && (
             <div className="stack-sm">

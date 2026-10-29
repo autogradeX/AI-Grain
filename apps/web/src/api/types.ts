@@ -31,8 +31,22 @@ export interface Standard {
   description: string | null;
   grades: GradeSpec[];
   definitions: Partial<Record<string, string>>;
+  allowEstimate: boolean;
   archived: boolean;
   updatedAt: string;
+}
+
+export interface SampleEstimate {
+  byClass: Record<string, number>;
+  byGroup: Record<ClassGroup, number>;
+  totalDefectsPct: number;
+  purityPct: number;
+  objects: number;
+  counted: number;
+  unclear: number;
+  unclassified: number;
+  countByClass: Record<string, number>;
+  grade: GradeResult;
 }
 
 export interface Crop {
@@ -64,6 +78,7 @@ export interface SampleListItem {
 }
 
 export interface SampleResult {
+  source?: "weighed" | "estimate";
   byClassPct: Record<string, number>;
   byGroupPct: Record<ClassGroup, number>;
   purityPct: number;
@@ -117,6 +132,8 @@ export interface Sample {
   createdAt: string;
   completedAt: string | null;
   cropProfile: CropProfile;
+  /** Mass % estimated from kernel areas in the photos; null until kernels are classified. */
+  estimate: SampleEstimate | null;
   standard: Standard | null;
   batches: {
     id: string;

@@ -35,6 +35,7 @@ const StandardBody = z.object({
       "Grade names must be unique",
     ),
   definitions: z.record(ClassId, z.string().max(1000)).default({}),
+  allowEstimate: z.boolean().default(false),
 });
 
 /** Limits and definitions may only name classes of the standard's crop. */

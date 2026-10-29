@@ -885,3 +885,9 @@ button.link {
   flex-direction: column;
   gap: 0.5rem;
 }
+
+.estimate-head {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "standards" ADD COLUMN "allow_estimate" boolean DEFAULT false NOT NULL;

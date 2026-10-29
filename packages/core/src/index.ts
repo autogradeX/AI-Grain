@@ -35,3 +35,5 @@ export type {
 } from "./validation.js";
 export { apply as applyHomography, homography } from "./homography.js";
 export type { Homography, Pt } from "./homography.js";
+export { estimateFromObjects } from "./estimate.js";
+export type { EstimateObject, MassEstimate } from "./estimate.js";

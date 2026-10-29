@@ -152,6 +152,11 @@ export const standards = pgTable("standards", {
   definitions: jsonb("definitions")
     .$type<Partial<Record<string, string>>>()
     .notNull(),
+  /**
+   * Whether a sample may be completed on the photo estimate when it wasn't
+   * weighed. Off by default: weighing gives the verified result.
+   */
+  allowEstimate: boolean("allow_estimate").notNull().default(false),
   archived: boolean("archived").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -181,6 +186,8 @@ export const sampleStatusEnum = pgEnum("sample_status", [
 ]);
 
 export interface SampleResult {
+  /** "weighed": from the cups on the scale. "estimate": from kernel areas in the photos. Missing means weighed. */
+  source?: "weighed" | "estimate";
   byClassPct: Record<string, number>;
   /** Missing on results computed before groups existed. */
   byGroupPct?: Record<ClassGroup, number>;

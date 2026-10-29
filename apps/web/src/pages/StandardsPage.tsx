@@ -161,6 +161,9 @@ function StandardForm({ standard }: { standard: Standard | null }) {
   const [name, setName] = useState(standard?.name ?? "");
   const [crop, setCrop] = useState(standard?.crop ?? "wheat");
   const [description, setDescription] = useState(standard?.description ?? "");
+  const [allowEstimate, setAllowEstimate] = useState(
+    standard?.allowEstimate ?? false,
+  );
   const [definitions, setDefinitions] = useState<
     Partial<Record<string, string>>
   >(standard?.definitions ?? {});
@@ -184,6 +187,7 @@ function StandardForm({ standard }: { standard: Standard | null }) {
           ),
         ),
         grades: grades.map((g) => fromForm(g, classIds)),
+        allowEstimate,
       };
       return standard
         ? api.put<Standard>(`/standards/${standard.id}`, body)
@@ -281,6 +285,16 @@ function StandardForm({ standard }: { standard: Standard | null }) {
             onChange={(e) => setDescription(e.target.value)}
           />
         </Field>
+        <label className="row small">
+          <input
+            type="checkbox"
+            disabled={readOnly}
+            checked={allowEstimate}
+            onChange={(e) => setAllowEstimate(e.target.checked)}
+          />
+          Allow completing a sample on the photo estimate when it wasn't weighed
+          (faster, but not verified by the scale)
+        </label>
       </Card>
 
       <Card
