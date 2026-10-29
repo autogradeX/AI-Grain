@@ -27,7 +27,7 @@ export function CropsPage() {
       api.post<Crop>("/crops", { key: name, label: name.trim() }),
     onSuccess: (crop) => {
       void qc.invalidateQueries({ queryKey: ["crops"] });
-      void navigate(`/crops/${crop.key}`);
+      void navigate(`/app/crops/${crop.key}`);
     },
   });
 
@@ -46,7 +46,7 @@ export function CropsPage() {
       <ul className="list">
         {crops.data?.map((c) => (
           <li key={c.key}>
-            <Link to={`/crops/${c.key}`} className="list-item">
+            <Link to={`/app/crops/${c.key}`} className="list-item">
               <div>
                 <strong>{c.label}</strong>{" "}
                 {c.archived && <Badge>Archived</Badge>}
@@ -158,7 +158,7 @@ function CropForm({ crop }: { crop: Crop }) {
   return (
     <div className="stack">
       <div>
-        <Link to="/crops" className="muted small">
+        <Link to="/app/crops" className="muted small">
           ← Crops
         </Link>
         <h1>{crop.label}</h1>

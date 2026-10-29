@@ -22,6 +22,8 @@ export interface Org {
   effectiveModel: ClaudeModel;
   models: ClaudeModel[];
   claudeConfigured: boolean;
+  /** This organisation runs the public website (demo, hub, enquiries). */
+  isSiteOwner: boolean;
 }
 
 export interface Standard {
@@ -129,6 +131,9 @@ export interface Sample {
   result: SampleResult | null;
   reference: ReferenceResult | null;
   aiSummary: string | null;
+  /** Shown on the public website's demo page. */
+  publicDemo: boolean;
+  demoTitle: string | null;
   createdAt: string;
   completedAt: string | null;
   cropProfile: CropProfile;

@@ -33,7 +33,7 @@ export function StandardsPage() {
       <div className="page-head">
         <h1>Grading standards</h1>
         {can.admin && (
-          <Link className="button primary" to="/standards/new">
+          <Link className="button primary" to="/app/standards/new">
             New standard
           </Link>
         )}
@@ -66,7 +66,7 @@ export function StandardsPage() {
       <ul className="list">
         {standards.data?.map((s) => (
           <li key={s.id}>
-            <Link to={`/standards/${s.id}`} className="list-item">
+            <Link to={`/app/standards/${s.id}`} className="list-item">
               <div>
                 <strong>{s.name}</strong>{" "}
                 <span className="muted">· {s.crop}</span>
@@ -195,7 +195,7 @@ function StandardForm({ standard }: { standard: Standard | null }) {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["standards"] });
-      void navigate("/standards");
+      void navigate("/app/standards");
     },
   });
   const archive = useMutation({
@@ -205,7 +205,7 @@ function StandardForm({ standard }: { standard: Standard | null }) {
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["standards"] });
-      void navigate("/standards");
+      void navigate("/app/standards");
     },
   });
 
@@ -238,7 +238,7 @@ function StandardForm({ standard }: { standard: Standard | null }) {
       }}
     >
       <div>
-        <Link to="/standards" className="muted small">
+        <Link to="/app/standards" className="muted small">
           ← Standards
         </Link>
         <h1>{standard ? standard.name : "New standard"}</h1>
@@ -258,7 +258,7 @@ function StandardForm({ standard }: { standard: Standard | null }) {
           </Field>
           <Field
             label="Crop"
-            hint={<Link to="/crops">Edit crops and their classes</Link>}
+            hint={<Link to="/app/crops">Edit crops and their classes</Link>}
           >
             <select
               required

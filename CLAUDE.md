@@ -4,7 +4,7 @@ npm-workspaces monorepo, TypeScript (ESM). Node 22+.
 
 - `packages/core`: pure grading logic shared by API and web. No I/O.
 - `apps/api`: Fastify + Drizzle (Postgres, or PGlite when `DATABASE_URL` is empty). One folder per module in `src/modules`; route modules take an `AppContext` so tests can swap the database, storage, mailer and classifier.
-- `apps/web`: React + Vite + TanStack Query. Imports `@ai-grain/core` from its built `dist`.
+- `apps/web`: React + Vite + TanStack Query. Imports `@ai-grain/core` from its built `dist`. The public website lives at `/` (`src/pages/public`); the signed-in app lives under `/app`.
 
 Rules:
 
@@ -15,4 +15,5 @@ Rules:
 - The API must keep working on Cloud Run (see `deploy/cloud-run.md`): no state on local disk (use `ctx.storage`), no state in memory that other instances need, and background jobs must survive being cut off.
 - Grade limits are configuration supplied by the user. Don't hard-code official grade standards.
 - Kernel counting stays in classic image processing (`apps/api/src/imaging`); Claude only classifies crops. Final percentages come from the scale.
+- Public endpoints (`/api/public/...`) only expose data of the site-owner organisation that it chose to publish (demo samples, published articles, certificates).
 - Tests never call the real Claude API: use `FakeClassifier` from `apps/api/test/helpers.ts`, or inject `fetch` into `ClaudeClassifier`.

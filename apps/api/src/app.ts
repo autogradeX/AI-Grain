@@ -22,6 +22,7 @@ import { promptRoutes } from "./modules/prompts/routes.js";
 import { referenceRoutes } from "./modules/references/routes.js";
 import { reportRoutes } from "./modules/reports/routes.js";
 import { sampleRoutes } from "./modules/samples/routes.js";
+import { publicSiteRoutes, siteAdminRoutes } from "./modules/site/routes.js";
 import { standardRoutes } from "./modules/standards/routes.js";
 import { userRoutes } from "./modules/users/routes.js";
 import { validationRoutes } from "./modules/validation/routes.js";
@@ -110,6 +111,8 @@ export async function buildApp(
       await api.register(certificateRoutes(ctx));
       await api.register(analyticsRoutes(ctx));
       await api.register(publicVerifyRoutes(ctx), { prefix: "/public" });
+      await api.register(publicSiteRoutes(ctx), { prefix: "/public" });
+      await api.register(siteAdminRoutes(ctx));
     },
     { prefix: "/api" },
   );

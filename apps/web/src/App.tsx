@@ -25,6 +25,13 @@ import { StandardEditPage, StandardsPage } from "./pages/StandardsPage";
 import { UsersPage } from "./pages/UsersPage";
 import { ValidationPage } from "./pages/ValidationPage";
 import { VerifyPage } from "./pages/VerifyPage";
+import { WebsitePage } from "./pages/WebsitePage";
+import { ContactPage } from "./pages/public/ContactPage";
+import { DemoPage } from "./pages/public/DemoPage";
+import { HomePage } from "./pages/public/HomePage";
+import { ArticlePage, HubPage } from "./pages/public/HubPage";
+import { PublicLayout } from "./pages/public/PublicLayout";
+import { RoiPage } from "./pages/public/RoiPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -44,9 +51,18 @@ export function App() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
-      <Route path="/verify" element={<VerifyPage />} />
-      <Route path="/verify/:code" element={<VerifyPage />} />
+      <Route element={<PublicLayout />}>
+        <Route index element={<HomePage />} />
+        <Route path="demo" element={<DemoPage />} />
+        <Route path="roi" element={<RoiPage />} />
+        <Route path="contact" element={<ContactPage />} />
+        <Route path="hub" element={<HubPage />} />
+        <Route path="hub/:slug" element={<ArticlePage />} />
+        <Route path="verify" element={<VerifyPage />} />
+        <Route path="verify/:code" element={<VerifyPage />} />
+      </Route>
       <Route
+        path="/app"
         element={
           <RequireAuth>
             <Layout />
@@ -69,9 +85,11 @@ export function App() {
         <Route path="dataset" element={<DatasetPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="website" element={<WebsitePage />} />
         <Route path="more" element={<MorePage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/app" replace />} />
       </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

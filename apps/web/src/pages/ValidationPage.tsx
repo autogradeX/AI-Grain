@@ -112,7 +112,7 @@ export function ValidationPage() {
               <ul className="list">
                 {r.samples.map((s) => (
                   <li key={s.id}>
-                    <Link to={`/samples/${s.id}`} className="list-item">
+                    <Link to={`/app/samples/${s.id}`} className="list-item">
                       <span>
                         #{s.number} · {s.standardName ?? "no standard"}
                       </span>

@@ -45,6 +45,11 @@ const EnvSchema = z.object({
   CLASSIFY_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(3),
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().default("AI-Grain <no-reply@localhost>"),
+  /**
+   * The organisation that runs the public website: its published demo samples,
+   * knowledge hub and contact form. Defaults to the first organisation created.
+   */
+  SITE_OWNER_ORG_ID: z.uuid().optional(),
   /** Directory with the built web app to serve. Leave empty to serve the API only. */
   WEB_DIST_DIR: z.string().optional(),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(20),

@@ -74,13 +74,14 @@ export function CapturePage() {
       form.set("photo", photo!.blob, "board.jpg");
       return api.upload<{ id: string }>(`/samples/${id}/batches`, form);
     },
-    onSuccess: (batch) => navigate(`/batches/${batch.id}`, { replace: true }),
+    onSuccess: (batch) =>
+      navigate(`/app/batches/${batch.id}`, { replace: true }),
   });
 
   return (
     <div className="stack">
       <div>
-        <Link to={`/samples/${id}`} className="muted small">
+        <Link to={`/app/samples/${id}`} className="muted small">
           ← Back to sample
         </Link>
         <h1>Add a board photo</h1>

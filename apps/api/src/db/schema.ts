@@ -32,10 +32,19 @@ export const tokenPurposeEnum = pgEnum("token_purpose", [
   "invite",
 ]);
 
+/** Public website settings, kept on the site owner's organisation. */
+export interface SiteSettings {
+  bookingUrl?: string;
+  contactEmail?: string;
+  phone?: string;
+  address?: string;
+}
+
 export const organizations = pgTable("organizations", {
   id: id(),
   name: text("name").notNull(),
   defaultModel: text("default_model"),
+  site: jsonb("site").$type<SiteSettings>().notNull().default({}),
   createdAt: createdAt(),
 });
 
@@ -232,6 +241,9 @@ export const samples = pgTable(
     result: jsonb("result").$type<SampleResult>(),
     reference: jsonb("reference").$type<ReferenceResult>(),
     aiSummary: text("ai_summary"),
+    /** Shown on the public website's interactive demo. Only the site owner's completed samples. */
+    publicDemo: boolean("public_demo").notNull().default(false),
+    demoTitle: text("demo_title"),
     createdBy: uuid("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -437,4 +449,62 @@ export const certificates = pgTable(
     withdrawnReason: text("withdrawn_reason"),
   },
   (t) => [index("certificates_sample_idx").on(t.sampleId, t.version)],
+);
+
+export const leadStatusEnum = pgEnum("lead_status", [
+  "new",
+  "contacted",
+  "closed",
+]);
+
+/** Messages sent through the public website's contact form. */
+export const leads = pgTable(
+  "leads",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    company: text("company"),
+    phone: text("phone"),
+    message: text("message").notNull(),
+    status: leadStatusEnum("status").notNull().default("new"),
+    ip: text("ip"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("leads_org_idx").on(t.orgId, t.createdAt)],
+);
+
+export const articleKindEnum = pgEnum("article_kind", [
+  "guide",
+  "glossary",
+  "news",
+  "case_study",
+]);
+export type ArticleKind = (typeof articleKindEnum.enumValues)[number];
+
+/** Knowledge hub content on the public website, written in Markdown. */
+export const articles = pgTable(
+  "articles",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    kind: articleKindEnum("kind").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary"),
+    body: text("body").notNull(),
+    published: boolean("published").notNull().default(false),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("articles_org_slug_idx").on(t.orgId, t.slug)],
 );

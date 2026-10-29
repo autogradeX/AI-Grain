@@ -50,7 +50,7 @@ export function ReviewPage() {
   return (
     <div className="stack">
       <div>
-        <Link to={`/samples/${id}`} className="muted small">
+        <Link to={`/app/samples/${id}`} className="muted small">
           ← Sample {sample.data ? `#${sample.data.number}` : ""}
         </Link>
         <h1>Check flagged kernels</h1>
@@ -83,7 +83,7 @@ export function ReviewPage() {
               ? "All flagged kernels are checked."
               : "No flagged kernels."}
           </p>
-          <Link className="button primary" to={`/samples/${id}`}>
+          <Link className="button primary" to={`/app/samples/${id}`}>
             Back to weighing
           </Link>
         </Card>

@@ -73,7 +73,7 @@ export function BatchPage() {
     mutationFn: () => api.delete(`/batches/${id}`),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["sample", sampleId] });
-      void navigate(`/samples/${sampleId}`, { replace: true });
+      void navigate(`/app/samples/${sampleId}`, { replace: true });
     },
   });
 
@@ -105,7 +105,7 @@ export function BatchPage() {
     <div className="stack">
       <div className="page-head">
         <div>
-          <Link to={`/samples/${b.sampleId}`} className="muted small">
+          <Link to={`/app/samples/${b.sampleId}`} className="muted small">
             ← Sample {sample.data ? `#${sample.data.number}` : ""}
           </Link>
           <h1>Batch · {b.side === "crease" ? "crease side" : "top side"}</h1>
@@ -199,7 +199,7 @@ export function BatchPage() {
                 {b.summary.pendingReview > 0 && (
                   <Link
                     className="button primary"
-                    to={`/samples/${b.sampleId}/review`}
+                    to={`/app/samples/${b.sampleId}/review`}
                   >
                     Review flagged kernels
                   </Link>

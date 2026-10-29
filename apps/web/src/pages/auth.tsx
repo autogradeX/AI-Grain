@@ -57,7 +57,7 @@ export function LoginPage() {
   const { user, signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? "/";
+  const from = (location.state as { from?: string } | null)?.from ?? "/app";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [needsVerify, setNeedsVerify] = useState(false);
@@ -136,7 +136,7 @@ export function RegisterPage() {
     );
     if ("accessToken" in res) {
       signIn(res);
-      void navigate("/standards", { replace: true });
+      void navigate("/app/standards", { replace: true });
     } else {
       setSentVerification(true);
     }
@@ -302,7 +302,7 @@ export function VerifyEmailPage() {
       {state === "working" && <Spinner label="Confirming…" />}
       {state === "done" && <p>Your email address is confirmed.</p>}
       {state === "failed" && <ErrorNote error={error} />}
-      <Link to={user ? "/" : "/login"}>Continue</Link>
+      <Link to={user ? "/app" : "/login"}>Continue</Link>
     </AuthFrame>
   );
 }
@@ -332,7 +332,7 @@ export function AcceptInvitePage() {
     signIn(
       await api.post<Session>("/auth/invite/accept", { token, name, password }),
     );
-    void navigate("/", { replace: true });
+    void navigate("/app", { replace: true });
   });
   return (
     <AuthFrame title="Join your team">

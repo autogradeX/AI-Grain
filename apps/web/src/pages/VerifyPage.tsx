@@ -83,11 +83,8 @@ export function VerifyPage() {
   );
 
   return (
-    <div className="public">
-      <div className="content stack">
-        <Link to="/" className="brand">
-          <img src="/icon.svg" alt="" width={28} height={28} /> AI-Grain
-        </Link>
+    <div className="site-page">
+      <div className="site-section narrow stack">
         <h1>Verify a grain report</h1>
         <p className="muted">
           Enter the code printed beside the QR code on the report, or scan the

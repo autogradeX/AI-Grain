@@ -15,6 +15,7 @@ import { api, openFile } from "../api/client";
 import {
   MODEL_LABELS,
   type ClaudeModel,
+  type Org,
   type Sample,
   type Standard,
 } from "../api/types";
@@ -58,7 +59,7 @@ export function SamplePage() {
     <div className="stack">
       <div className="page-head">
         <div>
-          <Link to="/" className="muted small">
+          <Link to="/app" className="muted small">
             ← Samples
           </Link>
           <h1>
@@ -339,7 +340,7 @@ function PhotosCard({
         editable && (
           <button
             className="primary"
-            onClick={() => navigate(`/samples/${sample.id}/capture`)}
+            onClick={() => navigate(`/app/samples/${sample.id}/capture`)}
           >
             Add photo
           </button>
@@ -358,7 +359,7 @@ function PhotosCard({
         <ul className="list">
           {sample.batches.map((b, i) => (
             <li key={b.id}>
-              <Link to={`/batches/${b.id}`} className="list-item">
+              <Link to={`/app/batches/${b.id}`} className="list-item">
                 <div>
                   <strong>
                     Batch {i + 1} ·{" "}
@@ -428,7 +429,10 @@ function ReviewCard({ sample }: { sample: Sample }) {
             Pick out each flagged kernel with tweezers, check it by eye (you
             make the final call) and drop it into the cup for its class.
           </p>
-          <Link className="button primary" to={`/samples/${sample.id}/review`}>
+          <Link
+            className="button primary"
+            to={`/app/samples/${sample.id}/review`}
+          >
             {k.pendingReview > 0
               ? `Review ${k.pendingReview} kernels`
               : "See reviewed kernels"}
@@ -773,6 +777,7 @@ function ResultCard({ sample }: { sample: Sample }) {
         </p>
       )}
       <Certificates sample={sample} />
+      <PublishDemo sample={sample} />
     </Card>
   );
 }
@@ -833,6 +838,76 @@ function Certificates({ sample }: { sample: Sample }) {
   );
 }
 
+/** Site-owner admins can show a completed sample on the public demo page. */
+function PublishDemo({ sample }: { sample: Sample }) {
+  const can = useCan();
+  const qc = useQueryClient();
+  const org = useQuery({
+    queryKey: ["org"],
+    queryFn: () => api.get<Org>("/org"),
+    enabled: can.admin,
+  });
+  const [title, setTitle] = useState<string | null>(null);
+  const publish = useMutation({
+    mutationFn: (publicDemo: boolean) =>
+      api.post(`/samples/${sample.id}/publish`, {
+        publicDemo,
+        demoTitle: (title ?? sample.demoTitle ?? "") || null,
+      }),
+    onSuccess: () => {
+      setTitle(null);
+      void qc.invalidateQueries({ queryKey: ["sample", sample.id] });
+    },
+  });
+  if (!can.admin || !org.data?.isSiteOwner || sample.status !== "completed")
+    return null;
+  return (
+    <details className="small" open={sample.publicDemo}>
+      <summary>
+        Public demo{" "}
+        {sample.publicDemo && <Badge tone="info">on the website</Badge>}
+      </summary>
+      <div className="stack-sm">
+        <p className="muted">
+          Anyone can open this sample on the website's demo page: its photos,
+          kernels, Claude's verdicts and the result. Names, notes and the source
+          are not shown.
+        </p>
+        <Field label="Title on the demo page">
+          <input
+            maxLength={120}
+            placeholder={`${sample.cropProfile.label} sample #${sample.number}`}
+            value={title ?? sample.demoTitle ?? ""}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </Field>
+        <div className="row wrap">
+          <button
+            className={sample.publicDemo ? "" : "primary"}
+            disabled={publish.isPending}
+            onClick={() => publish.mutate(true)}
+          >
+            {sample.publicDemo ? "Save title" : "Publish as demo"}
+          </button>
+          {sample.publicDemo && (
+            <>
+              <Link to="/demo">View demo</Link>
+              <button
+                className="danger"
+                disabled={publish.isPending}
+                onClick={() => publish.mutate(false)}
+              >
+                Remove from website
+              </button>
+            </>
+          )}
+        </div>
+        <ErrorNote error={publish.error} />
+      </div>
+    </details>
+  );
+}
+
 function ReferenceCard({ sample }: { sample: Sample }) {
   const can = useCan();
   const update = useSampleUpdate(sample.id);
@@ -885,7 +960,7 @@ function ReferenceCard({ sample }: { sample: Sample }) {
           Grade {ref.grade ?? "none"}
           {ref.graderName && ` by ${ref.graderName}`}
           {ref.gradedOn && ` on ${ref.gradedOn}`}.{" "}
-          <Link to="/validation">See the comparison</Link>
+          <Link to="/app/validation">See the comparison</Link>
         </p>
       )}
       {open && (

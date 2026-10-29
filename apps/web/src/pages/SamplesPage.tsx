@@ -106,7 +106,7 @@ export function SamplesPage() {
       <ul className="list">
         {samples.data?.items.map((s) => (
           <li key={s.id}>
-            <Link to={`/samples/${s.id}`} className="list-item">
+            <Link to={`/app/samples/${s.id}`} className="list-item">
               <div>
                 <strong>
                   #{s.number} · {s.crop}
@@ -174,7 +174,7 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
         source: source || null,
         sampleMassG: mass ? Number(mass) : null,
       }),
-    onSuccess: (s) => navigate(`/samples/${s.id}`),
+    onSuccess: (s) => navigate(`/app/samples/${s.id}`),
   });
   const matching = standards.data?.filter((s) => s.crop === crop) ?? [];
 

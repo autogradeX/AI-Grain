@@ -18,6 +18,7 @@ import {
   findUserByEmail,
   revokeAllSessions,
 } from "../auth/service.js";
+import { siteOwnerOrgId } from "../site/service.js";
 
 const Role = z.enum(roleEnum.enumValues);
 
@@ -189,6 +190,8 @@ export function userRoutes(ctx: AppContext) {
         effectiveModel: org.defaultModel ?? ctx.config.DEFAULT_MODEL,
         models: CLAUDE_MODELS,
         claudeConfigured: Boolean(ctx.config.ANTHROPIC_API_KEY),
+        // This organisation runs the public website (demo, hub, enquiries).
+        isSiteOwner: (await siteOwnerOrgId(ctx)) === me.orgId,
       };
     });
 
