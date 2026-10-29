@@ -1,11 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client";
+import { useCrops } from "../api/crops";
 import type { Standard } from "../api/types";
 import { Card, ErrorNote, Field, Spinner } from "../components/ui";
+import { useT } from "../i18n";
+import { useGrainLabels } from "../i18n/common";
+import { m } from "./PromptPage.i18n";
 
 /** Level 1: no app needed, just the Claude app on the phone and this prompt. */
 export function PromptPage() {
+  const t = useT(m);
+  const { cropLabel } = useGrainLabels();
+  const crops = useCrops(true);
   const standards = useQuery({
     queryKey: ["standards"],
     queryFn: () => api.get<Standard[]>("/standards"),
@@ -21,23 +28,22 @@ export function PromptPage() {
   });
   return (
     <div className="stack">
-      <h1>Prompt for the Claude app</h1>
-      <p className="muted small">
-        Level 1, without this app's camera flow: save this prompt in the Claude
-        app and send it with a straight-down photo of the grid board, plus a few
-        reference photos of each defect type from your own grain. Then pick out
-        the listed kernels, check them, weigh the cups and enter the weights on
-        a sample here.
-      </p>
-      <Field label="Standard">
+      <h1>{t("title")}</h1>
+      <p className="muted small">{t("intro")}</p>
+      <p className="muted small">{t("englishHint")}</p>
+      <Field label={t("standard")}>
         <select
           value={standardId}
           onChange={(e) => setStandardId(e.target.value)}
         >
-          <option value="">Generic (wheat)</option>
+          <option value="">{t("generic")}</option>
           {standards.data?.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name} ({s.crop})
+              {s.name} (
+              {cropLabel(
+                crops.data?.find((c) => c.key === s.crop)?.label ?? s.crop,
+              )}
+              )
             </option>
           ))}
         </select>
@@ -46,7 +52,7 @@ export function PromptPage() {
       <ErrorNote error={prompt.error} />
       {prompt.data && (
         <Card
-          title="Prompt"
+          title={t("prompt")}
           actions={
             <button
               onClick={() =>
@@ -58,7 +64,7 @@ export function PromptPage() {
                   })
               }
             >
-              {copied ? "Copied" : "Copy"}
+              {copied ? t("copied") : t("copy")}
             </button>
           }
         >

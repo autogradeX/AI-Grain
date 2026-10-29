@@ -1,8 +1,10 @@
-import { classLabel } from "@ai-grain/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, download } from "../api/client";
 import { useCrops } from "../api/crops";
 import { Card, ErrorNote, Spinner } from "../components/ui";
+import { useT } from "../i18n";
+import { useGrainLabels } from "../i18n/common";
+import { m } from "./DatasetPage.i18n";
 
 interface Stat {
   crop: string;
@@ -12,6 +14,8 @@ interface Stat {
 }
 
 export function DatasetPage() {
+  const t = useT(m);
+  const { classLabel, cropLabel } = useGrainLabels();
   const cropProfiles = useCrops(true);
   const stats = useQuery({
     queryKey: ["dataset"],
@@ -28,51 +32,43 @@ export function DatasetPage() {
 
   return (
     <div className="stack">
-      <h1>Training dataset</h1>
-      <p className="muted small">
-        Every kernel an operator confirmed or corrected is a labelled training
-        image. This is the cheapest way to build the dataset a dedicated grading
-        machine needs. Corrections are the most valuable labels: they are where
-        Claude was wrong.
-      </p>
+      <h1>{t("title")}</h1>
+      <p className="muted small">{t("intro")}</p>
       {stats.isPending && <Spinner />}
       <ErrorNote error={stats.error ?? exportZip.error} />
-      {stats.data?.length === 0 && <p>No reviewed kernels yet.</p>}
+      {stats.data?.length === 0 && <p>{t("empty")}</p>}
       {crops.map((crop) => {
         const rows = stats.data!.filter((s) => s.crop === crop);
         const total = rows.reduce((n, r) => n + r.count, 0);
+        const profile = cropProfiles.data?.find((c) => c.key === crop);
         return (
           <Card
             key={crop}
-            title={`${crop} · ${total} labelled kernels`}
+            title={t.n("cardTitle", total, {
+              crop: cropLabel(profile?.label ?? crop),
+            })}
             actions={
               <button
                 className="primary"
                 disabled={exportZip.isPending}
                 onClick={() => exportZip.mutate(crop)}
               >
-                Download ZIP
+                {t("downloadZip")}
               </button>
             }
           >
             <table className="table">
               <thead>
                 <tr>
-                  <th>Class</th>
-                  <th>Labels</th>
-                  <th>Corrected from Claude</th>
+                  <th>{t("cls")}</th>
+                  <th>{t("labels")}</th>
+                  <th>{t("corrected")}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.cls}>
-                    <td>
-                      {classLabel(
-                        cropProfiles.data?.find((c) => c.key === crop)
-                          ?.classes ?? [],
-                        r.cls,
-                      )}
-                    </td>
+                    <td>{classLabel(profile?.classes ?? [], r.cls)}</td>
                     <td className="num">{r.count}</td>
                     <td className="num">{r.corrected}</td>
                   </tr>

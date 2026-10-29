@@ -1,9 +1,4 @@
-import {
-  CLASS_GROUPS,
-  GROUP_LABELS,
-  type ClassGroup,
-  type GradeSpec,
-} from "@ai-grain/core";
+import { CLASS_GROUPS, type ClassGroup, type GradeSpec } from "@ai-grain/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -19,9 +14,15 @@ import {
   formatDate,
   Spinner,
 } from "../components/ui";
+import { useT } from "../i18n";
+import { useGrainLabels } from "../i18n/common";
+import { m } from "./StandardsPage.i18n";
 
 export function StandardsPage() {
   const can = useCan();
+  const t = useT(m);
+  const { cropLabel } = useGrainLabels();
+  const crops = useCrops(true);
   const [showArchived, setShowArchived] = useState(false);
   const standards = useQuery({
     queryKey: ["standards", showArchived],
@@ -31,35 +32,29 @@ export function StandardsPage() {
   return (
     <div className="stack">
       <div className="page-head">
-        <h1>Grading standards</h1>
+        <h1>{t("title")}</h1>
         {can.admin && (
           <Link className="button primary" to="/app/standards/new">
-            New standard
+            {t("newStandard")}
           </Link>
         )}
       </div>
-      <p className="muted small">
-        A standard holds the grade limits (maximum mass % per defect class) and
-        the defect definitions Claude is given. Copy the limits from the
-        official standard you grade against; the app ships with none built in.
-      </p>
+      <p className="muted small">{t("intro")}</p>
       <label className="row small">
         <input
           type="checkbox"
           checked={showArchived}
           onChange={(e) => setShowArchived(e.target.checked)}
         />{" "}
-        Show archived
+        {t("showArchived")}
       </label>
       {standards.isPending && <Spinner />}
       <ErrorNote error={standards.error} />
       {standards.data?.length === 0 && (
         <Card>
           <p>
-            No standards yet.
-            {can.admin
-              ? " Create one to grade samples."
-              : " Ask an admin to create one."}
+            {t("noStandards")}
+            {can.admin ? t("createOne") : t("askAdmin")}
           </p>
         </Card>
       )}
@@ -69,13 +64,20 @@ export function StandardsPage() {
             <Link to={`/app/standards/${s.id}`} className="list-item">
               <div>
                 <strong>{s.name}</strong>{" "}
-                <span className="muted">· {s.crop}</span>
+                <span className="muted">
+                  ·{" "}
+                  {cropLabel(
+                    crops.data?.find((c) => c.key === s.crop)?.label ?? s.crop,
+                  )}
+                </span>
                 <div className="muted small">
-                  Grades {s.grades.map((g) => g.grade).join(", ")} · updated{" "}
-                  {formatDate(s.updatedAt)}
+                  {t("gradesUpdated", {
+                    grades: s.grades.map((g) => g.grade).join(", "),
+                    date: formatDate(s.updatedAt),
+                  })}
                 </div>
               </div>
-              {s.archived && <Badge>Archived</Badge>}
+              {s.archived && <Badge>{t("archived")}</Badge>}
             </Link>
           </li>
         ))}
@@ -155,6 +157,8 @@ export function StandardEditPage() {
 
 function StandardForm({ standard }: { standard: Standard | null }) {
   const can = useCan();
+  const t = useT(m);
+  const { groupLabel, classLabel, cropLabel } = useGrainLabels();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const readOnly = !can.admin;
@@ -239,16 +243,13 @@ function StandardForm({ standard }: { standard: Standard | null }) {
     >
       <div>
         <Link to="/app/standards" className="muted small">
-          ← Standards
+          {t("backToStandards")}
         </Link>
-        <h1>{standard ? standard.name : "New standard"}</h1>
+        <h1>{standard ? standard.name : t("newStandard")}</h1>
       </div>
-      <Card title="Standard">
+      <Card title={t("standard")}>
         <div className="grid-2">
-          <Field
-            label="Name"
-            hint="For example the standard's official name and year"
-          >
+          <Field label={t("name")} hint={t("nameHint")}>
             <input
               required
               disabled={readOnly}
@@ -257,8 +258,8 @@ function StandardForm({ standard }: { standard: Standard | null }) {
             />
           </Field>
           <Field
-            label="Crop"
-            hint={<Link to="/app/crops">Edit crops and their classes</Link>}
+            label={t("crop")}
+            hint={<Link to="/app/crops">{t("editCrops")}</Link>}
           >
             <select
               required
@@ -271,13 +272,13 @@ function StandardForm({ standard }: { standard: Standard | null }) {
               )}
               {crops.data?.map((c) => (
                 <option key={c.key} value={c.key}>
-                  {c.label}
+                  {cropLabel(c.label)}
                 </option>
               ))}
             </select>
           </Field>
         </div>
-        <Field label="Description">
+        <Field label={t("description")}>
           <textarea
             rows={2}
             disabled={readOnly}
@@ -292,13 +293,12 @@ function StandardForm({ standard }: { standard: Standard | null }) {
             checked={allowEstimate}
             onChange={(e) => setAllowEstimate(e.target.checked)}
           />
-          Allow completing a sample on the photo estimate when it wasn't weighed
-          (faster, but not verified by the scale)
+          {t("allowEstimate")}
         </label>
       </Card>
 
       <Card
-        title="Grade limits"
+        title={t("gradeLimits")}
         actions={
           !readOnly && (
             <button
@@ -307,27 +307,22 @@ function StandardForm({ standard }: { standard: Standard | null }) {
                 setGrades([...grades, emptyGrade(String(grades.length + 1))])
               }
             >
-              Add grade
+              {t("addGrade")}
             </button>
           )
         }
       >
-        <p className="muted small">
-          Strictest grade first. A sample gets the first grade whose limits it
-          meets. Limits apply per class and per group. Leave a box empty for no
-          limit. A moisture or test-weight limit fails when that value wasn't
-          measured.
-        </p>
+        <p className="muted small">{t("limitsHint")}</p>
         <div className="table-scroll">
           <table className="table">
             <thead>
               <tr>
-                <th>Limit</th>
+                <th>{t("limit")}</th>
                 {grades.map((g, i) => (
                   <th key={i}>
                     <input
                       className="input-sm"
-                      aria-label="Grade name"
+                      aria-label={t("gradeName")}
                       required
                       disabled={readOnly}
                       value={g.grade}
@@ -341,7 +336,7 @@ function StandardForm({ standard }: { standard: Standard | null }) {
                           setGrades(grades.filter((_, j) => j !== i))
                         }
                       >
-                        remove
+                        {t("removeGrade")}
                       </button>
                     )}
                   </th>
@@ -355,7 +350,7 @@ function StandardForm({ standard }: { standard: Standard | null }) {
                 return (
                   <Fragment key={grp}>
                     <tr className="group-row">
-                      <td>{GROUP_LABELS[grp]} max %</td>
+                      <td>{t("maxPct", { label: groupLabel(grp) })}</td>
                       {grades.map((g, i) => (
                         <td key={i}>
                           {limitInput(
@@ -364,14 +359,19 @@ function StandardForm({ standard }: { standard: Standard | null }) {
                               setGrade(i, {
                                 maxGroupPct: { ...g.maxGroupPct, [grp]: v },
                               }),
-                            `${GROUP_LABELS[grp]} grade ${g.grade}`,
+                            t("limitAria", {
+                              label: groupLabel(grp),
+                              grade: g.grade,
+                            }),
                           )}
                         </td>
                       ))}
                     </tr>
                     {inGroup.map((c) => (
                       <tr key={c.id}>
-                        <td className="indent">{c.label} max %</td>
+                        <td className="indent">
+                          {t("maxPct", { label: classLabel(classes, c.id) })}
+                        </td>
                         {grades.map((g, i) => (
                           <td key={i}>
                             {limitInput(
@@ -383,7 +383,10 @@ function StandardForm({ standard }: { standard: Standard | null }) {
                                     [c.id]: v,
                                   },
                                 }),
-                              `${c.label} grade ${g.grade}`,
+                              t("limitAria", {
+                                label: classLabel(classes, c.id),
+                                grade: g.grade,
+                              }),
                             )}
                           </td>
                         ))}
@@ -393,37 +396,37 @@ function StandardForm({ standard }: { standard: Standard | null }) {
                 );
               })}
               <tr className="total">
-                <td>Total defects max %</td>
+                <td>{t("totalDefects")}</td>
                 {grades.map((g, i) => (
                   <td key={i}>
                     {limitInput(
                       g.maxTotalDefectsPct,
                       (v) => setGrade(i, { maxTotalDefectsPct: v }),
-                      `Total grade ${g.grade}`,
+                      t("totalAria", { grade: g.grade }),
                     )}
                   </td>
                 ))}
               </tr>
               <tr>
-                <td>Moisture max %</td>
+                <td>{t("moisture")}</td>
                 {grades.map((g, i) => (
                   <td key={i}>
                     {limitInput(
                       g.maxMoisturePct,
                       (v) => setGrade(i, { maxMoisturePct: v }),
-                      `Moisture grade ${g.grade}`,
+                      t("moistureAria", { grade: g.grade }),
                     )}
                   </td>
                 ))}
               </tr>
               <tr>
-                <td>Test weight min kg/hl</td>
+                <td>{t("testWeight")}</td>
                 {grades.map((g, i) => (
                   <td key={i}>
                     {limitInput(
                       g.minTestWeightKgPerHl,
                       (v) => setGrade(i, { minTestWeightKgPerHl: v }),
-                      `Test weight grade ${g.grade}`,
+                      t("testWeightAria", { grade: g.grade }),
                     )}
                   </td>
                 ))}
@@ -433,16 +436,11 @@ function StandardForm({ standard }: { standard: Standard | null }) {
         </div>
       </Card>
 
-      <Card title="Defect definitions for Claude">
-        <p className="muted small">
-          Claude reads these with every request. Leave a box empty to use the
-          crop's own description (shown greyed). Paste the standard's wording
-          where it differs, plus any local guidance (for example how to tell
-          Fusarium from weather bleaching in your region).
-        </p>
+      <Card title={t("definitionsTitle")}>
+        <p className="muted small">{t("definitionsHint")}</p>
         <div className="grid-2">
           {classes.map((c) => (
-            <Field key={c.id} label={c.label}>
+            <Field key={c.id} label={classLabel(classes, c.id)}>
               <textarea
                 rows={2}
                 disabled={readOnly}
@@ -462,11 +460,11 @@ function StandardForm({ standard }: { standard: Standard | null }) {
         <div className="row">
           {standard && (
             <button type="button" onClick={() => archive.mutate()}>
-              {standard.archived ? "Restore" : "Archive"}
+              {standard.archived ? t("restore") : t("archive")}
             </button>
           )}
           <button className="primary" disabled={save.isPending}>
-            Save standard
+            {t("saveStandard")}
           </button>
         </div>
       )}

@@ -1,4 +1,4 @@
-import { classLabel, kernelClassIds } from "@ai-grain/core";
+import { kernelClassIds } from "@ai-grain/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { api } from "../api/client";
@@ -7,8 +7,13 @@ import { CropSelect } from "../components/CropSelect";
 import type { ReferenceImage } from "../api/types";
 import { useCan } from "../auth/AuthContext";
 import { AuthImage, Card, ErrorNote, Field, Spinner } from "../components/ui";
+import { useT } from "../i18n";
+import { useGrainLabels } from "../i18n/common";
+import { m } from "./ReferencesPage.i18n";
 
 export function ReferencesPage() {
+  const t = useT(m);
+  const { classLabel, cropLabel } = useGrainLabels();
   const can = useCan();
   const qc = useQueryClient();
   const [crop, setCrop] = useState("wheat");
@@ -31,15 +36,9 @@ export function ReferencesPage() {
 
   return (
     <div className="stack">
-      <h1>Reference images</h1>
-      <p className="muted small">
-        Close-ups of kernels from your own grain, one per defect type or more.
-        Up to 12 per crop, spread across classes, are sent to Claude with every
-        request. They improve accuracy more than anything else you can add. The
-        quickest way to add one is “Use as a reference example” on a reviewed
-        kernel.
-      </p>
-      <Field label="Crop">
+      <h1>{t("title")}</h1>
+      <p className="muted small">{t("intro")}</p>
+      <Field label={t("crop")}>
         <CropSelect value={crop} onChange={setCrop} />
       </Field>
       {can.write && <UploadReference crop={crop} />}
@@ -73,7 +72,7 @@ export function ReferencesPage() {
                       className="link small"
                       onClick={() => remove.mutate(r.id)}
                     >
-                      Remove
+                      {t("remove")}
                     </button>
                   )}
                 </figure>
@@ -83,7 +82,7 @@ export function ReferencesPage() {
         ))}
       {refs.data?.length === 0 && (
         <p className="muted">
-          No reference images for {cropProfile?.label ?? crop} yet.
+          {t("empty", { crop: cropLabel(cropProfile?.label ?? crop) })}
         </p>
       )}
     </div>
@@ -91,6 +90,8 @@ export function ReferencesPage() {
 }
 
 function UploadReference({ crop }: { crop: string }) {
+  const t = useT(m);
+  const { classLabel } = useGrainLabels();
   const qc = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const classes = useCrop(crop)?.classes ?? [];
@@ -111,13 +112,10 @@ function UploadReference({ crop }: { crop: string }) {
     },
   });
   return (
-    <Card title="Add from a photo">
-      <p className="muted small">
-        Use a close-up of a single kernel, cropped square, on the same dark
-        board.
-      </p>
+    <Card title={t("addTitle")}>
+      <p className="muted small">{t("addHint")}</p>
       <div className="grid-3">
-        <Field label="Class">
+        <Field label={t("cls")}>
           <select value={cls} onChange={(e) => setCls(e.target.value)}>
             {kernelClassIds(classes).map((c) => (
               <option key={c} value={c}>
@@ -126,11 +124,11 @@ function UploadReference({ crop }: { crop: string }) {
             ))}
           </select>
         </Field>
-        <Field label="Note (optional)">
+        <Field label={t("note")}>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="e.g. early sprouting"
+            placeholder={t("notePlaceholder")}
           />
         </Field>
         <div className="field">
@@ -140,7 +138,7 @@ function UploadReference({ crop }: { crop: string }) {
             disabled={upload.isPending}
             onClick={() => input.current?.click()}
           >
-            Choose image
+            {t("chooseImage")}
           </button>
         </div>
       </div>

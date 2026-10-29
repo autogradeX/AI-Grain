@@ -1,7 +1,6 @@
 import {
   CLASS_GROUPS,
   CROP_PRESETS,
-  GROUP_LABELS,
   slugifyClassId,
   validateClasses,
   type ClassDef,
@@ -15,8 +14,13 @@ import { useCrops } from "../api/crops";
 import type { Crop } from "../api/types";
 import { useCan } from "../auth/AuthContext";
 import { Badge, Card, ErrorNote, Field, Spinner } from "../components/ui";
+import { useT } from "../i18n";
+import { useGrainLabels } from "../i18n/common";
+import { m } from "./CropsPage.i18n";
 
 export function CropsPage() {
+  const t = useT(m);
+  const { groupLabel, cropLabel } = useGrainLabels();
   const can = useCan();
   const crops = useCrops(true);
   const navigate = useNavigate();
@@ -33,14 +37,8 @@ export function CropsPage() {
 
   return (
     <div className="stack">
-      <h1>Crops and classes</h1>
-      <p className="muted small">
-        Each crop has its own defect classes in four groups: grain admixtures,
-        broken & defective, impurities & foreign material, and harmful &
-        disease. Claude sorts every kernel into one of them, and standards set
-        limits per class and per group. Wheat, barley, oats, rapeseed and hemp
-        start from presets you can change.
-      </p>
+      <h1>{t("title")}</h1>
+      <p className="muted small">{t("intro")}</p>
       {crops.isPending && <Spinner />}
       <ErrorNote error={crops.error} />
       <ul className="list">
@@ -48,22 +46,26 @@ export function CropsPage() {
           <li key={c.key}>
             <Link to={`/app/crops/${c.key}`} className="list-item">
               <div>
-                <strong>{c.label}</strong>{" "}
-                {c.archived && <Badge>Archived</Badge>}
+                <strong>{cropLabel(c.label)}</strong>{" "}
+                {c.archived && <Badge>{t("archived")}</Badge>}
                 <div className="muted small">
-                  {CLASS_GROUPS.map(
-                    (g) =>
-                      `${c.classes.filter((x) => x.group === g).length} ${GROUP_LABELS[g].toLowerCase()}`,
+                  {CLASS_GROUPS.map((g) =>
+                    t("groupCount", {
+                      count: c.classes.filter((x) => x.group === g).length,
+                      group: groupLabel(g).toLowerCase(),
+                    }),
                   ).join(" · ")}
                 </div>
               </div>
-              <span className="muted small">{c.classes.length} classes</span>
+              <span className="muted small">
+                {t.n("classes", c.classes.length)}
+              </span>
             </Link>
           </li>
         ))}
       </ul>
       {can.admin && (
-        <Card title="Add a crop">
+        <Card title={t("addCropTitle")}>
           <form
             className="row wrap"
             onSubmit={(e) => {
@@ -73,7 +75,7 @@ export function CropsPage() {
           >
             <input
               required
-              placeholder="e.g. triticale, sunflower"
+              placeholder={t("addCropPlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               style={{ maxWidth: 320 }}
@@ -82,13 +84,15 @@ export function CropsPage() {
               className="primary"
               disabled={add.isPending || !name.trim()}
             >
-              Add crop
+              {t("addCrop")}
             </button>
           </form>
           <p className="muted small">
-            It starts with the general cereal class list (
-            {Object.keys(CROP_PRESETS).join(", ")} have their own); edit it to
-            fit.
+            {t("addCropHint", {
+              presets: Object.values(CROP_PRESETS)
+                .map((p) => cropLabel(p.label))
+                .join(", "),
+            })}
           </p>
           <ErrorNote error={add.error} />
         </Card>
@@ -103,16 +107,19 @@ interface Row extends ClassDef {
 }
 
 export function CropEditPage() {
+  const t = useT(m);
   const { key = "" } = useParams();
   const crops = useCrops(true);
   const crop = crops.data?.find((c) => c.key === key);
   if (crops.isPending) return <Spinner />;
   if (!crop)
-    return <ErrorNote error={crops.error ?? new Error("Crop not found")} />;
+    return <ErrorNote error={crops.error ?? new Error(t("notFound"))} />;
   return <CropForm key={crop.key + crop.classes.length} crop={crop} />;
 }
 
 function CropForm({ crop }: { crop: Crop }) {
+  const t = useT(m);
+  const { groupLabel, cropLabel } = useGrainLabels();
   const can = useCan();
   const qc = useQueryClient();
   const readOnly = !can.admin;
@@ -159,13 +166,13 @@ function CropForm({ crop }: { crop: Crop }) {
     <div className="stack">
       <div>
         <Link to="/app/crops" className="muted small">
-          ← Crops
+          {t("backToCrops")}
         </Link>
-        <h1>{crop.label}</h1>
-        <div className="muted small">Key: {crop.key}</div>
+        <h1>{cropLabel(crop.label)}</h1>
+        <div className="muted small">{t("key", { key: crop.key })}</div>
       </div>
-      <Card title="Crop">
-        <Field label="Name">
+      <Card title={t("crop")}>
+        <Field label={t("name")}>
           <input
             disabled={readOnly}
             value={label}
@@ -176,23 +183,23 @@ function CropForm({ crop }: { crop: Crop }) {
       {CLASS_GROUPS.map((g) => (
         <Card
           key={g}
-          title={GROUP_LABELS[g]}
+          title={groupLabel(g)}
           actions={
             !readOnly && (
               <button type="button" onClick={() => addRow(g)}>
-                Add class
+                {t("addClass")}
               </button>
             )
           }
         >
           {rows.every((r) => r.group !== g) && (
-            <p className="muted small">No classes in this group.</p>
+            <p className="muted small">{t("noClasses")}</p>
           )}
           {rows.map((r, i) =>
             r.group !== g ? null : (
               <div key={i} className="class-row">
                 <div className="grid-3">
-                  <Field label="Name">
+                  <Field label={t("name")}>
                     <input
                       required
                       disabled={readOnly}
@@ -207,7 +214,7 @@ function CropForm({ crop }: { crop: Crop }) {
                       }
                     />
                   </Field>
-                  <Field label="Group">
+                  <Field label={t("group")}>
                     <select
                       disabled={readOnly}
                       value={r.group}
@@ -217,15 +224,12 @@ function CropForm({ crop }: { crop: Crop }) {
                     >
                       {CLASS_GROUPS.map((x) => (
                         <option key={x} value={x}>
-                          {GROUP_LABELS[x]}
+                          {groupLabel(x)}
                         </option>
                       ))}
                     </select>
                   </Field>
-                  <Field
-                    label="Mass factor"
-                    hint="For the photo estimate: weight relative to a sound kernel of the same size. Empty = 1."
-                  >
+                  <Field label={t("massFactor")} hint={t("massFactorHint")}>
                     <input
                       type="number"
                       step="0.1"
@@ -244,7 +248,7 @@ function CropForm({ crop }: { crop: Crop }) {
                     />
                   </Field>
                 </div>
-                <Field label="Description for Claude">
+                <Field label={t("description")} hint={t("descriptionHint")}>
                   <textarea
                     rows={2}
                     disabled={readOnly}
@@ -253,7 +257,7 @@ function CropForm({ crop }: { crop: Crop }) {
                   />
                 </Field>
                 <div className="row wrap small">
-                  <span className="muted">id: {r.id || "—"}</span>
+                  <span className="muted">{t("id", { id: r.id || "—" })}</span>
                   {!readOnly && (
                     <>
                       <button
@@ -261,14 +265,14 @@ function CropForm({ crop }: { crop: Crop }) {
                         className="link"
                         onClick={() => move(i, -1)}
                       >
-                        Move up
+                        {t("moveUp")}
                       </button>
                       <button
                         type="button"
                         className="link"
                         onClick={() => move(i, 1)}
                       >
-                        Move down
+                        {t("moveDown")}
                       </button>
                       <button
                         type="button"
@@ -278,7 +282,7 @@ function CropForm({ crop }: { crop: Crop }) {
                           setRows(rows.filter((_, j) => j !== i));
                         }}
                       >
-                        Remove
+                        {t("remove")}
                       </button>
                     </>
                   )}
@@ -290,18 +294,18 @@ function CropForm({ crop }: { crop: Crop }) {
       ))}
       {problems.length > 0 && <p className="error">{problems.join("; ")}</p>}
       <ErrorNote error={save.error ?? archive.error} />
-      {saved && <p className="good">Saved.</p>}
+      {saved && <p className="good">{t("saved")}</p>}
       {!readOnly && (
         <div className="row">
           <button type="button" onClick={() => archive.mutate()}>
-            {crop.archived ? "Restore crop" : "Archive crop"}
+            {crop.archived ? t("restore") : t("archive")}
           </button>
           <button
             className="primary"
             disabled={save.isPending || problems.length > 0}
             onClick={() => save.mutate()}
           >
-            Save classes
+            {t("saveClasses")}
           </button>
         </div>
       )}
