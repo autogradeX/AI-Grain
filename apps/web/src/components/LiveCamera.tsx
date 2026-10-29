@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../i18n";
+import { common } from "../i18n/common";
 import type { Corners } from "./CornerEditor";
+import { m } from "./LiveCamera.i18n";
 
 /** Share of the video height the alignment guide covers. */
 const GUIDE_HEIGHT = 0.86;
@@ -21,7 +24,10 @@ export function LiveCamera({
   ) => void;
   onCancel: () => void;
 }) {
+  const t = useT(m);
+  const tc = useT(common);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // The browser's reason, or "" when it gave none; null while the camera works.
   const [error, setError] = useState<string | null>(null);
   const [aspect, setAspect] = useState<number | null>(null);
 
@@ -41,11 +47,7 @@ export function LiveCamera({
         if (videoRef.current) videoRef.current.srcObject = s;
       })
       .catch((err: unknown) =>
-        setError(
-          err instanceof Error
-            ? `Camera unavailable: ${err.message}`
-            : "Camera unavailable",
-        ),
+        setError(err instanceof Error ? err.message : ""),
       );
     return () => stream?.getTracks().forEach((t) => t.stop());
   }, []);
@@ -78,8 +80,12 @@ export function LiveCamera({
 
   return (
     <div className="live-camera">
-      {error ? (
-        <p className="error">{error}</p>
+      {error !== null ? (
+        <p className="error">
+          {error
+            ? t("cameraUnavailableReason", { reason: error })
+            : t("cameraUnavailable")}
+        </p>
       ) : (
         // The frame takes the video's aspect ratio, so the guide covers the same pixels it captures.
         <div
@@ -107,14 +113,11 @@ export function LiveCamera({
           />
         </div>
       )}
-      <p className="muted small">
-        Hold the phone flat on its stand, 20–25 cm above the board. Line the
-        grid edges up with the guide. Even light, no shadows, no direct sun.
-      </p>
+      <p className="muted small">{t("hint")}</p>
       <div className="row">
-        <button onClick={onCancel}>Cancel</button>
+        <button onClick={onCancel}>{tc("cancel")}</button>
         <button className="primary" disabled={!aspect} onClick={capture}>
-          Capture
+          {t("capture")}
         </button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useCrops } from "../api/crops";
+import { useGrainLabels } from "../i18n/common";
 
 /** A select of the organisation's crops, by key. */
 export function CropSelect({
@@ -13,6 +14,7 @@ export function CropSelect({
   id?: string;
 }) {
   const crops = useCrops();
+  const { cropLabel } = useGrainLabels();
   return (
     <select
       id={id}
@@ -25,7 +27,7 @@ export function CropSelect({
       )}
       {crops.data?.map((c) => (
         <option key={c.key} value={c.key}>
-          {c.label}
+          {cropLabel(c.label)}
         </option>
       ))}
     </select>

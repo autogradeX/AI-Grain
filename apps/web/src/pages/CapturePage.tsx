@@ -9,6 +9,8 @@ import {
 } from "../components/CornerEditor";
 import { LiveCamera } from "../components/LiveCamera";
 import { Card, ErrorNote, Field } from "../components/ui";
+import { useT } from "../i18n";
+import { m } from "./CapturePage.i18n";
 
 interface Photo {
   blob: Blob;
@@ -17,7 +19,7 @@ interface Photo {
   height: number;
 }
 
-function loadPhoto(blob: Blob): Promise<Photo> {
+function loadPhoto(blob: Blob, notAnImage: string): Promise<Photo> {
   const url = URL.createObjectURL(blob);
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -28,13 +30,13 @@ function loadPhoto(blob: Blob): Promise<Photo> {
         width: img.naturalWidth,
         height: img.naturalHeight,
       });
-    img.onerror = () =>
-      reject(new Error("That file is not an image the browser can open"));
+    img.onerror = () => reject(new Error(notAnImage));
     img.src = url;
   });
 }
 
 export function CapturePage() {
+  const t = useT(m);
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"choose" | "live">("choose");
@@ -55,7 +57,7 @@ export function CapturePage() {
   const accept = async (blob: Blob, preset?: Corners) => {
     try {
       setLoadError(null);
-      const p = await loadPhoto(blob);
+      const p = await loadPhoto(blob, t("notAnImage"));
       setPhoto(p);
       setCorners(preset ?? insetCorners(p.width, p.height));
       setMode("choose");
@@ -82,9 +84,9 @@ export function CapturePage() {
     <div className="stack">
       <div>
         <Link to={`/app/samples/${id}`} className="muted small">
-          ← Back to sample
+          {t("backToSample")}
         </Link>
-        <h1>Add a board photo</h1>
+        <h1>{t("title")}</h1>
       </div>
 
       {mode === "live" && (
@@ -97,29 +99,21 @@ export function CapturePage() {
       {mode === "choose" && !photo && (
         <Card>
           <ol className="small steps">
-            <li>
-              Spread about 100–150 kernels on the board in one layer, not
-              touching.
-            </li>
-            <li>Fix the phone flat on the stand, 20–25 cm above the board.</li>
-            <li>
-              Light evenly from two sides at 45°, or with a ring light. No
-              shadows, no direct sun.
-            </li>
-            <li>Make sure every grid cell, A1 to T28, is in the picture.</li>
+            <li>{t("stepSpread")}</li>
+            <li>{t("stepStand")}</li>
+            <li>{t("stepLight")}</li>
+            <li>{t("stepCells")}</li>
           </ol>
           <div className="stack-sm">
             <button
               className="primary"
               onClick={() => cameraInput.current?.click()}
             >
-              Take photo
+              {t("takePhoto")}
             </button>
-            <button onClick={() => setMode("live")}>
-              Live camera with alignment guide
-            </button>
+            <button onClick={() => setMode("live")}>{t("liveCamera")}</button>
             <button onClick={() => galleryInput.current?.click()}>
-              Choose an existing photo
+              {t("choosePhoto")}
             </button>
           </div>
           <input
@@ -146,12 +140,8 @@ export function CapturePage() {
       )}
 
       {mode === "choose" && photo && corners && (
-        <Card title="Mark the grid corners">
-          <p className="muted small">
-            Drag each handle onto the outer corner of the grid: A1 top left, T1
-            top right, T28 bottom right, A28 bottom left. The blue lines should
-            sit on the printed grid.
-          </p>
+        <Card title={t("markCorners")}>
+          <p className="muted small">{t("markCornersHint")}</p>
           <CornerEditor
             src={photo.url}
             width={photo.width}
@@ -159,13 +149,13 @@ export function CapturePage() {
             corners={corners}
             onChange={setCorners}
           />
-          <Field label="Which side of the kernels is up?">
+          <Field label={t("whichSide")}>
             <select
               value={side}
               onChange={(e) => setSide(e.target.value as "front" | "crease")}
             >
-              <option value="front">Top side (first photo)</option>
-              <option value="crease">Crease side (kernels flipped)</option>
+              <option value="front">{t("sideFront")}</option>
+              <option value="crease">{t("sideCrease")}</option>
             </select>
           </Field>
           <ErrorNote error={upload.error} />
@@ -176,14 +166,14 @@ export function CapturePage() {
                 setCorners(null);
               }}
             >
-              Retake
+              {t("retake")}
             </button>
             <button
               className="primary"
               disabled={upload.isPending}
               onClick={() => upload.mutate()}
             >
-              {upload.isPending ? "Uploading…" : "Find kernels"}
+              {upload.isPending ? t("uploading") : t("findKernels")}
             </button>
           </div>
         </Card>

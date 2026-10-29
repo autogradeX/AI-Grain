@@ -1,4 +1,4 @@
-import { classLabel, type ClassDef } from "@ai-grain/core";
+import type { ClassDef } from "@ai-grain/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -19,6 +19,9 @@ import {
   ErrorNote,
   Spinner,
 } from "../components/ui";
+import { useT } from "../i18n";
+import { common, useGrainLabels } from "../i18n/common";
+import { m } from "./BatchPage.i18n";
 import { BatchStatusBadge } from "./SamplePage";
 
 const BUSY = new Set(["detecting", "classifying"]);
@@ -35,6 +38,7 @@ export function kernelColor(
 }
 
 export function BatchPage() {
+  const t = useT(m);
   const { id = "" } = useParams();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -106,12 +110,21 @@ export function BatchPage() {
       <div className="page-head">
         <div>
           <Link to={`/app/samples/${b.sampleId}`} className="muted small">
-            ← Sample {sample.data ? `#${sample.data.number}` : ""}
+            {t("backToSample", {
+              number: sample.data ? `#${sample.data.number}` : "",
+            })}
           </Link>
-          <h1>Batch · {b.side === "crease" ? "crease side" : "top side"}</h1>
+          <h1>
+            {t("title", {
+              side: b.side === "crease" ? t("sideCrease") : t("sideTop"),
+            })}
+          </h1>
           <div className="muted small">
-            {b.kernelCount ?? "…"} kernels · {b.summary.flagged} flagged ·{" "}
-            {b.summary.pendingReview} to check
+            {t("counts", {
+              kernels: b.kernelCount ?? "…",
+              flagged: b.summary.flagged,
+              pending: b.summary.pendingReview,
+            })}
           </div>
         </div>
         <BatchStatusBadge status={b.status} />
@@ -120,9 +133,7 @@ export function BatchPage() {
       {busy && (
         <Spinner
           label={
-            b.status === "detecting"
-              ? "Finding kernels…"
-              : "Claude is classifying the kernels…"
+            b.status === "detecting" ? t("findingKernels") : t("classifying")
           }
         />
       )}
@@ -132,7 +143,7 @@ export function BatchPage() {
           <div className="board">
             <AuthImage
               path={`/batches/${id}/image?variant=preview&v=${b.kernelCount ?? 0}`}
-              alt="Straightened board"
+              alt={t("straightenedBoard")}
             />
             <svg
               viewBox={`0 0 ${b.board.width} ${b.board.height}`}
@@ -176,10 +187,7 @@ export function BatchPage() {
               />
             ) : (
               <Card>
-                <p className="muted">
-                  Tap a kernel on the photo to see Claude's verdict and set its
-                  class.
-                </p>
+                <p className="muted">{t("tapKernel")}</p>
               </Card>
             )}
             <ErrorNote error={review.error ?? classify.error ?? remove.error} />
@@ -192,8 +200,8 @@ export function BatchPage() {
                     onClick={() => classify.mutate(false)}
                   >
                     {b.summary.classified
-                      ? "Classify remaining kernels"
-                      : "Classify with Claude"}
+                      ? t("classifyRemaining")
+                      : t("classifyWithClaude")}
                   </button>
                 )}
                 {b.summary.pendingReview > 0 && (
@@ -201,33 +209,28 @@ export function BatchPage() {
                     className="button primary"
                     to={`/app/samples/${b.sampleId}/review`}
                   >
-                    Review flagged kernels
+                    {t("reviewFlagged")}
                   </Link>
                 )}
                 {b.summary.classified > 0 && (
                   <button
                     disabled={busy || classify.isPending}
                     onClick={() =>
-                      confirm(
-                        "Ask Claude again for every kernel? Your decisions are kept.",
-                      ) && classify.mutate(true)
+                      confirm(t("confirmReclassify")) && classify.mutate(true)
                     }
                   >
-                    Reclassify all
+                    {t("reclassifyAll")}
                   </button>
                 )}
                 <button disabled={busy} onClick={() => setRecornering(true)}>
-                  Re-mark corners
+                  {t("remarkCorners")}
                 </button>
                 <button
                   className="danger"
                   disabled={busy || remove.isPending}
-                  onClick={() =>
-                    confirm("Delete this photo and its kernels?") &&
-                    remove.mutate()
-                  }
+                  onClick={() => confirm(t("confirmDelete")) && remove.mutate()}
                 >
-                  Delete batch
+                  {t("deleteBatch")}
                 </button>
               </div>
             )}
@@ -237,10 +240,10 @@ export function BatchPage() {
       {!detected && b.status === "failed" && editable && (
         <div className="row">
           <button onClick={() => setRecornering(true)}>
-            Re-mark corners and retry
+            {t("remarkRetry")}
           </button>
           <button className="danger" onClick={() => remove.mutate()}>
-            Delete batch
+            {t("deleteBatch")}
           </button>
         </div>
       )}
@@ -249,12 +252,13 @@ export function BatchPage() {
 }
 
 function Legend() {
+  const t = useT(m);
   const items: [string, string][] = [
-    [CLASS_COLORS.defect!, "Defect"],
-    [CLASS_COLORS.unclear!, "Unclear"],
-    [CLASS_COLORS.cluster!, "Touching kernels"],
-    [CLASS_COLORS.sound!, "Sound"],
-    [CLASS_COLORS.pending!, "Not classified"],
+    [CLASS_COLORS.defect!, t("legendDefect")],
+    [CLASS_COLORS.unclear!, t("legendUnclear")],
+    [CLASS_COLORS.cluster!, t("legendCluster")],
+    [CLASS_COLORS.sound!, t("legendSound")],
+    [CLASS_COLORS.pending!, t("legendPending")],
   ];
   return (
     <div className="legend">
@@ -282,26 +286,29 @@ function KernelPanel({
   onPick: (cls: string) => void;
   onClear: () => void;
 }) {
+  const t = useT(m);
+  const { classLabel } = useGrainLabels();
   return (
-    <Card title={`Kernel #${kernel.number} · cell ${kernel.cell}`}>
+    <Card
+      title={t("kernelTitle", { number: kernel.number, cell: kernel.cell })}
+    >
       <div className="kernel-detail">
         <AuthImage
           path={`/kernels/${kernel.id}/crop`}
-          alt={`Kernel ${kernel.number}`}
+          alt={t("kernelAlt", { number: kernel.number })}
           className="crop"
         />
         <div className="stack-sm">
           {kernel.isCluster && (
-            <p className="warn small">
-              Looks like touching kernels. Separate them and take a new photo,
-              or classify the group by hand.
-            </p>
+            <p className="warn small">{t("clusterWarning")}</p>
           )}
           <div>
-            Claude: <ClassBadge cls={kernel.aiClass} classes={classes} />{" "}
+            {t("claude")} <ClassBadge cls={kernel.aiClass} classes={classes} />{" "}
             {kernel.aiConfidence && (
               <span className="muted small">
-                {kernel.aiConfidence} confidence
+                {t("confidence", {
+                  level: t(`confidence_${kernel.aiConfidence}`),
+                })}
               </span>
             )}
           </div>
@@ -309,11 +316,11 @@ function KernelPanel({
             <div className="muted small">“{kernel.aiReason}”</div>
           )}
           <div>
-            Your decision:{" "}
+            {t("yourDecision")}{" "}
             {kernel.finalClass ? (
               <ClassBadge cls={kernel.finalClass} classes={classes} />
             ) : (
-              <span className="muted">not checked</span>
+              <span className="muted">{t("notChecked")}</span>
             )}
           </div>
         </div>
@@ -329,14 +336,14 @@ function KernelPanel({
           />
           {kernel.finalClass && (
             <button className="link small" onClick={onClear}>
-              Clear my decision
+              {t("clearDecision")}
             </button>
           )}
         </>
       )}
       {kernel.finalClass && kernel.finalClass !== "sound" && (
         <p className="muted small">
-          Put this kernel in the “{classLabel(classes, kernel.finalClass)}” cup.
+          {t("putInCup", { cls: classLabel(classes, kernel.finalClass) })}
         </p>
       )}
     </Card>
@@ -344,6 +351,8 @@ function KernelPanel({
 }
 
 function Recorner({ batch, onDone }: { batch: Batch; onDone: () => void }) {
+  const t = useT(m);
+  const tc = useT(common);
   const [src, setSrc] = useState<string | null>(null);
   const [corners, setCorners] = useState<Corners>(
     () =>
@@ -369,11 +378,8 @@ function Recorner({ batch, onDone }: { batch: Batch; onDone: () => void }) {
     onSuccess: onDone,
   });
   return (
-    <Card title="Re-mark the grid corners">
-      <p className="muted small">
-        Kernels will be found again; earlier verdicts and decisions for this
-        photo are cleared.
-      </p>
+    <Card title={t("remarkTitle")}>
+      <p className="muted small">{t("remarkHint")}</p>
       <ErrorNote error={error ?? save.error} />
       {src && (
         <CornerEditor
@@ -385,13 +391,13 @@ function Recorner({ batch, onDone }: { batch: Batch; onDone: () => void }) {
         />
       )}
       <div className="row">
-        <button onClick={onDone}>Cancel</button>
+        <button onClick={onDone}>{tc("cancel")}</button>
         <button
           className="primary"
           disabled={save.isPending}
           onClick={() => save.mutate()}
         >
-          Find kernels again
+          {t("findAgain")}
         </button>
       </div>
     </Card>

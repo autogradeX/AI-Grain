@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, download } from "../api/client";
+import { useCrops } from "../api/crops";
 import { CropSelect } from "../components/CropSelect";
 import type { SampleListItem, Standard } from "../api/types";
 import { useCan } from "../auth/AuthContext";
@@ -14,11 +15,17 @@ import {
   pct,
   Spinner,
 } from "../components/ui";
+import { useT } from "../i18n";
+import { common, useGrainLabels } from "../i18n/common";
+import { m } from "./SamplesPage.i18n";
 
 const PAGE = 25;
 
 export function SamplesPage() {
+  const t = useT(m);
   const can = useCan();
+  const crops = useCrops();
+  const { cropLabel } = useGrainLabels();
   const [status, setStatus] = useState<"" | "in_progress" | "completed">("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -41,16 +48,16 @@ export function SamplesPage() {
   return (
     <div className="stack">
       <div className="page-head">
-        <h1>Samples</h1>
+        <h1>{t("title")}</h1>
         <div className="row">
           <button
             onClick={() => void download("/samples/export.csv", "samples.csv")}
           >
-            Export CSV
+            {t("exportCsv")}
           </button>
           {can.write && (
             <button className="primary" onClick={() => setCreating(true)}>
-              New sample
+              {t("newSample")}
             </button>
           )}
         </div>
@@ -62,9 +69,9 @@ export function SamplesPage() {
         <div className="segmented">
           {(
             [
-              ["", "All"],
-              ["in_progress", "In progress"],
-              ["completed", "Completed"],
+              ["", t("all")],
+              ["in_progress", t("inProgress")],
+              ["completed", t("completed")],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -81,7 +88,7 @@ export function SamplesPage() {
         </div>
         <input
           type="search"
-          placeholder="Search number, crop or source"
+          placeholder={t("search")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -94,13 +101,8 @@ export function SamplesPage() {
       <ErrorNote error={samples.error} />
       {samples.data && samples.data.items.length === 0 && (
         <Card>
-          <p>No samples yet.</p>
-          {can.write && (
-            <p className="muted">
-              Set up a grading standard first, then create a sample for each lot
-              you screen.
-            </p>
-          )}
+          <p>{t("noSamples")}</p>
+          {can.write && <p className="muted">{t("noSamplesHint")}</p>}
         </Card>
       )}
       <ul className="list">
@@ -109,25 +111,29 @@ export function SamplesPage() {
             <Link to={`/app/samples/${s.id}`} className="list-item">
               <div>
                 <strong>
-                  #{s.number} · {s.crop}
+                  #{s.number} ·{" "}
+                  {cropLabel(
+                    crops.data?.find((c) => c.key === s.crop)?.label ?? s.crop,
+                  )}
                 </strong>
                 {s.source && <span className="muted"> · {s.source}</span>}
                 <div className="muted small">
-                  {s.standardName ?? "No standard"} · {formatDate(s.createdAt)}
+                  {s.standardName ?? t("noStandard")} ·{" "}
+                  {formatDate(s.createdAt)}
                   {s.createdByName && ` · ${s.createdByName}`}
                 </div>
               </div>
               <div className="list-item-end">
                 {s.status === "completed" ? (
                   <Badge tone={s.grade ? "good" : "warn"}>
-                    {s.grade ? `Grade ${s.grade}` : "No grade"}
+                    {s.grade ? t("grade", { grade: s.grade }) : t("noGrade")}
                   </Badge>
                 ) : (
-                  <Badge tone="info">In progress</Badge>
+                  <Badge tone="info">{t("inProgress")}</Badge>
                 )}
                 {s.totalDefectsPct !== null && (
                   <span className="muted small">
-                    {pct(s.totalDefectsPct)} defects
+                    {t("defects", { pct: pct(s.totalDefectsPct) })}
                   </span>
                 )}
               </div>
@@ -138,17 +144,20 @@ export function SamplesPage() {
       {samples.data && samples.data.total > PAGE && (
         <div className="row center">
           <button disabled={page === 0} onClick={() => setPage(page - 1)}>
-            Previous
+            {t("previous")}
           </button>
           <span className="muted">
-            {page * PAGE + 1}–{Math.min(samples.data.total, (page + 1) * PAGE)}{" "}
-            of {samples.data.total}
+            {t("range", {
+              from: page * PAGE + 1,
+              to: Math.min(samples.data.total, (page + 1) * PAGE),
+              total: samples.data.total,
+            })}
           </span>
           <button
             disabled={(page + 1) * PAGE >= samples.data.total}
             onClick={() => setPage(page + 1)}
           >
-            Next
+            {t("next")}
           </button>
         </div>
       )}
@@ -157,6 +166,8 @@ export function SamplesPage() {
 }
 
 function NewSampleForm({ onCancel }: { onCancel: () => void }) {
+  const t = useT(m);
+  const tc = useT(common);
   const navigate = useNavigate();
   const standards = useQuery({
     queryKey: ["standards"],
@@ -179,7 +190,7 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
   const matching = standards.data?.filter((s) => s.crop === crop) ?? [];
 
   return (
-    <Card title="New sample">
+    <Card title={t("newSample")}>
       <form
         className="grid-2"
         onSubmit={(e) => {
@@ -187,7 +198,7 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
           create.mutate();
         }}
       >
-        <Field label="Crop">
+        <Field label={t("crop")}>
           <CropSelect
             value={crop}
             onChange={(c) => {
@@ -197,18 +208,14 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
           />
         </Field>
         <Field
-          label="Standard"
-          hint={
-            matching.length
-              ? undefined
-              : "No standard for this crop yet: results get percentages but no grade."
-          }
+          label={t("standard")}
+          hint={matching.length ? undefined : t("noStandardHint")}
         >
           <select
             value={standardId}
             onChange={(e) => setStandardId(e.target.value)}
           >
-            <option value="">None</option>
+            <option value="">{tc("none")}</option>
             {matching.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -216,13 +223,10 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
             ))}
           </select>
         </Field>
-        <Field label="Source (farm, lot, truck)">
+        <Field label={t("source")}>
           <input value={source} onChange={(e) => setSource(e.target.value)} />
         </Field>
-        <Field
-          label="Working sample mass (g)"
-          hint="Weigh 20–25 g on the 0.01 g scale (about 500–600 wheat kernels)."
-        >
+        <Field label={t("mass")} hint={t("massHint")}>
           <input
             type="number"
             inputMode="decimal"
@@ -235,10 +239,10 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
         <ErrorNote error={create.error} />
         <div className="row">
           <button type="button" onClick={onCancel}>
-            Cancel
+            {tc("cancel")}
           </button>
           <button className="primary" disabled={create.isPending}>
-            Create sample
+            {t("createSample")}
           </button>
         </div>
       </form>

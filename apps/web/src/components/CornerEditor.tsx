@@ -1,5 +1,7 @@
 import { applyHomography, homography, type Pt } from "@ai-grain/core";
 import { useRef, useState } from "react";
+import { useT } from "../i18n";
+import { m } from "./CornerEditor.i18n";
 
 export type Corners = [Pt, Pt, Pt, Pt];
 
@@ -40,6 +42,7 @@ export function CornerEditor({
   corners: Corners;
   onChange: (corners: Corners) => void;
 }) {
+  const t = useT(m);
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragging, setDragging] = useState<number | null>(null);
   const [loupe, setLoupe] = useState<{ x: number; y: number } | null>(null);
@@ -85,7 +88,7 @@ export function CornerEditor({
 
   return (
     <div className="corner-editor">
-      <img src={src} alt="Board photo" draggable={false} />
+      <img src={src} alt={t("boardPhoto")} draggable={false} />
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
