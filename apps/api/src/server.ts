@@ -3,6 +3,7 @@ import { Storage as GcsClient } from "@google-cloud/storage";
 import { ClaudeClassifier, UnconfiguredClassifier } from "./ai/classifier.js";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
+import { SchemaMismatchError } from "./db/adopt.js";
 import { createDb, DatabaseUnreachableError } from "./db/client.js";
 import { JobRunner } from "./lib/jobs.js";
 import { LogMailer, SmtpMailer } from "./lib/mailer.js";
@@ -22,7 +23,12 @@ try {
   if (config.RUN_MIGRATIONS) await dbHandle.migrate();
 } catch (err) {
   // A plain message instead of a stack trace, so the cause is the first thing in the logs.
-  console.error(err instanceof DatabaseUnreachableError ? err.message : err);
+  console.error(
+    err instanceof DatabaseUnreachableError ||
+      err instanceof SchemaMismatchError
+      ? err.message
+      : err,
+  );
   process.exit(1);
 }
 

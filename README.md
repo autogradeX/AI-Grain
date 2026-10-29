@@ -87,7 +87,7 @@ SQL migrations are in [`apps/api/drizzle`](apps/api/drizzle), generated from `ap
 - at start-up (default; a database lock keeps several instances from migrating at once), or
 - with `npm run db:migrate`, or `node apps/api/dist/src/db/migrate-cli.js` in the container, and `RUN_MIGRATIONS=false` on the server.
 
-The `.sql` files also run as-is in `psql`, but the app then doesn't know they were applied; prefer the commands above.
+The `.sql` files also run as-is in `psql`. If the tables were created that way, the app notices at start-up, records the matching migrations as applied and runs only newer ones.
 
 ## Development
 

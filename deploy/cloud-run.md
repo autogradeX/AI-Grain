@@ -147,6 +147,30 @@ gcloud run services describe $SERVICE --region=$REGION --project=$PROJECT \
 
 Also check that the database and user in `DATABASE_URL` exist (`gcloud sql databases list --instance=$INSTANCE`, `gcloud sql users list --instance=$INSTANCE`).
 
+### `type "batch_status" already exists` during migrations
+
+The tables were created by running a migration `.sql` file by hand (psql, Cloud SQL Studio), so the app's migration log `drizzle.__drizzle_migrations` is empty and it tries to create everything again.
+
+The app handles this itself: at start-up it compares the existing tables with each migration's schema snapshot, records the matching migrations as applied (`Found tables created outside the app; recorded migrations … as already applied`) and runs only the newer ones. If the tables only partly match, it stops with a list of what is missing instead of guessing.
+
+For an image built before that fix, record the hand-run migrations yourself in Cloud SQL Studio or psql, then deploy again:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS drizzle;
+CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (id serial PRIMARY KEY, hash text NOT NULL, created_at bigint);
+-- 0000_init: you ran this by hand
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '3c5df5c651fc557fdf539329182f0d79a1c501951b895593988bd3a79be5ecd3', 1793277117881
+WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE created_at = 1793277117881);
+-- 0001_batch_updated_at: only recorded if you ran it too (batches.updated_at exists)
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '12519b8a04b460e11eb4855952f3953592d46dab9e5841c2e7fbdc23f377d719', 1793287189474
+WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'batches' AND column_name = 'updated_at')
+  AND NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE created_at = 1793287189474);
+```
+
+To start clean instead (only while the database holds no data), drop and recreate the database and let the app create the tables.
+
 ### Photos disappear or show "Image unavailable"
 
 Files are on the container disk. Set `STORAGE_BUCKET` (preferred), or mount the bucket as a Cloud Storage volume and point `DATA_DIR` at the mount path. With a volume mount, the bucket must be writable by the container user (uid 1000).

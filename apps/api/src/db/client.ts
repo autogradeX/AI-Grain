@@ -8,6 +8,7 @@ import { migrate as migratePg } from "drizzle-orm/node-postgres/migrator";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { parse as parseConnectionString } from "pg-connection-string";
+import { adoptHandAppliedSchema } from "./adopt.js";
 import * as schema from "./schema.js";
 
 export type Db = ReturnType<typeof drizzlePg<typeof schema>>;
@@ -128,6 +129,15 @@ export function createDb(
         const client = await pool.connect();
         try {
           await client.query("select pg_advisory_lock($1)", [MIGRATION_LOCK]);
+          const adopted = await adoptHandAppliedSchema(
+            (text, params) => client.query(text, params),
+            migrationsFolder,
+          );
+          if (adopted.length) {
+            console.warn(
+              `Found tables created outside the app; recorded migrations ${adopted.join(", ")} as already applied.`,
+            );
+          }
           await migratePg(drizzlePg(client), { migrationsFolder });
         } finally {
           await client
