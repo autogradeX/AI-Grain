@@ -9,6 +9,7 @@ import Fastify, { type FastifyServerOptions } from "fastify";
 import { ZodError } from "zod";
 import type { AppContext } from "./context.js";
 import { HttpError } from "./lib/errors.js";
+import { analyticsRoutes } from "./modules/analytics/routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { batchRoutes } from "./modules/batches/routes.js";
 import {
@@ -107,6 +108,7 @@ export async function buildApp(
       await api.register(datasetRoutes(ctx));
       await api.register(promptRoutes(ctx));
       await api.register(certificateRoutes(ctx));
+      await api.register(analyticsRoutes(ctx));
       await api.register(publicVerifyRoutes(ctx), { prefix: "/public" });
     },
     { prefix: "/api" },

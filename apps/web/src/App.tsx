@@ -10,6 +10,7 @@ import {
   ResetPasswordPage,
   VerifyEmailPage,
 } from "./pages/auth";
+import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { BatchPage } from "./pages/BatchPage";
 import { CapturePage } from "./pages/CapturePage";
 import { CropEditPage, CropsPage } from "./pages/CropsPage";
@@ -57,6 +58,7 @@ export function App() {
         <Route path="samples/:id/capture" element={<CapturePage />} />
         <Route path="samples/:id/review" element={<ReviewPage />} />
         <Route path="batches/:id" element={<BatchPage />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="crops" element={<CropsPage />} />
         <Route path="crops/:key" element={<CropEditPage />} />
         <Route path="standards" element={<StandardsPage />} />
