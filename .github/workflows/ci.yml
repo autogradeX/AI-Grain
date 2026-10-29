@@ -17,3 +17,9 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t ai-grain .

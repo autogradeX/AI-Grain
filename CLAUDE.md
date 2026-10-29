@@ -1,9 +1,17 @@
 # AI-Grain
 
-TypeScript (ESM, NodeNext) library for grain quality analysis. Node 22+.
+npm-workspaces monorepo, TypeScript (ESM). Node 22+.
 
-- Run `npm run check` before committing. It runs typecheck, lint, the Prettier check and the tests, the same checks as CI.
-- Source is in `src/`. Export the public API from `src/index.ts`. Relative imports use `.js` extensions.
-- Tests are in `test/*.test.ts` and use Vitest.
-- The tsconfig is strict and includes `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`.
-- Grade limits are configuration supplied by the caller. Don't hard-code official grade standards in library code.
+- `packages/core`: pure grading logic shared by API and web. No I/O.
+- `apps/api`: Fastify + Drizzle (Postgres, or PGlite when `DATABASE_URL` is empty). One folder per module in `src/modules`; route modules take an `AppContext` so tests can swap the database, storage, mailer and classifier.
+- `apps/web`: React + Vite + TanStack Query. Imports `@ai-grain/core` from its built `dist`.
+
+Rules:
+
+- Run `npm run check` before committing. It builds core, typechecks, lints, checks formatting and runs all tests, the same as CI.
+- Relative imports in core and api use `.js` extensions.
+- Every query on org data filters by `orgId` from the authenticated user. Write routes use `requireRole(...WRITE_ROLES)` or `requireRole("admin")`.
+- After changing `apps/api/src/db/schema.ts`, run `npm run db:generate -- --name <change>` and commit the migration.
+- Grade limits are configuration supplied by the user. Don't hard-code official grade standards.
+- Kernel counting stays in classic image processing (`apps/api/src/imaging`); Claude only classifies crops. Final percentages come from the scale.
+- Tests never call the real Claude API: use `FakeClassifier` from `apps/api/test/helpers.ts`, or inject `fetch` into `ClaudeClassifier`.

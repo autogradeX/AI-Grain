@@ -1,0 +1,243 @@
+import { BOARD_PX_PER_CM, cellAt, rawToSharp, type RawImage } from "./board.js";
+
+/** Detection runs on a downscaled board: faster, and it smooths out printed grid lines. */
+const DETECT_PX_PER_CM = 25;
+const SCALE = BOARD_PX_PER_CM / DETECT_PX_PER_CM;
+
+export interface DetectOptions {
+  /** Smallest object to keep, in cm². Smaller blobs are dust or grid noise. */
+  minAreaCm2?: number;
+  /** Erosion radius in detection pixels, to remove thin grid lines before labelling. */
+  openingRadius?: number;
+  /** Larger bright areas are not kernels: usually table showing past a misplaced corner. */
+  maxAreaCm2?: number;
+}
+
+/** How much brighter than the board a pixel must be to count as an object. */
+const MIN_CONTRAST = 30;
+
+export interface DetectedKernel {
+  /** 1-based, in reading order: row by row, left to right. */
+  number: number;
+  /** Bounding box in straightened-board pixels. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Area in straightened-board pixels. */
+  area: number;
+  cell: string;
+  isCluster: boolean;
+}
+
+export interface Detection {
+  kernels: DetectedKernel[];
+  threshold: number;
+  medianArea: number;
+  /** Bright regions too large to be kernels, which were left out. */
+  ignoredLargeRegions: number;
+}
+
+/**
+ * Finds kernels on a dark board by classic image processing: grayscale,
+ * Otsu threshold, morphological opening, connected components. Counting
+ * stays out of the language model, which is unreliable at exact counts of
+ * many small objects.
+ */
+export async function detectKernels(
+  board: RawImage,
+  options: DetectOptions = {},
+): Promise<Detection> {
+  const minAreaCm2 = options.minAreaCm2 ?? 0.02;
+  const radius = options.openingRadius ?? 1;
+
+  const width = Math.round(board.width / SCALE);
+  const height = Math.round(board.height / SCALE);
+  const gray = await rawToSharp(board)
+    .resize(width, height, { kernel: "linear" })
+    .grayscale()
+    .raw()
+    .toBuffer();
+
+  // Otsu alone splits the board from the *light* kernels and misses dark ones
+  // (heat damage, black point), which are the defects that matter most. Cap the
+  // threshold at a fixed contrast above the board, which covers most of the image.
+  const background = median(gray);
+  const threshold = Math.min(otsu(gray), background + MIN_CONTRAST);
+  let mask: Uint8Array = new Uint8Array(width * height);
+  for (let i = 0; i < gray.length; i++) mask[i] = gray[i]! > threshold ? 1 : 0;
+  if (radius > 0) {
+    mask = dilate(erode(mask, width, height, radius), width, height, radius);
+  }
+
+  const cm2 = DETECT_PX_PER_CM * DETECT_PX_PER_CM;
+  const minArea = minAreaCm2 * cm2;
+  const maxArea = (options.maxAreaCm2 ?? 4) * cm2;
+  const all = label(mask, width, height);
+  const blobs = all.filter((b) => b.area >= minArea && b.area <= maxArea);
+  const ignoredLargeRegions = all.filter((b) => b.area > maxArea).length;
+
+  const areas = blobs.map((b) => b.area).sort((a, b) => a - b);
+  const medianArea = areas.length ? areas[Math.floor(areas.length / 2)]! : 0;
+
+  const kernels = blobs
+    .map((b) => {
+      const x = Math.max(0, Math.round(b.minX * SCALE));
+      const y = Math.max(0, Math.round(b.minY * SCALE));
+      const w = Math.min(
+        board.width - x,
+        Math.round((b.maxX - b.minX + 1) * SCALE),
+      );
+      const h = Math.min(
+        board.height - y,
+        Math.round((b.maxY - b.minY + 1) * SCALE),
+      );
+      return {
+        x,
+        y,
+        w,
+        h,
+        area: Math.round(b.area * SCALE * SCALE),
+        cell: cellAt(x + w / 2, y + h / 2),
+        row: Math.floor((y + h / 2) / BOARD_PX_PER_CM),
+        cx: x + w / 2,
+        isCluster: areas.length >= 5 && b.area > medianArea * 2.2,
+      };
+    })
+    .sort((a, b) => a.row - b.row || a.cx - b.cx)
+    .map(({ row: _row, cx: _cx, ...k }, i) => ({ number: i + 1, ...k }));
+
+  return {
+    kernels,
+    threshold,
+    medianArea: Math.round(medianArea * SCALE * SCALE),
+    ignoredLargeRegions,
+  };
+}
+
+/** Median gray level. The board covers most of the image, so this is the board's brightness. */
+function median(gray: Uint8Array | Buffer): number {
+  const hist = new Array<number>(256).fill(0);
+  for (const v of gray) hist[v]!++;
+  let seen = 0;
+  for (let i = 0; i < 256; i++) {
+    seen += hist[i]!;
+    if (seen * 2 >= gray.length) return i;
+  }
+  return 255;
+}
+
+/** Otsu's method: the threshold that best separates the histogram into two classes. */
+export function otsu(gray: Uint8Array | Buffer): number {
+  const hist = new Array<number>(256).fill(0);
+  for (const v of gray) hist[v]!++;
+  const total = gray.length;
+  let sumAll = 0;
+  for (let i = 0; i < 256; i++) sumAll += i * hist[i]!;
+  let sumBg = 0;
+  let weightBg = 0;
+  let best = 0;
+  let threshold = 127;
+  for (let t = 0; t < 256; t++) {
+    weightBg += hist[t]!;
+    if (weightBg === 0) continue;
+    const weightFg = total - weightBg;
+    if (weightFg === 0) break;
+    sumBg += t * hist[t]!;
+    const meanBg = sumBg / weightBg;
+    const meanFg = (sumAll - sumBg) / weightFg;
+    const between = weightBg * weightFg * (meanBg - meanFg) ** 2;
+    if (between > best) {
+      best = between;
+      threshold = t;
+    }
+  }
+  return threshold;
+}
+
+/** Square min-filter, done as a horizontal then a vertical pass. */
+function erode(m: Uint8Array, w: number, h: number, r: number): Uint8Array {
+  return filter(filter(m, w, h, r, true, 1), w, h, r, false, 1);
+}
+
+function dilate(m: Uint8Array, w: number, h: number, r: number): Uint8Array {
+  return filter(filter(m, w, h, r, true, 0), w, h, r, false, 0);
+}
+
+/** For erosion (`keep` = 1) a pixel stays set only if all neighbours are set; for dilation (`keep` = 0) it is set if any is. */
+function filter(
+  m: Uint8Array,
+  w: number,
+  h: number,
+  r: number,
+  horizontal: boolean,
+  keep: 0 | 1,
+): Uint8Array {
+  const out = new Uint8Array(m.length);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let value = keep;
+      for (let d = -r; d <= r; d++) {
+        const nx = horizontal ? x + d : x;
+        const ny = horizontal ? y : y + d;
+        const v = nx < 0 || ny < 0 || nx >= w || ny >= h ? 0 : m[ny * w + nx]!;
+        if (keep === 1 && v === 0) {
+          value = 0;
+          break;
+        }
+        if (keep === 0 && v === 1) {
+          value = 1;
+          break;
+        }
+      }
+      out[y * w + x] = value;
+    }
+  }
+  return out;
+}
+
+interface Blob {
+  area: number;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** 8-connected component labelling with an explicit stack. */
+function label(mask: Uint8Array, w: number, h: number): Blob[] {
+  const seen = new Uint8Array(mask.length);
+  const stack = new Int32Array(mask.length);
+  const blobs: Blob[] = [];
+  for (let start = 0; start < mask.length; start++) {
+    if (!mask[start] || seen[start]) continue;
+    let top = 0;
+    stack[top++] = start;
+    seen[start] = 1;
+    const blob: Blob = { area: 0, minX: w, minY: h, maxX: 0, maxY: 0 };
+    while (top > 0) {
+      const i = stack[--top]!;
+      const x = i % w;
+      const y = (i - x) / w;
+      blob.area++;
+      if (x < blob.minX) blob.minX = x;
+      if (x > blob.maxX) blob.maxX = x;
+      if (y < blob.minY) blob.minY = y;
+      if (y > blob.maxY) blob.maxY = y;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const j = ny * w + nx;
+          if (mask[j] && !seen[j]) {
+            seen[j] = 1;
+            stack[top++] = j;
+          }
+        }
+      }
+    }
+    blobs.push(blob);
+  }
+  return blobs;
+}

@@ -1,0 +1,17 @@
+{
+  "name": "AI-Grain",
+  "short_name": "AI-Grain",
+  "description": "Grain screening with a phone, a precise scale and Claude",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f4ee",
+  "theme_color": "#2f5d34",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

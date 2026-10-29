@@ -1,0 +1,33 @@
+# Production-like setup: the app plus Postgres. Copy .env.example to .env first.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: aigrain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: aigrain
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aigrain"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://aigrain:${POSTGRES_PASSWORD}@db:5432/aigrain
+    ports:
+      - "3000:3000"
+    volumes:
+      - files:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db:
+  files:

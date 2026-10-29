@@ -1,33 +1,39 @@
 {
   "name": "ai-grain",
   "version": "0.1.0",
-  "description": "AI-assisted grain quality analysis",
+  "description": "Low-cost grain screening with a phone, a precise scale and Claude",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit",
+    "build": "tsc -b && npm run build -w @ai-grain/web",
+    "typecheck": "tsc -b && npm run typecheck -w @ai-grain/web",
+    "dev": "npm run build:core && concurrently -n api,web -c green,cyan \"npm run dev -w @ai-grain/api\" \"npm run dev -w @ai-grain/web\"",
+    "build:core": "tsc -b packages/core",
+    "db:generate": "npm run db:generate -w @ai-grain/api",
+    "db:migrate": "npm run db:migrate -w @ai-grain/api",
+    "start": "npm run start -w @ai-grain/api",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.5",
+    "concurrently": "^10.0.6",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
     "prettier": "^3.9.10",
-    "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",
     "vitest": "^5.0.5"
