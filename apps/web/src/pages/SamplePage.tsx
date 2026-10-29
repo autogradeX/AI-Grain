@@ -1,7 +1,5 @@
 import {
   CLASS_GROUPS,
-  GROUP_LABELS,
-  classLabel,
   massPercentages,
   validateMeasurement,
   type ClassDef,
@@ -29,6 +27,11 @@ import {
   pct,
   Spinner,
 } from "../components/ui";
+import { useT, type Translate } from "../i18n";
+import { common, useGrainLabels } from "../i18n/common";
+import { m } from "./SamplePage.i18n";
+
+type T = Translate<keyof typeof m>;
 
 const BUSY = new Set(["detecting", "classifying"]);
 
@@ -49,6 +52,8 @@ export function SamplePage() {
   const { id = "" } = useParams();
   const sample = useSample(id);
   const can = useCan();
+  const t = useT(m);
+  const { cropLabel } = useGrainLabels();
 
   if (sample.isPending) return <Spinner />;
   if (sample.error) return <ErrorNote error={sample.error} />;
@@ -60,19 +65,23 @@ export function SamplePage() {
       <div className="page-head">
         <div>
           <Link to="/app" className="muted small">
-            ← Samples
+            {t("backToSamples")}
           </Link>
           <h1>
-            Sample #{s.number} · {s.crop}
+            {t("heading", {
+              number: s.number,
+              crop: cropLabel(s.cropProfile.label),
+            })}
           </h1>
           <div className="muted small">
-            {s.source ?? "No source"} · created {formatDate(s.createdAt)}
+            {s.source ?? t("noSource")} ·{" "}
+            {t("createdOn", { date: formatDate(s.createdAt) })}
           </div>
         </div>
         {s.status === "completed" ? (
-          <Badge tone="good">Completed</Badge>
+          <Badge tone="good">{t("completed")}</Badge>
         ) : (
-          <Badge tone="info">In progress</Badge>
+          <Badge tone="info">{t("inProgress")}</Badge>
         )}
       </div>
 
@@ -116,6 +125,8 @@ function DetailsCard({
     queryFn: () => api.get<Standard[]>("/standards"),
   });
   const update = useSampleUpdate(sample.id);
+  const t = useT(m);
+  const tc = useT(common);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     standardId: sample.standardId ?? "",
@@ -140,19 +151,21 @@ function DetailsCard({
   if (!editing) {
     return (
       <Card
-        title="Details"
+        title={t("details")}
         actions={
-          editable && <button onClick={() => setEditing(true)}>Edit</button>
+          editable && (
+            <button onClick={() => setEditing(true)}>{tc("edit")}</button>
+          )
         }
       >
         <dl className="facts">
-          <dt>Standard</dt>
-          <dd>{sample.standard?.name ?? "None (no grade will be assigned)"}</dd>
-          <dt>AI model</dt>
+          <dt>{t("standard")}</dt>
+          <dd>{sample.standard?.name ?? t("noStandard")}</dd>
+          <dt>{t("aiModel")}</dt>
           <dd>{MODEL_LABELS[sample.effectiveModel]}</dd>
           {sample.notes && (
             <>
-              <dt>Notes</dt>
+              <dt>{t("notes")}</dt>
               <dd>{sample.notes}</dd>
             </>
           )}
@@ -161,7 +174,7 @@ function DetailsCard({
     );
   }
   return (
-    <Card title="Details">
+    <Card title={t("details")}>
       <form
         className="grid-2"
         onSubmit={(e) => {
@@ -169,12 +182,12 @@ function DetailsCard({
           save.mutate();
         }}
       >
-        <Field label="Standard">
+        <Field label={t("standard")}>
           <select
             value={form.standardId}
             onChange={(e) => setForm({ ...form, standardId: e.target.value })}
           >
-            <option value="">None</option>
+            <option value="">{tc("none")}</option>
             {standards.data
               ?.filter((s) => s.crop === sample.crop)
               .map((s) => (
@@ -184,12 +197,12 @@ function DetailsCard({
               ))}
           </select>
         </Field>
-        <Field label="AI model for this sample">
+        <Field label={t("aiModelForSample")}>
           <select
             value={form.model}
             onChange={(e) => setForm({ ...form, model: e.target.value })}
           >
-            <option value="">Organisation default</option>
+            <option value="">{t("orgDefault")}</option>
             {(Object.keys(MODEL_LABELS) as ClaudeModel[]).map((m) => (
               <option key={m} value={m}>
                 {MODEL_LABELS[m]}
@@ -197,13 +210,13 @@ function DetailsCard({
             ))}
           </select>
         </Field>
-        <Field label="Source">
+        <Field label={t("source")}>
           <input
             value={form.source}
             onChange={(e) => setForm({ ...form, source: e.target.value })}
           />
         </Field>
-        <Field label="Notes">
+        <Field label={t("notes")}>
           <textarea
             rows={2}
             value={form.notes}
@@ -213,10 +226,10 @@ function DetailsCard({
         <ErrorNote error={save.error} />
         <div className="row">
           <button type="button" onClick={() => setEditing(false)}>
-            Cancel
+            {tc("cancel")}
           </button>
           <button className="primary" disabled={save.isPending}>
-            Save
+            {tc("save")}
           </button>
         </div>
       </form>
@@ -226,6 +239,8 @@ function DetailsCard({
 
 function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
   const update = useSampleUpdate(sample.id);
+  const t = useT(m);
+  const tc = useT(common);
   const [form, setForm] = useState({
     sampleMassG: str(sample.sampleMassG),
     moisturePct: str(sample.moisturePct),
@@ -246,11 +261,8 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
     form.testWeightKgPerHl !== str(sample.testWeightKgPerHl);
 
   return (
-    <Card title="1. Weigh the working sample">
-      <p className="muted small">
-        Use a 0.01 g scale. A kitchen scale with 1 g steps is too coarse: on a
-        50 g sample, 1 g is already 2 %.
-      </p>
+    <Card title={t("weighTitle")}>
+      <p className="muted small">{t("weighHint")}</p>
       <form
         className="grid-3"
         onSubmit={(e) => {
@@ -258,7 +270,7 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
           save.mutate();
         }}
       >
-        <Field label="Sample mass (g)">
+        <Field label={t("sampleMass")}>
           <input
             type="number"
             inputMode="decimal"
@@ -269,7 +281,7 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
             onChange={(e) => setForm({ ...form, sampleMassG: e.target.value })}
           />
         </Field>
-        <Field label="Moisture (%)" hint="Optional, from a moisture meter">
+        <Field label={t("moisture")} hint={t("moistureHint")}>
           <input
             type="number"
             inputMode="decimal"
@@ -281,7 +293,7 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
             onChange={(e) => setForm({ ...form, moisturePct: e.target.value })}
           />
         </Field>
-        <Field label="Test weight (kg/hl)" hint="Optional">
+        <Field label={t("testWeight")} hint={t("optional")}>
           <input
             type="number"
             inputMode="decimal"
@@ -297,7 +309,7 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
         <ErrorNote error={save.error} />
         {editable && dirty && (
           <button className="primary" disabled={save.isPending}>
-            Save
+            {tc("save")}
           </button>
         )}
       </form>
@@ -314,6 +326,7 @@ function PhotosCard({
 }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const t = useT(m);
   const classify = useMutation({
     mutationFn: async () => {
       for (const b of sample.batches) {
@@ -335,26 +348,21 @@ function PhotosCard({
 
   return (
     <Card
-      title="2. Photograph the kernels"
+      title={t("photosTitle")}
       actions={
         editable && (
           <button
             className="primary"
             onClick={() => navigate(`/app/samples/${sample.id}/capture`)}
           >
-            Add photo
+            {t("addPhoto")}
           </button>
         )
       }
     >
-      <p className="muted small">
-        Spread 100–150 kernels on the grid board in one layer, not touching.
-        Photograph straight down with every grid cell visible. Repeat until the
-        whole sample is done. Optionally flip the kernels and add a crease-side
-        photo.
-      </p>
+      <p className="muted small">{t("photosHint")}</p>
       {sample.batches.length === 0 ? (
-        <p>No photos yet.</p>
+        <p>{t("noPhotos")}</p>
       ) : (
         <ul className="list">
           {sample.batches.map((b, i) => (
@@ -362,11 +370,16 @@ function PhotosCard({
               <Link to={`/app/batches/${b.id}`} className="list-item">
                 <div>
                   <strong>
-                    Batch {i + 1} ·{" "}
-                    {b.side === "crease" ? "crease side" : "top side"}
+                    {t("batchTitle", {
+                      number: i + 1,
+                      side: t(b.side === "crease" ? "creaseSide" : "topSide"),
+                    })}
                   </strong>
                   <div className="muted small">
-                    {b.kernelCount ?? "?"} kernels · {formatDate(b.createdAt)}
+                    {t("kernelsAndDate", {
+                      count: b.kernelCount ?? "?",
+                      date: formatDate(b.createdAt),
+                    })}
                   </div>
                   {b.error && <div className="error small">{b.error}</div>}
                 </div>
@@ -377,7 +390,9 @@ function PhotosCard({
         </ul>
       )}
       {sample.batches.length > 0 && (
-        <p className="muted small">{totalKernels} kernels detected in total.</p>
+        <p className="muted small">
+          {t("totalKernels", { count: totalKernels })}
+        </p>
       )}
       {editable && ready.length > 0 && (
         <>
@@ -386,9 +401,7 @@ function PhotosCard({
             disabled={classify.isPending}
             onClick={() => classify.mutate()}
           >
-            Classify{" "}
-            {ready.length === 1 ? "the batch" : `${ready.length} batches`} with
-            Claude
+            {t.n("classifyBatches", ready.length)}
           </button>
           <ErrorNote error={classify.error} />
         </>
@@ -398,16 +411,17 @@ function PhotosCard({
 }
 
 export function BatchStatusBadge({ status }: { status: string }) {
+  const t = useT(m);
   const map: Record<
     string,
     [string, "neutral" | "good" | "warn" | "bad" | "info"]
   > = {
-    uploaded: ["Uploaded", "neutral"],
-    detecting: ["Finding kernels…", "info"],
-    detected: ["Ready to classify", "warn"],
-    classifying: ["Claude is classifying…", "info"],
-    classified: ["Classified", "good"],
-    failed: ["Needs attention", "bad"],
+    uploaded: [t("statusUploaded"), "neutral"],
+    detecting: [t("statusDetecting"), "info"],
+    detected: [t("statusDetected"), "warn"],
+    classifying: [t("statusClassifying"), "info"],
+    classified: [t("statusClassified"), "good"],
+    failed: [t("statusFailed"), "bad"],
   };
   const [label, tone] = map[status] ?? [status, "neutral"];
   return <Badge tone={tone}>{label}</Badge>;
@@ -415,27 +429,28 @@ export function BatchStatusBadge({ status }: { status: string }) {
 
 function ReviewCard({ sample }: { sample: Sample }) {
   const k = sample.kernels;
+  const t = useT(m);
   return (
-    <Card title="3. Check flagged kernels">
+    <Card title={t("reviewTitle")}>
       {k.classified === 0 ? (
-        <p className="muted">Classify the photos first.</p>
+        <p className="muted">{t("classifyFirst")}</p>
       ) : (
         <>
           <p>
-            Claude flagged <strong>{k.flagged}</strong> of {k.total} kernels.{" "}
-            {k.pendingReview} still need your check.
+            {t.rich("flaggedOf", {
+              flagged: <strong>{k.flagged}</strong>,
+              total: k.total,
+              pending: k.pendingReview,
+            })}
           </p>
-          <p className="muted small">
-            Pick out each flagged kernel with tweezers, check it by eye (you
-            make the final call) and drop it into the cup for its class.
-          </p>
+          <p className="muted small">{t("reviewHint")}</p>
           <Link
             className="button primary"
             to={`/app/samples/${sample.id}/review`}
           >
             {k.pendingReview > 0
-              ? `Review ${k.pendingReview} kernels`
-              : "See reviewed kernels"}
+              ? t.n("reviewKernels", k.pendingReview)
+              : t("seeReviewed")}
           </Link>
         </>
       )}
@@ -445,6 +460,8 @@ function ReviewCard({ sample }: { sample: Sample }) {
 
 function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
   const update = useSampleUpdate(sample.id);
+  const t = useT(m);
+  const { groupLabel, classLabel } = useGrainLabels();
   const classes = sample.cropProfile.classes;
   const [cups, setCups] = useState<Partial<Record<string, string>>>(() =>
     Object.fromEntries(classes.map((c) => [c.id, str(sample.cupMassG[c.id])])),
@@ -471,9 +488,9 @@ function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
   });
 
   return (
-    <Card title="4. Weigh each cup">
+    <Card title={t("cupsTitle")}>
       {!sample.sampleMassG ? (
-        <p className="muted">Enter the sample mass in step 1 first.</p>
+        <p className="muted">{t("massFirst")}</p>
       ) : (
         <form
           onSubmit={(e) => {
@@ -482,17 +499,16 @@ function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
           }}
         >
           <p className="muted small">
-            Mass % per class = cup weight ÷ sample weight ({sample.sampleMassG}{" "}
-            g) × 100. Leave classes you found nothing for empty.
+            {t("cupsHint", { mass: sample.sampleMassG })}
           </p>
           <div className="table-scroll">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Class</th>
-                  <th>Kernels</th>
-                  <th>Cup (g)</th>
-                  <th>Mass %</th>
+                  <th>{t("class")}</th>
+                  <th>{t("kernels")}</th>
+                  <th>{t("cupG")}</th>
+                  <th>{t("massPct")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -502,14 +518,16 @@ function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
                   return (
                     <Fragment key={g}>
                       <tr className="group-row">
-                        <td colSpan={3}>{GROUP_LABELS[g]}</td>
+                        <td colSpan={3}>{groupLabel(g)}</td>
                         <td className="num">
                           {live ? pct(live.byGroup[g]) : "—"}
                         </td>
                       </tr>
                       {inGroup.map((c) => (
                         <tr key={c.id}>
-                          <td className="indent">{c.label}</td>
+                          <td className="indent">
+                            {classLabel(classes, c.id)}
+                          </td>
                           <td className="num">
                             {sample.kernels.byClass[c.id] ?? 0}
                           </td>
@@ -520,7 +538,9 @@ function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
                               inputMode="decimal"
                               step="0.01"
                               min="0"
-                              aria-label={`${c.label} cup (g)`}
+                              aria-label={t("cupAria", {
+                                class: classLabel(classes, c.id),
+                              })}
                               disabled={!editable}
                               value={cups[c.id] ?? ""}
                               onChange={(e) =>
@@ -537,13 +557,13 @@ function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
                   );
                 })}
                 <tr className="total">
-                  <td colSpan={3}>Total defects</td>
+                  <td colSpan={3}>{t("totalDefects")}</td>
                   <td className="num">
                     {live ? pct(live.totalDefectsPct) : "—"}
                   </td>
                 </tr>
                 <tr className="total">
-                  <td colSpan={3}>Purity (sound grain)</td>
+                  <td colSpan={3}>{t("purity")}</td>
                   <td className="num">{live ? pct(live.purityPct) : "—"}</td>
                 </tr>
               </tbody>
@@ -558,7 +578,7 @@ function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
               className="primary"
               disabled={save.isPending || problems.length > 0}
             >
-              Save weights and grade
+              {t("saveWeights")}
             </button>
           )}
         </form>
@@ -567,16 +587,23 @@ function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
   );
 }
 
-function limitName(f: LimitFailure, classes: readonly ClassDef[]) {
-  if (f.scope === "class") return classLabel(classes, f.limit);
-  if (f.scope === "group") return GROUP_LABELS[f.limit as ClassGroup];
-  if (f.scope === "total") return "Total defects";
-  if (f.scope === "moisture") return "Moisture";
-  return "Test weight";
+function limitName(
+  f: LimitFailure,
+  classes: readonly ClassDef[],
+  t: T,
+  labels: ReturnType<typeof useGrainLabels>,
+) {
+  if (f.scope === "class") return labels.classLabel(classes, f.limit);
+  if (f.scope === "group") return labels.groupLabel(f.limit as ClassGroup);
+  if (f.scope === "total") return t("totalDefects");
+  if (f.scope === "moisture") return t("limitMoisture");
+  return t("limitTestWeight");
 }
 
 /** Mass % estimated from kernel areas in the photos, with the weighed result beside it when there is one. */
 function EstimateCard({ sample }: { sample: Sample }) {
+  const t = useT(m);
+  const { groupLabel, classLabel } = useGrainLabels();
   const e = sample.estimate;
   const classes = sample.cropProfile.classes;
   const weighed =
@@ -584,25 +611,27 @@ function EstimateCard({ sample }: { sample: Sample }) {
   if (!e) return null;
   const pendingNote =
     sample.kernels.pendingReview > 0
-      ? `Uses Claude's classes for the ${sample.kernels.pendingReview} flagged kernel(s) not checked yet.`
-      : "Uses your decisions for every flagged kernel.";
+      ? t.n("pendingNote", sample.kernels.pendingReview)
+      : t("allDecided");
   const top = classes
     .filter((c) => (e.byClass[c.id] ?? 0) > 0)
     .sort((a, b) => (e.byClass[b.id] ?? 0) - (e.byClass[a.id] ?? 0))
     .slice(0, 6);
   return (
-    <Card title="Instant estimate from the photos">
+    <Card title={t("estimateTitle")}>
       <div className="estimate-head">
         <div>
           <div className="result-grade">{pct(e.purityPct, 1)}</div>
-          <div className="muted small">estimated purity</div>
+          <div className="muted small">{t("estimatedPurity")}</div>
         </div>
         {sample.standard && (
           <div>
             <div className="result-grade">
-              {e.grade.grade ? `Grade ${e.grade.grade}` : "Below all grades"}
+              {e.grade.grade
+                ? t("grade", { grade: e.grade.grade })
+                : t("belowAllGrades")}
             </div>
-            <div className="muted small">on the estimate</div>
+            <div className="muted small">{t("onEstimate")}</div>
           </div>
         )}
       </div>
@@ -610,15 +639,15 @@ function EstimateCard({ sample }: { sample: Sample }) {
         <table className="table">
           <thead>
             <tr>
-              <th>Group</th>
-              <th className="num">Estimate</th>
-              {weighed && <th className="num">Weighed</th>}
+              <th>{t("group")}</th>
+              <th className="num">{t("estimate")}</th>
+              {weighed && <th className="num">{t("weighed")}</th>}
             </tr>
           </thead>
           <tbody>
             {CLASS_GROUPS.map((g) => (
               <tr key={g}>
-                <td>{GROUP_LABELS[g]}</td>
+                <td>{groupLabel(g)}</td>
                 <td className="num">{pct(e.byGroup[g])}</td>
                 {weighed && (
                   <td className="num">{pct(weighed.byGroupPct[g])}</td>
@@ -626,7 +655,7 @@ function EstimateCard({ sample }: { sample: Sample }) {
               </tr>
             ))}
             <tr className="total">
-              <td>Total defects</td>
+              <td>{t("totalDefects")}</td>
               <td className="num">{pct(e.totalDefectsPct)}</td>
               {weighed && (
                 <td className="num">{pct(weighed.totalDefectsPct)}</td>
@@ -637,21 +666,29 @@ function EstimateCard({ sample }: { sample: Sample }) {
       </div>
       {top.length > 0 && (
         <p className="small">
-          Largest classes:{" "}
-          {top
-            .map(
-              (c) =>
-                `${c.label} ${pct(e.byClass[c.id], 2)} (${e.countByClass[c.id] ?? 0} objects)`,
-            )
-            .join(" · ")}
+          {t("largestClasses", {
+            list: top
+              .map((c) =>
+                t("topClass", {
+                  class: classLabel(classes, c.id),
+                  pct: pct(e.byClass[c.id], 2),
+                  count: e.countByClass[c.id] ?? 0,
+                }),
+              )
+              .join(" · "),
+          })}
         </p>
       )}
       <p className="muted small">
-        Weight is estimated from each object's area in the photo and its class's
-        mass factor, over {e.counted} of {e.objects} objects
-        {e.unclear + e.unclassified > 0 &&
-          ` (${e.unclear + e.unclassified} unclear or not yet classified are left out)`}
-        . {pendingNote} Weighing the cups gives the verified result.
+        {t("estimateNote", {
+          counted: e.counted,
+          objects: e.objects,
+          excluded:
+            e.unclear + e.unclassified > 0
+              ? t("excluded", { count: e.unclear + e.unclassified })
+              : "",
+          pending: pendingNote,
+        })}
       </p>
     </Card>
   );
@@ -659,6 +696,8 @@ function EstimateCard({ sample }: { sample: Sample }) {
 
 function ResultCard({ sample }: { sample: Sample }) {
   const can = useCan();
+  const t = useT(m);
+  const labels = useGrainLabels();
   const update = useSampleUpdate(sample.id);
   const complete = useMutation({
     mutationFn: () => api.post<Sample>(`/samples/${sample.id}/complete`),
@@ -679,13 +718,14 @@ function ResultCard({ sample }: { sample: Sample }) {
   const grade = r?.grade.grade ?? null;
 
   return (
-    <Card title="5. Result and report">
+    <Card title={t("resultTitle")}>
       {!r ? (
         <p className="muted">
-          Enter the cup weights to see the result
-          {sample.standard?.allowEstimate
-            ? ", or complete the sample on the photo estimate (this standard allows it)."
-            : "."}
+          {t(
+            sample.standard?.allowEstimate
+              ? "enterCupsOrEstimate"
+              : "enterCups",
+          )}
         </p>
       ) : (
         <>
@@ -693,33 +733,49 @@ function ResultCard({ sample }: { sample: Sample }) {
             <div className="result-grade">
               {sample.standard
                 ? grade
-                  ? `Grade ${grade}`
-                  : "Below all grades"
-                : "No standard"}
+                  ? t("grade", { grade })
+                  : t("belowAllGrades")
+                : t("noStandardShort")}
             </div>
             <div className="muted">
-              Purity {pct(r.purityPct)} · total defects {pct(r.totalDefectsPct)}{" "}
-              by mass
+              {t("purityLine", {
+                purity: pct(r.purityPct),
+                defects: pct(r.totalDefectsPct),
+              })}
             </div>
             {r.source === "estimate" ? (
-              <Badge tone="warn">Estimated from photos, not weighed</Badge>
+              <Badge tone="warn">{t("estimatedNotWeighed")}</Badge>
             ) : (
-              <Badge tone="good">Weighed</Badge>
+              <Badge tone="good">{t("weighed")}</Badge>
             )}
           </div>
           {Object.entries(r.grade.failures).length > 0 && (
             <div className="stack-sm">
-              <strong>Why stricter grades were not met</strong>
+              <strong>{t("whyNotMet")}</strong>
               <ul className="small">
                 {Object.entries(r.grade.failures).map(([g, list]) => (
                   <li key={g}>
-                    Grade {g}:{" "}
-                    {list
-                      .map(
-                        (f) =>
-                          `${limitName(f, sample.cropProfile.classes)} ${f.value === null ? "not measured" : f.value.toFixed(2)} (${f.kind} ${f.allowed})`,
-                      )
-                      .join("; ")}
+                    {t("gradeFailures", {
+                      grade: g,
+                      list: list
+                        .map((f) =>
+                          t("failure", {
+                            limit: limitName(
+                              f,
+                              sample.cropProfile.classes,
+                              t,
+                              labels,
+                            ),
+                            value:
+                              f.value === null
+                                ? t("notMeasured")
+                                : f.value.toFixed(2),
+                            kind: t(f.kind === "max" ? "kindMax" : "kindMin"),
+                            allowed: f.allowed,
+                          }),
+                        )
+                        .join("; "),
+                    })}
                   </li>
                 ))}
               </ul>
@@ -728,16 +784,10 @@ function ResultCard({ sample }: { sample: Sample }) {
           {sample.aiSummary && (
             <blockquote className="summary">
               {sample.aiSummary}
-              <footer className="muted small">
-                Written by Claude from the figures above
-              </footer>
+              <footer className="muted small">{t("writtenByClaude")}</footer>
             </blockquote>
           )}
-          <p className="note small">
-            This is a screening and pre-check result. It is not acceptable for
-            official trade grading unless the method has been validated and
-            approved.
-          </p>
+          <p className="note small">{t("screeningNote")}</p>
         </>
       )}
       <ErrorNote
@@ -745,15 +795,15 @@ function ResultCard({ sample }: { sample: Sample }) {
       />
       <div className="row wrap">
         <button disabled={report.isPending} onClick={() => report.mutate()}>
-          PDF report
+          {t("pdfReport")}
         </button>
         {can.write && r && (
           <button disabled={summary.isPending} onClick={() => summary.mutate()}>
             {summary.isPending
-              ? "Claude is writing…"
+              ? t("claudeWriting")
               : sample.aiSummary
-                ? "Rewrite summary"
-                : "Write summary with Claude"}
+                ? t("rewriteSummary")
+                : t("writeSummary")}
           </button>
         )}
         {can.write && sample.status === "in_progress" && (
@@ -762,18 +812,18 @@ function ResultCard({ sample }: { sample: Sample }) {
             disabled={complete.isPending}
             onClick={() => complete.mutate()}
           >
-            Complete sample
+            {t("completeSample")}
           </button>
         )}
         {can.write && sample.status === "completed" && (
           <button disabled={reopen.isPending} onClick={() => reopen.mutate()}>
-            Reopen
+            {t("reopen")}
           </button>
         )}
       </div>
       {sample.completedAt && (
         <p className="muted small">
-          Completed {formatDate(sample.completedAt)}.
+          {t("completedOn", { date: formatDate(sample.completedAt) })}
         </p>
       )}
       <Certificates sample={sample} />
@@ -793,6 +843,7 @@ interface CertificateRow {
 
 /** The sample's certificates: the current one to share, and earlier withdrawn versions. */
 function Certificates({ sample }: { sample: Sample }) {
+  const t = useT(m);
   const certs = useQuery({
     queryKey: ["certificates", sample.id, sample.status],
     queryFn: () =>
@@ -804,31 +855,31 @@ function Certificates({ sample }: { sample: Sample }) {
     <div className="stack-sm">
       {current ? (
         <p className="small">
-          <Badge tone="good">Verified report</Badge> Code{" "}
-          <strong>{current.code}</strong> (version {current.version}). Anyone
-          can check it at{" "}
-          <Link to={`/verify/${current.code}`}>/verify/{current.code}</Link>;
-          the PDF carries the same code as a QR code.
+          <Badge tone="good">{t("verifiedReport")}</Badge>{" "}
+          {t.rich("certificateLine", {
+            code: <strong>{current.code}</strong>,
+            version: current.version,
+            link: (
+              <Link to={`/verify/${current.code}`}>/verify/{current.code}</Link>
+            ),
+          })}
         </p>
       ) : (
-        <p className="small muted">
-          The sample is reopened: its certificate is withdrawn until it is
-          completed again.
-        </p>
+        <p className="small muted">{t("certificateWithdrawn")}</p>
       )}
       {certs.data.length > 1 && (
         <details className="small">
-          <summary>Earlier versions</summary>
+          <summary>{t("earlierVersions")}</summary>
           <ul>
             {certs.data
               .filter((c) => c !== current)
               .map((c) => (
                 <li key={c.code}>
-                  v{c.version} <Link to={`/verify/${c.code}`}>{c.code}</Link>,
-                  issued {formatDate(c.issuedAt)},{" "}
+                  v{c.version} <Link to={`/verify/${c.code}`}>{c.code}</Link>,{" "}
+                  {t("issuedOn", { date: formatDate(c.issuedAt) })},{" "}
                   {c.status === "withdrawn"
-                    ? `withdrawn ${formatDate(c.withdrawnAt)}`
-                    : c.status}
+                    ? t("withdrawnOn", { date: formatDate(c.withdrawnAt) })
+                    : t("statusValid")}
                 </li>
               ))}
           </ul>
@@ -842,6 +893,8 @@ function Certificates({ sample }: { sample: Sample }) {
 function PublishDemo({ sample }: { sample: Sample }) {
   const can = useCan();
   const qc = useQueryClient();
+  const t = useT(m);
+  const { cropLabel } = useGrainLabels();
   const org = useQuery({
     queryKey: ["org"],
     queryFn: () => api.get<Org>("/org"),
@@ -864,19 +917,18 @@ function PublishDemo({ sample }: { sample: Sample }) {
   return (
     <details className="small" open={sample.publicDemo}>
       <summary>
-        Public demo{" "}
-        {sample.publicDemo && <Badge tone="info">on the website</Badge>}
+        {t("publicDemo")}{" "}
+        {sample.publicDemo && <Badge tone="info">{t("onWebsite")}</Badge>}
       </summary>
       <div className="stack-sm">
-        <p className="muted">
-          Anyone can open this sample on the website's demo page: its photos,
-          kernels, Claude's verdicts and the result. Names, notes and the source
-          are not shown.
-        </p>
-        <Field label="Title on the demo page">
+        <p className="muted">{t("publicDemoHint")}</p>
+        <Field label={t("demoTitle")}>
           <input
             maxLength={120}
-            placeholder={`${sample.cropProfile.label} sample #${sample.number}`}
+            placeholder={t("demoTitlePlaceholder", {
+              crop: cropLabel(sample.cropProfile.label),
+              number: sample.number,
+            })}
             value={title ?? sample.demoTitle ?? ""}
             onChange={(e) => setTitle(e.target.value)}
           />
@@ -887,17 +939,17 @@ function PublishDemo({ sample }: { sample: Sample }) {
             disabled={publish.isPending}
             onClick={() => publish.mutate(true)}
           >
-            {sample.publicDemo ? "Save title" : "Publish as demo"}
+            {sample.publicDemo ? t("saveTitle") : t("publishAsDemo")}
           </button>
           {sample.publicDemo && (
             <>
-              <Link to="/demo">View demo</Link>
+              <Link to="/demo">{t("viewDemo")}</Link>
               <button
                 className="danger"
                 disabled={publish.isPending}
                 onClick={() => publish.mutate(false)}
               >
-                Remove from website
+                {t("removeFromWebsite")}
               </button>
             </>
           )}
@@ -911,6 +963,9 @@ function PublishDemo({ sample }: { sample: Sample }) {
 function ReferenceCard({ sample }: { sample: Sample }) {
   const can = useCan();
   const update = useSampleUpdate(sample.id);
+  const t = useT(m);
+  const tc = useT(common);
+  const { classLabel } = useGrainLabels();
   const [open, setOpen] = useState(false);
   const ref = sample.reference;
   const [form, setForm] = useState(() => ({
@@ -941,26 +996,23 @@ function ReferenceCard({ sample }: { sample: Sample }) {
 
   return (
     <Card
-      title="Certified grader result (validation)"
+      title={t("referenceTitle")}
       actions={
         can.write &&
         !open && (
-          <button onClick={() => setOpen(true)}>{ref ? "Edit" : "Add"}</button>
+          <button onClick={() => setOpen(true)}>
+            {ref ? tc("edit") : t("add")}
+          </button>
         )
       }
     >
-      {!open && !ref && (
-        <p className="muted small">
-          To validate this method, have a certified grader grade the same sample
-          and enter their result here. Aim for 30–50 samples graded both ways.
-        </p>
-      )}
+      {!open && !ref && <p className="muted small">{t("referenceHint")}</p>}
       {!open && ref && (
         <p>
-          Grade {ref.grade ?? "none"}
-          {ref.graderName && ` by ${ref.graderName}`}
-          {ref.gradedOn && ` on ${ref.gradedOn}`}.{" "}
-          <Link to="/app/validation">See the comparison</Link>
+          {t("referenceGrade", { grade: ref.grade ?? t("referenceNone") })}
+          {ref.graderName && t("byGrader", { name: ref.graderName })}
+          {ref.gradedOn && t("onDate", { date: ref.gradedOn })}.{" "}
+          <Link to="/app/validation">{t("seeComparison")}</Link>
         </p>
       )}
       {open && (
@@ -972,13 +1024,13 @@ function ReferenceCard({ sample }: { sample: Sample }) {
           className="stack"
         >
           <div className="grid-3">
-            <Field label="Grade">
+            <Field label={t("gradeLabel")}>
               <input
                 value={form.grade}
                 onChange={(e) => setForm({ ...form, grade: e.target.value })}
               />
             </Field>
-            <Field label="Grader">
+            <Field label={t("grader")}>
               <input
                 value={form.graderName}
                 onChange={(e) =>
@@ -986,7 +1038,7 @@ function ReferenceCard({ sample }: { sample: Sample }) {
                 }
               />
             </Field>
-            <Field label="Date">
+            <Field label={t("date")}>
               <input
                 type="date"
                 value={form.gradedOn}
@@ -995,8 +1047,13 @@ function ReferenceCard({ sample }: { sample: Sample }) {
             </Field>
           </div>
           <div className="grid-3">
-            {sample.cropProfile.classes.map(({ id: c, label }) => (
-              <Field key={c} label={`${label} (%)`}>
+            {sample.cropProfile.classes.map(({ id: c }) => (
+              <Field
+                key={c}
+                label={t("classPct", {
+                  class: classLabel(sample.cropProfile.classes, c),
+                })}
+              >
                 <input
                   type="number"
                   inputMode="decimal"
@@ -1017,10 +1074,10 @@ function ReferenceCard({ sample }: { sample: Sample }) {
           <ErrorNote error={save.error} />
           <div className="row">
             <button type="button" onClick={() => setOpen(false)}>
-              Cancel
+              {tc("cancel")}
             </button>
             <button className="primary" disabled={save.isPending}>
-              Save
+              {tc("save")}
             </button>
           </div>
         </form>

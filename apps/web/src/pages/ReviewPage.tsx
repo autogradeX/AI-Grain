@@ -1,4 +1,4 @@
-import { classLabel, type ClassDef } from "@ai-grain/core";
+import type { ClassDef } from "@ai-grain/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -14,6 +14,9 @@ import {
   ErrorNote,
   Spinner,
 } from "../components/ui";
+import { useT } from "../i18n";
+import { useGrainLabels } from "../i18n/common";
+import { m } from "./ReviewPage.i18n";
 import { useSample } from "./SamplePage";
 
 export function ReviewPage() {
@@ -22,6 +25,7 @@ export function ReviewPage() {
   const can = useCan();
   const sample = useSample(id);
   const [scope, setScope] = useState<"pending" | "flagged">("pending");
+  const t = useT(m);
   const list = useQuery({
     queryKey: ["review", id, scope],
     queryFn: () =>
@@ -51,40 +55,36 @@ export function ReviewPage() {
     <div className="stack">
       <div>
         <Link to={`/app/samples/${id}`} className="muted small">
-          ← Sample {sample.data ? `#${sample.data.number}` : ""}
+          {t("backToSample", {
+            number: sample.data ? `#${sample.data.number}` : "",
+          })}
         </Link>
-        <h1>Check flagged kernels</h1>
-        <p className="muted small">
-          For each kernel: find it on the board by its cell, pick it out with
-          tweezers, look at it, then confirm or correct the class and drop it
-          into that cup. Your decision is final; Claude only points.
-        </p>
+        <h1>{t("title")}</h1>
+        <p className="muted small">{t("intro")}</p>
       </div>
       <div className="segmented">
         <button
           className={scope === "pending" ? "active" : ""}
           onClick={() => setScope("pending")}
         >
-          To check{sample.data ? ` (${sample.data.kernels.pendingReview})` : ""}
+          {t("toCheck")}
+          {sample.data ? ` (${sample.data.kernels.pendingReview})` : ""}
         </button>
         <button
           className={scope === "flagged" ? "active" : ""}
           onClick={() => setScope("flagged")}
         >
-          All flagged{sample.data ? ` (${sample.data.kernels.flagged})` : ""}
+          {t("allFlagged")}
+          {sample.data ? ` (${sample.data.kernels.flagged})` : ""}
         </button>
       </div>
       <ErrorNote error={list.error ?? decide.error} />
       {list.isPending && <Spinner />}
       {list.data?.length === 0 && (
         <Card>
-          <p>
-            {scope === "pending"
-              ? "All flagged kernels are checked."
-              : "No flagged kernels."}
-          </p>
+          <p>{scope === "pending" ? t("allChecked") : t("noFlagged")}</p>
           <Link className="button primary" to={`/app/samples/${id}`}>
-            Back to weighing
+            {t("backToWeighing")}
           </Link>
         </Card>
       )}
@@ -115,6 +115,8 @@ function ReviewCard({
   onPick: (cls: string) => void;
 }) {
   const [correcting, setCorrecting] = useState(false);
+  const t = useT(m);
+  const { classLabel } = useGrainLabels();
   const saveRef = useMutation({
     mutationFn: () =>
       api.post("/reference-images/from-kernel", { kernelId: kernel.id }),
@@ -125,21 +127,23 @@ function ReviewCard({
       <div className="kernel-detail">
         <AuthImage
           path={`/kernels/${kernel.id}/crop`}
-          alt={`Kernel ${kernel.number}`}
+          alt={t("kernelAlt", { number: kernel.number })}
           className="crop"
         />
         <div className="stack-sm">
           <strong>
-            Cell {kernel.cell} · #{kernel.number}
+            {t("cell", { cell: kernel.cell, number: kernel.number })}
           </strong>
           <span className="muted small">
-            {kernel.side === "crease" ? "Crease-side photo" : "Top-side photo"}
+            {t(kernel.side === "crease" ? "creaseSide" : "topSide")}
           </span>
-          {kernel.isCluster && <Badge tone="info">Touching kernels</Badge>}
+          {kernel.isCluster && <Badge tone="info">{t("touching")}</Badge>}
           <div>
             <ClassBadge cls={kernel.aiClass} classes={classes} />{" "}
             {kernel.aiConfidence && (
-              <span className="muted small">{kernel.aiConfidence}</span>
+              <span className="muted small">
+                {t(`confidence_${kernel.aiConfidence}`)}
+              </span>
             )}
           </div>
           {kernel.aiReason && (
@@ -147,7 +151,9 @@ function ReviewCard({
           )}
           {kernel.finalClass && (
             <span className="small">
-              Decided: <ClassBadge cls={kernel.finalClass} classes={classes} />
+              {t.rich("decided", {
+                class: <ClassBadge cls={kernel.finalClass} classes={classes} />,
+              })}
             </span>
           )}
         </div>
@@ -161,13 +167,15 @@ function ReviewCard({
                 className="primary"
                 onClick={() => onPick(kernel.aiClass!)}
               >
-                Confirm {classLabel(classes, kernel.aiClass).toLowerCase()}
+                {t("confirm", {
+                  class: classLabel(classes, kernel.aiClass).toLowerCase(),
+                })}
               </button>
             )}
           <button onClick={() => setCorrecting(true)}>
             {kernel.aiClass === "unclear" || kernel.isCluster
-              ? "Choose class"
-              : "Correct"}
+              ? t("chooseClass")
+              : t("correct")}
           </button>
         </div>
       )}
@@ -188,9 +196,7 @@ function ReviewCard({
           disabled={saveRef.isPending || saveRef.isSuccess}
           onClick={() => saveRef.mutate()}
         >
-          {saveRef.isSuccess
-            ? "Saved as a reference example"
-            : "Use as a reference example for Claude"}
+          {saveRef.isSuccess ? t("savedAsReference") : t("useAsReference")}
         </button>
       )}
       <ErrorNote error={saveRef.error} />
