@@ -369,3 +369,72 @@ export const analysisRuns = pgTable("analysis_runs", {
   error: text("error"),
   createdAt: createdAt(),
 });
+
+export const certificateStatusEnum = pgEnum("certificate_status", [
+  "valid",
+  "withdrawn",
+]);
+
+/** What a certificate vouches for: a frozen copy of the completed sample's result. */
+export interface CertificatePayload {
+  version: number;
+  code: string;
+  organisation: string;
+  sample: {
+    number: number;
+    crop: string;
+    source: string | null;
+    standard: string | null;
+  };
+  result: {
+    source: "weighed" | "estimate";
+    grade: string | null;
+    purityPct: number;
+    totalDefectsPct: number;
+    byGroupPct: Record<string, number>;
+    byClassPct: { id: string; label: string; group: string; pct: number }[];
+  };
+  measurements: {
+    sampleMassG: number | null;
+    moisturePct: number | null;
+    testWeightKgPerHl: number | null;
+  };
+  kernels: { total: number; flagged: number; reviewed: number };
+  model: string;
+  operators: string[];
+  completedAt: string;
+  issuedAt: string;
+}
+
+/**
+ * Issued when a sample is completed. The hash covers the payload, so anyone
+ * with the code can check that a report's figures are genuine and unchanged.
+ * Reopening the sample withdraws the certificate; completing again issues a
+ * new version.
+ */
+export const certificates = pgTable(
+  "certificates",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    sampleId: uuid("sample_id")
+      .notNull()
+      .references(() => samples.id, { onDelete: "cascade" }),
+    code: text("code").notNull().unique(),
+    version: integer("version").notNull(),
+    payload: jsonb("payload").$type<CertificatePayload>().notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    status: certificateStatusEnum("status").notNull().default("valid"),
+    issuedBy: uuid("issued_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    issuedAt: timestamp("issued_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+    withdrawnReason: text("withdrawn_reason"),
+  },
+  (t) => [index("certificates_sample_idx").on(t.sampleId, t.version)],
+);

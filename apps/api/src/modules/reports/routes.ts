@@ -1,6 +1,7 @@
 import { CLASS_GROUPS, roundPct, summarizePercentages } from "@ai-grain/core";
-import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import QRCode from "qrcode";
 import { z } from "zod";
 import type { AppContext } from "../../context.js";
 import {
@@ -21,6 +22,7 @@ import {
   modelFor,
 } from "../batches/service.js";
 import { csvCell } from "../../lib/csv.js";
+import { currentCertificate } from "../certificates/service.js";
 import { ensureCrop, listCrops } from "../crops/service.js";
 import { getStandard } from "../standards/routes.js";
 import { loadSample } from "../samples/service.js";
@@ -90,6 +92,50 @@ export function reportRoutes(ctx: AppContext) {
       }
 
       const crop = await ensureCrop(ctx, me.orgId, sample.crop);
+
+      // Gallery: every kernel whose class isn't sound, in batch and number order.
+      const GALLERY_MAX = 240;
+      const batchIndex = new Map(batchRows.map((b, i) => [b.id, i + 1]));
+      const notSound = sql`coalesce(${effectiveClass}, '') <> 'sound'`;
+      const galleryRows = await ctx.db
+        .select({
+          batchId: kernels.batchId,
+          number: kernels.number,
+          cell: kernels.cell,
+          cropKey: kernels.cropKey,
+          aiClass: kernels.aiClass,
+          aiConfidence: kernels.aiConfidence,
+          finalClass: kernels.finalClass,
+          reviewStatus: kernels.reviewStatus,
+        })
+        .from(kernels)
+        .where(and(eq(kernels.sampleId, id), notSound))
+        .orderBy(asc(kernels.batchId), asc(kernels.number));
+      const ordered = galleryRows.sort(
+        (a, b) =>
+          (batchIndex.get(a.batchId) ?? 0) - (batchIndex.get(b.batchId) ?? 0) ||
+          a.number - b.number,
+      );
+      const gallery = await Promise.all(
+        ordered.slice(0, GALLERY_MAX).map(async (k) => ({
+          jpeg: await ctx.storage.get(k.cropKey),
+          number: k.number,
+          cell: k.cell,
+          batch: batchIndex.get(k.batchId) ?? 0,
+          finalClass: k.finalClass,
+          aiClass: k.aiClass,
+          aiConfidence: k.aiConfidence,
+          reviewed: k.reviewStatus !== "pending",
+        })),
+      );
+
+      const cert =
+        sample.status === "completed"
+          ? await currentCertificate(ctx, id)
+          : null;
+      const verifyUrl = cert
+        ? `${ctx.config.APP_URL}/verify/${cert.code}`
+        : null;
       const pdf = await renderReport({
         orgName: org?.name ?? "",
         sample,
@@ -103,6 +149,22 @@ export function reportRoutes(ctx: AppContext) {
         model: await modelFor(ctx, id),
         kernels: await kernelSummary(ctx, { sampleId: id }),
         boards,
+        certificate:
+          cert && verifyUrl
+            ? {
+                code: cert.code,
+                version: cert.version,
+                hash: cert.payloadHash,
+                url: verifyUrl,
+                qr: await QRCode.toBuffer(verifyUrl, {
+                  type: "png",
+                  margin: 1,
+                  width: 300,
+                }),
+              }
+            : null,
+        gallery,
+        galleryTotal: ordered.length,
       });
       reply
         .type("application/pdf")

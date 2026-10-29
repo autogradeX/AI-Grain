@@ -772,7 +772,64 @@ function ResultCard({ sample }: { sample: Sample }) {
           Completed {formatDate(sample.completedAt)}.
         </p>
       )}
+      <Certificates sample={sample} />
     </Card>
+  );
+}
+
+interface CertificateRow {
+  code: string;
+  version: number;
+  status: "valid" | "withdrawn";
+  payloadHash: string;
+  issuedAt: string;
+  withdrawnAt: string | null;
+}
+
+/** The sample's certificates: the current one to share, and earlier withdrawn versions. */
+function Certificates({ sample }: { sample: Sample }) {
+  const certs = useQuery({
+    queryKey: ["certificates", sample.id, sample.status],
+    queryFn: () =>
+      api.get<CertificateRow[]>(`/samples/${sample.id}/certificates`),
+  });
+  if (!certs.data?.length) return null;
+  const current = certs.data.find((c) => c.status === "valid");
+  return (
+    <div className="stack-sm">
+      {current ? (
+        <p className="small">
+          <Badge tone="good">Verified report</Badge> Code{" "}
+          <strong>{current.code}</strong> (version {current.version}). Anyone
+          can check it at{" "}
+          <Link to={`/verify/${current.code}`}>/verify/{current.code}</Link>;
+          the PDF carries the same code as a QR code.
+        </p>
+      ) : (
+        <p className="small muted">
+          The sample is reopened: its certificate is withdrawn until it is
+          completed again.
+        </p>
+      )}
+      {certs.data.length > 1 && (
+        <details className="small">
+          <summary>Earlier versions</summary>
+          <ul>
+            {certs.data
+              .filter((c) => c !== current)
+              .map((c) => (
+                <li key={c.code}>
+                  v{c.version} <Link to={`/verify/${c.code}`}>{c.code}</Link>,
+                  issued {formatDate(c.issuedAt)},{" "}
+                  {c.status === "withdrawn"
+                    ? `withdrawn ${formatDate(c.withdrawnAt)}`
+                    : c.status}
+                </li>
+              ))}
+          </ul>
+        </details>
+      )}
+    </div>
   );
 }
 

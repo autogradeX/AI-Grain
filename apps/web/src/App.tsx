@@ -23,6 +23,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { StandardEditPage, StandardsPage } from "./pages/StandardsPage";
 import { UsersPage } from "./pages/UsersPage";
 import { ValidationPage } from "./pages/ValidationPage";
+import { VerifyPage } from "./pages/VerifyPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -42,6 +43,8 @@ export function App() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
+      <Route path="/verify" element={<VerifyPage />} />
+      <Route path="/verify/:code" element={<VerifyPage />} />
       <Route
         element={
           <RequireAuth>

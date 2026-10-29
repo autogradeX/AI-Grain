@@ -28,6 +28,26 @@ export interface ReportData {
     byClass: Record<string, number>;
   };
   boards: { side: string; image: Buffer }[];
+  /** The sample's valid certificate; null while the sample is in progress. */
+  certificate: {
+    code: string;
+    version: number;
+    hash: string;
+    url: string;
+    qr: Buffer;
+  } | null;
+  /** Every kernel not judged sound, with its crop image, for the gallery pages. */
+  gallery: {
+    jpeg: Buffer;
+    number: number;
+    cell: string;
+    batch: number;
+    finalClass: string | null;
+    aiClass: string | null;
+    aiConfidence: string | null;
+    reviewed: boolean;
+  }[];
+  galleryTotal: number;
 }
 
 const fmt = (n: number | null | undefined, digits = 2) =>
@@ -69,24 +89,74 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     : null;
   const left = doc.page.margins.left;
   const width = doc.page.width - left - doc.page.margins.right;
+  // The header shares page 1 with the verification box on the right.
+  const boxW = 120;
+  const headW = width - boxW - 16;
+  const top = doc.page.margins.top;
+
+  const cert = data.certificate;
+  const bx = left + width - boxW;
+  if (cert) {
+    doc.image(cert.qr, bx + (boxW - 84) / 2, top, { width: 84, height: 84 });
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(9)
+      .text(cert.code, bx, top + 88, { width: boxW, align: "center" });
+    doc
+      .font("Helvetica")
+      .fontSize(6.5)
+      .fillColor("#555")
+      .text(`Version ${cert.version} · verify at`, bx, top + 100, {
+        width: boxW,
+        align: "center",
+      })
+      .text(cert.url, { width: boxW, align: "center" })
+      .text(`SHA-256 ${cert.hash.slice(0, 16)}…`, {
+        width: boxW,
+        align: "center",
+      })
+      .fillColor("#000");
+  } else {
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .fillColor("#b00020")
+      .text("DRAFT", bx, top + 20, { width: boxW, align: "center" })
+      .font("Helvetica")
+      .fontSize(8)
+      .text("Not verified: the sample is not completed.", {
+        width: boxW,
+        align: "center",
+      })
+      .fillColor("#000");
+  }
 
   doc
     .font("Helvetica-Bold")
     .fontSize(18)
-    .text(`Grain screening report: sample #${sample.number}`);
+    .text(`Grain screening report: sample #${sample.number}`, left, top, {
+      width: headW,
+    });
   doc.moveDown(0.3).font("Helvetica").fontSize(10).fillColor("#555");
   doc.text(
-    `${data.orgName} · ${sample.crop}${sample.source ? ` · ${sample.source}` : ""} · ${
+    `${data.orgName} · ${data.cropLabel}${sample.source ? ` · ${sample.source}` : ""} · ${
       sample.status === "completed"
         ? `completed ${sample.completedAt?.toISOString().slice(0, 10)}`
         : "in progress"
     }`,
+    { width: headW },
   );
   doc.moveDown(0.6).fillColor("#8a4b00").fontSize(9);
   doc.text(
-    "Screening and pre-check result. Kernels were flagged by AI and confirmed by a person; percentages come from weighing. Not acceptable for official trade grading unless this method has been validated and approved.",
-    { width },
+    `Screening and pre-check result. Kernels were flagged by AI and confirmed by a person; percentages come from ${
+      sample.result?.source === "estimate"
+        ? "kernel areas in the photos"
+        : "weighing"
+    }. Not acceptable for official trade grading unless this method has been validated and approved.`,
+    { width: headW },
   );
+  doc.y = Math.max(doc.y, top + 150);
+  doc.x = left;
   doc.fillColor("#000").moveDown(1);
 
   const line = (label: string, value: string) => {
@@ -98,7 +168,12 @@ export function renderReport(data: ReportData): Promise<Buffer> {
   };
   line("Crop", data.cropLabel);
   line("Standard", standard?.name ?? "none selected");
-  line("Sample mass", `${fmt(sample.sampleMassG)} g`);
+  line(
+    "Sample mass",
+    sample.sampleMassG === null
+      ? "not weighed"
+      : `${fmt(sample.sampleMassG)} g`,
+  );
   line(
     "Moisture",
     sample.moisturePct === null
@@ -188,6 +263,8 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     );
     y += 13;
   };
+  // Cups are only meaningful when the result comes from the scale.
+  const weighed = sample.result?.source !== "estimate";
   for (const group of CLASS_GROUPS) {
     const inGroup = data.classes.filter((c) => c.group === group);
     if (!inGroup.length) continue;
@@ -196,7 +273,9 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     row(
       [
         GROUP_LABELS[group],
-        fmt(inGroup.reduce((n, c) => n + (sample.cupMassG[c.id] ?? 0), 0)),
+        weighed
+          ? fmt(inGroup.reduce((n, c) => n + (sample.cupMassG[c.id] ?? 0), 0))
+          : "—",
         gPct === undefined ? "—" : fmt(roundPct(gPct)),
         gLimit === undefined ? "" : `max ${fmt(gLimit)}`,
         String(
@@ -212,7 +291,7 @@ export function renderReport(data: ReportData): Promise<Buffer> {
       row(
         [
           `   ${c.label}`,
-          fmt(sample.cupMassG[c.id] ?? 0),
+          weighed ? fmt(sample.cupMassG[c.id] ?? 0) : "—",
           value === undefined ? "—" : fmt(roundPct(value)),
           limit === undefined ? "—" : `max ${fmt(limit)}`,
           String(data.kernels.byClass[c.id] ?? 0),
@@ -253,18 +332,94 @@ export function renderReport(data: ReportData): Promise<Buffer> {
 
   if (data.boards.length) {
     doc.addPage();
-    doc.font("Helvetica-Bold").fontSize(12).text("Photos (defects circled)");
-    doc.moveDown(0.5);
-    const perRow = 2;
-    const imgW = (width - 16) / perRow;
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor("#000")
+      .text("Photos (defects circled)", left, doc.page.margins.top);
+    const imgW = (width - 16) / 2;
     const imgH = imgW * 1.4;
+    let y = doc.page.margins.top + 24;
     data.boards.forEach((b, i) => {
-      if (i > 0 && i % 4 === 0) doc.addPage();
-      const slot = i % 4;
-      const x = left + (slot % perRow) * (imgW + 16);
-      const top = (slot < 2 ? 90 : 90 + imgH + 30) - (i < 4 ? 0 : 40);
-      doc.image(b.image, x, top, { width: imgW, height: imgH });
-      doc.fontSize(8).text(`Batch ${i + 1} (${b.side})`, x, top + imgH + 4);
+      const col = i % 2;
+      if (col === 0 && i > 0) y += imgH + 26;
+      if (y + imgH + 20 > doc.page.height - doc.page.margins.bottom) {
+        doc.addPage();
+        y = doc.page.margins.top;
+      }
+      const x = left + col * (imgW + 16);
+      doc.image(b.image, x, y, { width: imgW, height: imgH });
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .text(`Batch ${i + 1} (${b.side} side)`, x, y + imgH + 4);
+    });
+  }
+
+  if (data.gallery.length) {
+    doc.addPage();
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor("#000")
+      .text(
+        "Kernel images: everything not judged sound",
+        left,
+        doc.page.margins.top,
+      );
+    doc
+      .font("Helvetica")
+      .fontSize(8)
+      .fillColor("#555")
+      .text(
+        `Each image is the crop Claude classified, at the same scale. "Decided" is the operator's call after checking the kernel by eye.${
+          data.galleryTotal > data.gallery.length
+            ? ` First ${data.gallery.length} of ${data.galleryTotal} shown.`
+            : ""
+        }`,
+        { width },
+      )
+      .fillColor("#000");
+    const perRow = 5;
+    const gap = 8;
+    const tile = (width - gap * (perRow - 1)) / perRow;
+    const rowH = tile + 34;
+    let y = doc.y + 8;
+    data.gallery.forEach((k, i) => {
+      const col = i % perRow;
+      if (col === 0 && i > 0) y += rowH;
+      if (y + rowH > doc.page.height - doc.page.margins.bottom) {
+        doc.addPage();
+        y = doc.page.margins.top;
+      }
+      const x = left + col * (tile + gap);
+      doc.image(k.jpeg, x, y, { width: tile, height: tile });
+      const decided = k.reviewed
+        ? classLabel(data.classes, k.finalClass)
+        : "not checked";
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(6.5)
+        .text(`#${k.number} · ${k.cell} · batch ${k.batch}`, x, y + tile + 2, {
+          width: tile,
+          lineBreak: false,
+        })
+        .font("Helvetica")
+        .text(`Decided: ${decided}`, x, y + tile + 11, {
+          width: tile,
+          lineBreak: false,
+        })
+        .fillColor("#555")
+        .text(
+          `Claude: ${classLabel(data.classes, k.aiClass)}${k.aiConfidence ? ` (${k.aiConfidence})` : ""}`,
+          x,
+          y + tile + 20,
+          {
+            width: tile,
+            lineBreak: false,
+          },
+        )
+        .fillColor("#000");
     });
   }
 

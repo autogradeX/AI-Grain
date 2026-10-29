@@ -69,7 +69,8 @@ export async function adoptHandAppliedSchema(
   const journal = JSON.parse(
     await readFile(join(migrationsFolder, "meta", "_journal.json"), "utf8"),
   ) as Journal;
-  let firstMissing: string[] | null = null;
+  // For the error message: what the closest snapshot (fewest gaps) is missing.
+  let closestMissing: string[] | null = null;
   for (let i = journal.entries.length - 1; i >= 0; i--) {
     const entry = journal.entries[i]!;
     const snapshot = JSON.parse(
@@ -93,7 +94,8 @@ export async function adoptHandAppliedSchema(
         .filter((e) => !enums.has(e)),
     ];
     if (missing.length > 0) {
-      firstMissing ??= missing;
+      if (!closestMissing || missing.length < closestMissing.length)
+        closestMissing = missing;
       continue;
     }
 
@@ -119,7 +121,7 @@ export async function adoptHandAppliedSchema(
   throw new SchemaMismatchError(
     [
       "The database already has AI-Grain tables, but they don't match any migration, so it is not safe to migrate it.",
-      `Missing: ${(firstMissing ?? []).slice(0, 15).join(", ")}${(firstMissing?.length ?? 0) > 15 ? ", …" : ""}.`,
+      `Missing: ${(closestMissing ?? []).slice(0, 15).join(", ")}${(closestMissing?.length ?? 0) > 15 ? ", …" : ""}.`,
       "This usually means a migration SQL file was only partly run by hand. If the database holds no data yet,",
       "drop and recreate it and let the app create the tables. See deploy/cloud-run.md (Troubleshooting).",
     ].join("\n"),

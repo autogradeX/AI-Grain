@@ -33,6 +33,10 @@ import {
   modelFor,
 } from "../batches/service.js";
 import { ensureCrop, normalizeCropKey } from "../crops/service.js";
+import {
+  issueCertificate,
+  withdrawCertificates,
+} from "../certificates/service.js";
 import { getStandard } from "../standards/routes.js";
 import {
   estimateFor,
@@ -345,6 +349,7 @@ export function sampleRoutes(ctx: AppContext) {
         })
         .where(eq(samples.id, id))
         .returning();
+      const certificate = await issueCertificate(ctx, id, me.id);
       await audit(ctx.db, {
         orgId: me.orgId,
         userId: me.id,
@@ -354,9 +359,13 @@ export function sampleRoutes(ctx: AppContext) {
           number: sample.number,
           grade: result?.grade.grade ?? null,
           source: result?.source ?? "weighed",
+          certificate: certificate.code,
         },
       });
-      return row;
+      return {
+        ...row,
+        certificate: { code: certificate.code, version: certificate.version },
+      };
     });
 
     app.post("/samples/:id/reopen", write, async (request) => {
@@ -374,6 +383,11 @@ export function sampleRoutes(ctx: AppContext) {
         })
         .where(eq(samples.id, id))
         .returning();
+      await withdrawCertificates(
+        ctx,
+        id,
+        "The sample was reopened for changes.",
+      );
       await audit(ctx.db, {
         orgId: me.orgId,
         userId: me.id,
