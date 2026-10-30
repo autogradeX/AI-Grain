@@ -12,6 +12,7 @@ export const m = defineMessages({
     hi: "नंबर, फसल या स्रोत से खोजें",
   },
   noSamples: { en: "No samples yet.", hi: "अभी कोई नमूना नहीं है।" },
+  openStandards: { en: "Open standards", hi: "मानक खोलें" },
   noSamplesHint: {
     en: "Set up a grading standard first, then create a sample for each lot you screen.",
     hi: "पहले ग्रेडिंग मानक बनाएँ, फिर जाँचे जाने वाले हर लॉट के लिए एक नमूना बनाएँ।",

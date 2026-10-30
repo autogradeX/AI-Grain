@@ -42,14 +42,17 @@ export const m = defineMessages({
     en: "Model Orchestration is not configured on the server (API key missing). Classification will fail.",
     hi: "सर्वर पर मॉडल ऑर्केस्ट्रेशन सेट नहीं है (API key नहीं है)। वर्गीकरण नहीं हो पाएगा।",
   },
-  defaultModel: { en: "Default AI model", hi: "डिफ़ॉल्ट AI मॉडल" },
+  defaultModel: {
+    en: "Default Model Orchestration tier",
+    hi: "डिफ़ॉल्ट मॉडल ऑर्केस्ट्रेशन स्तर",
+  },
   defaultModelHint: {
     en: "Standard is the default. Economy costs least. Advanced is for difficult samples. A sample can override this.",
     hi: "स्टैंडर्ड डिफ़ॉल्ट है। इकॉनमी सबसे सस्ता है। एडवांस्ड कठिन नमूनों के लिए है। हर नमूने में इसे बदला जा सकता है।",
   },
   serverDefault: {
-    en: "Server default ({model})",
-    hi: "सर्वर डिफ़ॉल्ट ({model})",
+    en: "Server default: {model}",
+    hi: "सर्वर डिफ़ॉल्ट: {model}",
   },
   saveName: { en: "Save name", hi: "नाम सहेजें" },
   activityLog: { en: "Activity log", hi: "गतिविधि लॉग" },

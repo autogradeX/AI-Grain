@@ -12,6 +12,11 @@
   --primary: #e2b24c;
   --primary-text: #17120a;
   --good-bg: #1d2a1f;
+  --surface-2: #18201a;
+  --border-strong: #34403a;
+  --primary-hover: #f0c565;
+  --primary-soft: rgb(226 178 76 / 12%);
+  --ring: 0 0 0 3px rgb(226 178 76 / 30%);
   --gold: #e2b24c;
   --sound: #199e70;
   --defect: #d95926;

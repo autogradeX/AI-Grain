@@ -1,4 +1,5 @@
 import type { ClassDef } from "@ai-grain/core";
+import { CircleCheck } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -13,6 +14,7 @@ import {
   ClassBadge,
   ErrorNote,
   Spinner,
+  EmptyState,
 } from "../components/ui";
 import { useT } from "../i18n";
 import { useGrainLabels } from "../i18n/common";
@@ -81,12 +83,15 @@ export function ReviewPage() {
       <ErrorNote error={list.error ?? decide.error} />
       {list.isPending && <Spinner />}
       {list.data?.length === 0 && (
-        <Card>
-          <p>{scope === "pending" ? t("allChecked") : t("noFlagged")}</p>
-          <Link className="button primary" to={`/app/samples/${id}`}>
-            {t("backToWeighing")}
-          </Link>
-        </Card>
+        <EmptyState
+          icon={CircleCheck}
+          title={scope === "pending" ? t("allChecked") : t("noFlagged")}
+          action={
+            <Link className="button primary" to={`/app/samples/${id}`}>
+              {t("backToWeighing")}
+            </Link>
+          }
+        />
       )}
       <div className="review-grid">
         {list.data?.map((k) => (

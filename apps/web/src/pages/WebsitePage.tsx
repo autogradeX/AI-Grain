@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Inbox } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
@@ -12,6 +13,7 @@ import {
   Field,
   formatDate,
   Spinner,
+  EmptyState,
 } from "../components/ui";
 import { useT } from "../i18n";
 import { common } from "../i18n/common";
@@ -128,7 +130,8 @@ function Leads() {
   });
   if (leads.isPending) return <Spinner />;
   if (leads.error) return <ErrorNote error={leads.error} />;
-  if (!leads.data.length) return <p className="muted">{t("noEnquiries")}</p>;
+  if (!leads.data.length)
+    return <EmptyState icon={Inbox} title={t("noEnquiries")} />;
   return (
     <div className="stack-sm">
       <ErrorNote error={update.error} />

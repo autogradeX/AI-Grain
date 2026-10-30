@@ -1,4 +1,5 @@
 import { SOUND, UNCLEAR, type ClassDef } from "@ai-grain/core";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api/client";
 import { common, useGrainLabels } from "../i18n/common";
@@ -38,14 +39,16 @@ export function ErrorNote({ error }: { error: unknown }) {
 export function Card({
   title,
   actions,
+  className,
   children,
 }: {
   title?: ReactNode;
   actions?: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="card">
+    <section className={className ? `card ${className}` : "card"}>
       {(title || actions) && (
         <header className="card-head">
           {title && <h2>{title}</h2>}
@@ -167,4 +170,28 @@ export function pct(value: number | null | undefined, digits = 2): string {
   return value === null || value === undefined
     ? "—"
     : `${value.toFixed(digits)} %`;
+}
+
+/** "Nothing here yet": an icon, what is missing, and what to do about it. */
+export function EmptyState({
+  icon: Icon,
+  title,
+  hint,
+  action,
+}: {
+  icon: LucideIcon;
+  title: ReactNode;
+  hint?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <Card className="empty">
+      <span className="empty-icon" aria-hidden>
+        <Icon size={24} strokeWidth={1.8} />
+      </span>
+      <strong>{title}</strong>
+      {hint && <p className="muted small">{hint}</p>}
+      {action}
+    </Card>
+  );
 }

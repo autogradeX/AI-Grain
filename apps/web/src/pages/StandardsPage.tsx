@@ -1,4 +1,5 @@
 import { CLASS_GROUPS, type ClassGroup, type GradeSpec } from "@ai-grain/core";
+import { Ruler } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -13,6 +14,7 @@ import {
   Field,
   formatDate,
   Spinner,
+  EmptyState,
 } from "../components/ui";
 import { useT } from "../i18n";
 import { useGrainLabels } from "../i18n/common";
@@ -51,12 +53,11 @@ export function StandardsPage() {
       {standards.isPending && <Spinner />}
       <ErrorNote error={standards.error} />
       {standards.data?.length === 0 && (
-        <Card>
-          <p>
-            {t("noStandards")}
-            {can.admin ? t("createOne") : t("askAdmin")}
-          </p>
-        </Card>
+        <EmptyState
+          icon={Ruler}
+          title={t("noStandards")}
+          hint={can.admin ? t("createOne") : t("askAdmin")}
+        />
       )}
       <ul className="list">
         {standards.data?.map((s) => (

@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { ScanSearch } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, download } from "../api/client";
@@ -14,6 +15,7 @@ import {
   formatDate,
   pct,
   Spinner,
+  EmptyState,
 } from "../components/ui";
 import { useT } from "../i18n";
 import { common, useGrainLabels } from "../i18n/common";
@@ -100,10 +102,18 @@ export function SamplesPage() {
       {samples.isPending && <Spinner />}
       <ErrorNote error={samples.error} />
       {samples.data && samples.data.items.length === 0 && (
-        <Card>
-          <p>{t("noSamples")}</p>
-          {can.write && <p className="muted">{t("noSamplesHint")}</p>}
-        </Card>
+        <EmptyState
+          icon={ScanSearch}
+          title={t("noSamples")}
+          hint={can.write ? t("noSamplesHint") : undefined}
+          action={
+            can.write && (
+              <Link to="/app/standards" className="button">
+                {t("openStandards")}
+              </Link>
+            )
+          }
+        />
       )}
       <ul className="list">
         {samples.data?.items.map((s) => (

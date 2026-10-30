@@ -10,12 +10,12 @@ export const m = defineMessages({
   showArchived: { en: "Show archived", hi: "संग्रहित भी दिखाएँ" },
   noStandards: { en: "No standards yet.", hi: "अभी कोई मानक नहीं है।" },
   createOne: {
-    en: " Create one to grade samples.",
-    hi: " नमूनों की ग्रेडिंग के लिए एक मानक बनाएँ।",
+    en: "Create one to grade samples.",
+    hi: "नमूनों की ग्रेडिंग के लिए एक मानक बनाएँ।",
   },
   askAdmin: {
-    en: " Ask an admin to create one.",
-    hi: " किसी व्यवस्थापक से मानक बनाने को कहें।",
+    en: "Ask an admin to create one.",
+    hi: "किसी व्यवस्थापक से मानक बनाने को कहें।",
   },
   gradesUpdated: {
     en: "Grades {grades} · updated {date}",
