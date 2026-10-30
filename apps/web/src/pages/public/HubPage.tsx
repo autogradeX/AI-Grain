@@ -1,8 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import remarkGfm from "remark-gfm";
 import { api } from "../../api/client";
+import type { Page } from "../../api/types";
+import { Pager, usePage } from "../../components/Pager";
 import { ErrorNote, formatDate, Spinner } from "../../components/ui";
 import { useLang, useT } from "../../i18n";
 import { m } from "./HubPage.i18n";
@@ -41,15 +43,25 @@ export interface ArticleItem {
   publishedAt: string | null;
 }
 
+const HUB_PAGE = 24;
+
 export function HubPage() {
   const [params, setParams] = useSearchParams();
   const kind = (params.get("kind") as Kind | null) ?? null;
+  const [page, setPage] = usePage();
   const list = useQuery({
-    queryKey: ["articles", kind],
+    queryKey: ["articles", kind, page],
+    placeholderData: keepPreviousData,
     queryFn: () =>
-      api.get<ArticleItem[]>(`/public/articles${kind ? `?kind=${kind}` : ""}`),
+      api.get<Page<ArticleItem>>(
+        `/public/articles?${new URLSearchParams({
+          limit: String(HUB_PAGE),
+          offset: String(page * HUB_PAGE),
+          ...(kind && { kind }),
+        }).toString()}`,
+      ),
   });
-  const shown = list.data ?? [];
+  const shown = list.data?.items ?? [];
   const t = useT(m);
   const kinds = useKindLabels();
   const { lang } = useLang();
@@ -111,6 +123,14 @@ export function HubPage() {
               </Link>
             ))}
           </div>
+        )}
+        {list.data && (
+          <Pager
+            total={list.data.total}
+            limit={HUB_PAGE}
+            page={page}
+            onPage={setPage}
+          />
         )}
       </section>
     </div>

@@ -46,6 +46,7 @@ import {
   measurementOf,
   refreshResult,
 } from "./service.js";
+import { likePattern } from "../../lib/pagination.js";
 
 const Mass = z.number().positive().max(100_000);
 const Pct = z.number().min(0).max(100);
@@ -91,7 +92,7 @@ export function sampleRoutes(ctx: AppContext) {
       const conditions = [eq(samples.orgId, me.orgId)];
       if (q.status) conditions.push(eq(samples.status, q.status));
       if (q.search) {
-        const like = `%${q.search.replace(/[%_\\]/g, "\\$&")}%`;
+        const like = likePattern(q.search);
         const asNumber = Number(q.search.replace(/^#/, ""));
         conditions.push(
           or(

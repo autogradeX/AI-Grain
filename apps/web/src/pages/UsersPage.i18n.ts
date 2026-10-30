@@ -34,4 +34,5 @@ export const m = defineMessages({
     en: "Invite sent. If email isn't set up on the server, share this link (valid 7 days): {link}",
     hi: "आमंत्रण भेज दिया गया। अगर सर्वर पर ईमेल सेट नहीं है, तो यह लिंक भेजें (7 दिन तक मान्य): {link}",
   },
+  searchMembers: { en: "Search name or email", hi: "नाम या ईमेल खोजें" },
 });

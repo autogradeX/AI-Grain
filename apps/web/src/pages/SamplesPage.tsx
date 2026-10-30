@@ -1,10 +1,11 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { ScanSearch } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, download } from "../api/client";
 import { useCrops } from "../api/crops";
 import { CropSelect } from "../components/CropSelect";
+import { Pager, useDebounced, usePage } from "../components/Pager";
 import type { SampleListItem, Standard } from "../api/types";
 import { useCan } from "../auth/AuthContext";
 import {
@@ -30,7 +31,8 @@ export function SamplesPage() {
   const { cropLabel } = useGrainLabels();
   const [status, setStatus] = useState<"" | "in_progress" | "completed">("");
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(0);
+  const [page, setPage] = usePage();
+  const term = useDebounced(search.trim());
   const [creating, setCreating] = useState(false);
 
   const query = new URLSearchParams({
@@ -38,9 +40,10 @@ export function SamplesPage() {
     offset: String(page * PAGE),
   });
   if (status) query.set("status", status);
-  if (search.trim()) query.set("search", search.trim());
+  if (term) query.set("search", term);
   const samples = useQuery({
-    queryKey: ["samples", status, search, page],
+    queryKey: ["samples", status, term, page],
+    placeholderData: keepPreviousData,
     queryFn: () =>
       api.get<{ items: SampleListItem[]; total: number }>(
         `/samples?${query.toString()}`,
@@ -115,7 +118,7 @@ export function SamplesPage() {
           }
         />
       )}
-      <ul className="list">
+      <ul className={samples.isPlaceholderData ? "list refetching" : "list"}>
         {samples.data?.items.map((s) => (
           <li key={s.id}>
             <Link to={`/app/samples/${s.id}`} className="list-item">
@@ -151,25 +154,13 @@ export function SamplesPage() {
           </li>
         ))}
       </ul>
-      {samples.data && samples.data.total > PAGE && (
-        <div className="row center">
-          <button disabled={page === 0} onClick={() => setPage(page - 1)}>
-            {t("previous")}
-          </button>
-          <span className="muted">
-            {t("range", {
-              from: page * PAGE + 1,
-              to: Math.min(samples.data.total, (page + 1) * PAGE),
-              total: samples.data.total,
-            })}
-          </span>
-          <button
-            disabled={(page + 1) * PAGE >= samples.data.total}
-            onClick={() => setPage(page + 1)}
-          >
-            {t("next")}
-          </button>
-        </div>
+      {samples.data && (
+        <Pager
+          total={samples.data.total}
+          limit={PAGE}
+          page={page}
+          onPage={setPage}
+        />
       )}
     </div>
   );

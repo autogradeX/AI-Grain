@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { AppContext } from "../../context.js";
 import { samples, standards } from "../../db/schema.js";
 import { authenticate, authOf } from "../auth/guard.js";
+import { pageQuery } from "../../lib/pagination.js";
 
 /** The number of samples graded both ways before the method's results should be relied on. */
 export const VALIDATION_TARGET = { min: 30, recommended: 50 };
@@ -23,6 +24,7 @@ export function validationRoutes(ctx: AppContext) {
         .object({
           crop: z.string().optional(),
           standardId: z.uuid().optional(),
+          ...pageQuery(25),
         })
         .parse(request.query);
       const conditions = [
@@ -59,7 +61,11 @@ export function validationRoutes(ctx: AppContext) {
       return {
         target: VALIDATION_TARGET,
         summary,
-        samples: rows.map((r) => ({
+        // The summary covers every sample; the list is one page of them.
+        total: rows.length,
+        limit: q.limit,
+        offset: q.offset,
+        samples: rows.slice(q.offset, q.offset + q.limit).map((r) => ({
           id: r.id,
           number: r.number,
           crop: r.crop,

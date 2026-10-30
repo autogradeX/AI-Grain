@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { AppContext } from "../../context.js";
@@ -30,6 +30,7 @@ import {
   requireSiteOwnerId,
   siteOwnerOrgId,
 } from "./service.js";
+import { page, pageQuery } from "../../lib/pagination.js";
 
 const Kind = z.enum(articleKindEnum.enumValues);
 const Slug = z
@@ -271,27 +272,34 @@ export function publicSiteRoutes(ctx: AppContext) {
     );
 
     app.get("/articles", async (request) => {
-      const { kind } = z.object({ kind: Kind.optional() }).parse(request.query);
+      const q = z
+        .object({ kind: Kind.optional(), ...pageQuery(24, 60) })
+        .parse(request.query);
       const owner = await siteOwnerOrgId(ctx);
-      if (!owner) return [];
+      if (!owner) return page([], 0, q);
       await ensureDefaultArticles(ctx, owner);
-      return ctx.db
-        .select({
-          slug: articles.slug,
-          kind: articles.kind,
-          title: articles.title,
-          summary: articles.summary,
-          publishedAt: articles.publishedAt,
-        })
-        .from(articles)
-        .where(
-          and(
-            eq(articles.orgId, owner),
-            eq(articles.published, true),
-            ...(kind ? [eq(articles.kind, kind)] : []),
-          ),
-        )
-        .orderBy(asc(articles.kind), asc(articles.title));
+      const where = and(
+        eq(articles.orgId, owner),
+        eq(articles.published, true),
+        ...(q.kind ? [eq(articles.kind, q.kind)] : []),
+      );
+      const [items, [totals]] = await Promise.all([
+        ctx.db
+          .select({
+            slug: articles.slug,
+            kind: articles.kind,
+            title: articles.title,
+            summary: articles.summary,
+            publishedAt: articles.publishedAt,
+          })
+          .from(articles)
+          .where(where)
+          .orderBy(asc(articles.kind), asc(articles.title), asc(articles.id))
+          .limit(q.limit)
+          .offset(q.offset),
+        ctx.db.select({ total: count() }).from(articles).where(where),
+      ]);
+      return page(items, totals?.total, q);
     });
 
     app.get("/articles/:slug", async (request) => {
@@ -361,12 +369,27 @@ export function siteAdminRoutes(ctx: AppContext) {
 
     app.get("/site/leads", admin, async (request) => {
       const owner = await assertSiteAdmin(ctx, request);
-      return ctx.db
-        .select()
-        .from(leads)
-        .where(eq(leads.orgId, owner))
-        .orderBy(desc(leads.createdAt))
-        .limit(500);
+      const q = z
+        .object({
+          status: z.enum(["new", "contacted", "closed"]).optional(),
+          ...pageQuery(20),
+        })
+        .parse(request.query);
+      const where = and(
+        eq(leads.orgId, owner),
+        ...(q.status ? [eq(leads.status, q.status)] : []),
+      );
+      const [items, [totals]] = await Promise.all([
+        ctx.db
+          .select()
+          .from(leads)
+          .where(where)
+          .orderBy(desc(leads.createdAt), desc(leads.id))
+          .limit(q.limit)
+          .offset(q.offset),
+        ctx.db.select({ total: count() }).from(leads).where(where),
+      ]);
+      return page(items, totals?.total, q);
     });
 
     app.patch("/site/leads/:id", admin, async (request) => {
@@ -386,12 +409,25 @@ export function siteAdminRoutes(ctx: AppContext) {
 
     app.get("/site/articles", admin, async (request) => {
       const owner = await assertSiteAdmin(ctx, request);
+      const q = z
+        .object({ kind: Kind.optional(), ...pageQuery(25) })
+        .parse(request.query);
       await ensureDefaultArticles(ctx, owner);
-      return ctx.db
-        .select()
-        .from(articles)
-        .where(eq(articles.orgId, owner))
-        .orderBy(asc(articles.kind), asc(articles.title));
+      const where = and(
+        eq(articles.orgId, owner),
+        ...(q.kind ? [eq(articles.kind, q.kind)] : []),
+      );
+      const [items, [totals]] = await Promise.all([
+        ctx.db
+          .select()
+          .from(articles)
+          .where(where)
+          .orderBy(asc(articles.kind), asc(articles.title), asc(articles.id))
+          .limit(q.limit)
+          .offset(q.offset),
+        ctx.db.select({ total: count() }).from(articles).where(where),
+      ]);
+      return page(items, totals?.total, q);
     });
 
     const ArticleBody = z.object({

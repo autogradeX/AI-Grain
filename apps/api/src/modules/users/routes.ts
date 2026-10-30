@@ -1,4 +1,15 @@
-import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gt,
+  ilike,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { CLAUDE_MODELS } from "../../config.js";
@@ -19,6 +30,7 @@ import {
   revokeAllSessions,
 } from "../auth/service.js";
 import { siteOwnerOrgId } from "../site/service.js";
+import { likePattern, page, pageQuery } from "../../lib/pagination.js";
 
 const Role = z.enum(roleEnum.enumValues);
 
@@ -29,20 +41,43 @@ export function userRoutes(ctx: AppContext) {
 
     app.get("/users", admin, async (request) => {
       const me = authOf(request);
-      return ctx.db
-        .select({
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          role: users.role,
-          active: users.active,
-          emailVerified: sql<boolean>`${users.emailVerifiedAt} is not null`,
-          lastLoginAt: users.lastLoginAt,
-          createdAt: users.createdAt,
+      const q = z
+        .object({
+          search: z.string().trim().max(100).optional(),
+          ...pageQuery(25),
         })
-        .from(users)
-        .where(eq(users.orgId, me.orgId))
-        .orderBy(users.name);
+        .parse(request.query);
+      const where = and(
+        eq(users.orgId, me.orgId),
+        ...(q.search
+          ? [
+              or(
+                ilike(users.name, likePattern(q.search)),
+                ilike(users.email, likePattern(q.search)),
+              )!,
+            ]
+          : []),
+      );
+      const [items, [totals]] = await Promise.all([
+        ctx.db
+          .select({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            role: users.role,
+            active: users.active,
+            emailVerified: sql<boolean>`${users.emailVerifiedAt} is not null`,
+            lastLoginAt: users.lastLoginAt,
+            createdAt: users.createdAt,
+          })
+          .from(users)
+          .where(where)
+          .orderBy(users.name, users.id)
+          .limit(q.limit)
+          .offset(q.offset),
+        ctx.db.select({ total: count() }).from(users).where(where),
+      ]);
+      return page(items, totals?.total, q);
     });
 
     app.patch("/users/:id", admin, async (request) => {
@@ -223,20 +258,27 @@ export function userRoutes(ctx: AppContext) {
 
     app.get("/audit", admin, async (request) => {
       const me = authOf(request);
-      return ctx.db
-        .select({
-          id: auditLog.id,
-          action: auditLog.action,
-          detail: auditLog.detail,
-          ip: auditLog.ip,
-          createdAt: auditLog.createdAt,
-          user: { id: users.id, name: users.name, email: users.email },
-        })
-        .from(auditLog)
-        .leftJoin(users, eq(users.id, auditLog.userId))
-        .where(eq(auditLog.orgId, me.orgId))
-        .orderBy(desc(auditLog.createdAt))
-        .limit(200);
+      const q = z.object(pageQuery(50)).parse(request.query);
+      const where = eq(auditLog.orgId, me.orgId);
+      const [items, [totals]] = await Promise.all([
+        ctx.db
+          .select({
+            id: auditLog.id,
+            action: auditLog.action,
+            detail: auditLog.detail,
+            ip: auditLog.ip,
+            createdAt: auditLog.createdAt,
+            user: { id: users.id, name: users.name, email: users.email },
+          })
+          .from(auditLog)
+          .leftJoin(users, eq(users.id, auditLog.userId))
+          .where(where)
+          .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
+          .limit(q.limit)
+          .offset(q.offset),
+        ctx.db.select({ total: count() }).from(auditLog).where(where),
+      ]);
+      return page(items, totals?.total, q);
     });
   };
 }

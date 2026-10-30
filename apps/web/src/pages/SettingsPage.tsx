@@ -1,9 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type CurrentUser, type Session } from "../api/client";
-import { type AuditEntry, type ClaudeModel, type Org } from "../api/types";
+import {
+  type AuditEntry,
+  type ClaudeModel,
+  type Org,
+  type Page,
+} from "../api/types";
 import { useAuth, useCan } from "../auth/AuthContext";
+import { Pager, usePage } from "../components/Pager";
 import { Badge, Card, ErrorNote, Field, formatDate } from "../components/ui";
 import { LanguageSelect, useT } from "../i18n";
 import { common } from "../i18n/common";
@@ -242,11 +253,18 @@ function OrgCard() {
   );
 }
 
+const AUDIT_PAGE = 50;
+
 function AuditCard() {
   const t = useT(m);
+  const [page, setPage] = usePage("log");
   const audit = useQuery({
-    queryKey: ["audit"],
-    queryFn: () => api.get<AuditEntry[]>("/audit"),
+    queryKey: ["audit", page],
+    placeholderData: keepPreviousData,
+    queryFn: () =>
+      api.get<Page<AuditEntry>>(
+        `/audit?limit=${AUDIT_PAGE}&offset=${page * AUDIT_PAGE}`,
+      ),
   });
   return (
     <Card title={t("activityLog")}>
@@ -262,7 +280,7 @@ function AuditCard() {
             </tr>
           </thead>
           <tbody>
-            {audit.data?.map((a) => (
+            {audit.data?.items.map((a) => (
               <tr key={a.id}>
                 <td>{formatDate(a.createdAt)}</td>
                 <td>{a.user?.name ?? "—"}</td>
@@ -278,6 +296,14 @@ function AuditCard() {
           </tbody>
         </table>
       </div>
+      {audit.data && (
+        <Pager
+          total={audit.data.total}
+          limit={AUDIT_PAGE}
+          page={page}
+          onPage={setPage}
+        />
+      )}
     </Card>
   );
 }

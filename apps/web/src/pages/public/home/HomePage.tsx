@@ -12,6 +12,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../../api/client";
+import type { Page } from "../../../api/types";
 import { useLang, useT } from "../../../i18n";
 import { useGrainLabels } from "../../../i18n/common";
 import { CategorySection } from "../CategorySection";
@@ -448,14 +449,15 @@ function CaseStudies() {
   const t = useT(m);
   const list = useQuery({
     queryKey: ["articles", "case_study"],
-    queryFn: () => api.get<ArticleItem[]>("/public/articles?kind=case_study"),
+    queryFn: () =>
+      api.get<Page<ArticleItem>>("/public/articles?kind=case_study&limit=3"),
   });
-  if (!list.data?.length) return null;
+  if (!list.data?.items.length) return null;
   return (
     <section className="site-section">
       <h2>{t("resultsTitle")}</h2>
       <div className="feature-grid">
-        {list.data.slice(0, 3).map((a) => (
+        {list.data.items.map((a) => (
           <Link
             key={a.slug}
             to={`/hub/${a.slug}`}

@@ -18,6 +18,7 @@ export const m = defineMessages({
     en: "No enquiries yet. They arrive from the website's contact page.",
     hi: "अभी कोई पूछताछ नहीं। ये वेबसाइट के संपर्क पेज से आती हैं।",
   },
+  allStatuses: { en: "All", hi: "सभी" },
   status_new: { en: "new", hi: "नई" },
   status_contacted: { en: "contacted", hi: "संपर्क किया" },
   status_closed: { en: "closed", hi: "बंद" },

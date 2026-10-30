@@ -1,5 +1,5 @@
 import { kernelClassIds } from "@ai-grain/core";
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -15,6 +15,7 @@ import {
 } from "../auth/guard.js";
 import { readUpload } from "../batches/upload.js";
 import { ensureCrop } from "../crops/service.js";
+import { page, pageQuery } from "../../lib/pagination.js";
 
 /** At most this many reference images per crop go into each Claude request. */
 export const MAX_REFERENCES_PER_REQUEST = 12;
@@ -25,31 +26,37 @@ export function referenceRoutes(ctx: AppContext) {
 
     app.get("/reference-images", async (request) => {
       const me = authOf(request);
-      const { crop } = z
-        .object({ crop: z.string().optional() })
+      const q = z
+        .object({ crop: z.string().optional(), ...pageQuery(48) })
         .parse(request.query);
-      return ctx.db
-        .select({
-          id: referenceImages.id,
-          crop: referenceImages.crop,
-          cls: referenceImages.cls,
-          note: referenceImages.note,
-          createdAt: referenceImages.createdAt,
-        })
-        .from(referenceImages)
-        .where(
-          crop
-            ? and(
-                eq(referenceImages.orgId, me.orgId),
-                eq(referenceImages.crop, crop.toLowerCase()),
-              )
-            : eq(referenceImages.orgId, me.orgId),
-        )
-        .orderBy(
-          referenceImages.crop,
-          referenceImages.cls,
-          desc(referenceImages.createdAt),
-        );
+      const where = q.crop
+        ? and(
+            eq(referenceImages.orgId, me.orgId),
+            eq(referenceImages.crop, q.crop.toLowerCase()),
+          )
+        : eq(referenceImages.orgId, me.orgId);
+      const [items, [totals]] = await Promise.all([
+        ctx.db
+          .select({
+            id: referenceImages.id,
+            crop: referenceImages.crop,
+            cls: referenceImages.cls,
+            note: referenceImages.note,
+            createdAt: referenceImages.createdAt,
+          })
+          .from(referenceImages)
+          .where(where)
+          .orderBy(
+            referenceImages.crop,
+            referenceImages.cls,
+            desc(referenceImages.createdAt),
+            referenceImages.id,
+          )
+          .limit(q.limit)
+          .offset(q.offset),
+        ctx.db.select({ total: count() }).from(referenceImages).where(where),
+      ]);
+      return page(items, totals?.total, q);
     });
 
     app.post(

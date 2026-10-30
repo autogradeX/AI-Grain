@@ -1,11 +1,17 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Inbox } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
 import remarkGfm from "remark-gfm";
 import { api } from "../api/client";
-import type { Org } from "../api/types";
+import type { Org, Page } from "../api/types";
+import { Pager, usePage } from "../components/Pager";
 import {
   Badge,
   Card,
@@ -61,6 +67,8 @@ export function WebsitePage() {
     queryFn: () => api.get<Org>("/org"),
   });
   const [tab, setTab] = useState<Tab>("leads");
+  // Each tab has its own list; switching starts it at page 1.
+  const [, setPage] = usePage();
   const t = useT(m);
   if (org.isPending) return <Spinner />;
   if (!org.data?.isSiteOwner) {
@@ -97,7 +105,10 @@ export function WebsitePage() {
             role="tab"
             aria-selected={tab === key}
             className={tab === key ? "active" : ""}
-            onClick={() => setTab(key)}
+            onClick={() => {
+              setTab(key);
+              setPage(0);
+            }}
           >
             {label}
           </button>
@@ -116,26 +127,64 @@ const LEAD_TONE = {
   closed: "neutral",
 } as const;
 
+const LEADS_PAGE = 20;
+const ARTICLES_PAGE = 25;
+
 function Leads() {
   const qc = useQueryClient();
   const t = useT(m);
+  const [status, setStatus] = useState<Lead["status"] | "">("");
+  const [page, setPage] = usePage();
   const leads = useQuery({
-    queryKey: ["site-leads"],
-    queryFn: () => api.get<Lead[]>("/site/leads"),
+    queryKey: ["site-leads", status, page],
+    placeholderData: keepPreviousData,
+    queryFn: () =>
+      api.get<Page<Lead>>(
+        `/site/leads?${new URLSearchParams({
+          limit: String(LEADS_PAGE),
+          offset: String(page * LEADS_PAGE),
+          ...(status && { status }),
+        }).toString()}`,
+      ),
   });
   const update = useMutation({
     mutationFn: (d: { id: string; status: Lead["status"] }) =>
       api.patch(`/site/leads/${d.id}`, { status: d.status }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["site-leads"] }),
   });
+  const filter = (
+    <div className="segmented" role="group" aria-label={t("status")}>
+      {(["", "new", "contacted", "closed"] as const).map((s) => (
+        <button
+          key={s || "all"}
+          className={status === s ? "active" : ""}
+          aria-pressed={status === s}
+          onClick={() => {
+            setStatus(s);
+            setPage(0);
+          }}
+        >
+          {s ? t(`status_${s}`) : t("allStatuses")}
+        </button>
+      ))}
+    </div>
+  );
   if (leads.isPending) return <Spinner />;
   if (leads.error) return <ErrorNote error={leads.error} />;
-  if (!leads.data.length)
-    return <EmptyState icon={Inbox} title={t("noEnquiries")} />;
+  if (!leads.data.total)
+    return (
+      <div className="stack-sm">
+        {status && filter}
+        <EmptyState icon={Inbox} title={t("noEnquiries")} />
+      </div>
+    );
   return (
-    <div className="stack-sm">
+    <div
+      className={leads.isPlaceholderData ? "stack-sm refetching" : "stack-sm"}
+    >
+      {filter}
       <ErrorNote error={update.error} />
-      {leads.data.map((l) => (
+      {leads.data.items.map((l) => (
         <Card
           key={l.id}
           title={
@@ -171,6 +220,12 @@ function Leads() {
                   {t(`mark_${s}`)}
                 </button>
               ))}
+            <Pager
+              total={leads.data.total}
+              limit={LEADS_PAGE}
+              page={page}
+              onPage={setPage}
+            />
           </div>
         </Card>
       ))}
@@ -198,9 +253,14 @@ function slugify(title: string) {
 
 function Articles() {
   const t = useT(m);
+  const [page, setPage] = usePage();
   const articles = useQuery({
-    queryKey: ["site-articles"],
-    queryFn: () => api.get<Article[]>("/site/articles"),
+    queryKey: ["site-articles", page],
+    placeholderData: keepPreviousData,
+    queryFn: () =>
+      api.get<Page<Article>>(
+        `/site/articles?limit=${ARTICLES_PAGE}&offset=${page * ARTICLES_PAGE}`,
+      ),
   });
   const [editing, setEditing] = useState<Article | "new" | null>(null);
   if (editing)
@@ -230,7 +290,7 @@ function Articles() {
             </tr>
           </thead>
           <tbody>
-            {articles.data.map((a) => (
+            {articles.data.items.map((a) => (
               <tr key={a.id}>
                 <td>
                   <button className="link" onClick={() => setEditing(a)}>
@@ -251,6 +311,12 @@ function Articles() {
           </tbody>
         </table>
       </div>
+      <Pager
+        total={articles.data.total}
+        limit={ARTICLES_PAGE}
+        page={page}
+        onPage={setPage}
+      />
     </div>
   );
 }

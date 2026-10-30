@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Pager, usePage } from "../components/Pager";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useCrop } from "../api/crops";
@@ -12,14 +13,20 @@ import { m } from "./ValidationPage.i18n";
 
 const f = (v: number) => v.toFixed(2);
 
+const SAMPLES_PAGE = 25;
+
 export function ValidationPage() {
   const [crop, setCrop] = useState("wheat");
+  const [page, setPage] = usePage();
   const t = useT(m);
   const { classLabel } = useGrainLabels();
   const report = useQuery({
-    queryKey: ["validation", crop],
+    queryKey: ["validation", crop, page],
+    placeholderData: keepPreviousData,
     queryFn: () =>
-      api.get<ValidationReport>(`/validation?crop=${encodeURIComponent(crop)}`),
+      api.get<ValidationReport>(
+        `/validation?crop=${encodeURIComponent(crop)}&limit=${SAMPLES_PAGE}&offset=${page * SAMPLES_PAGE}`,
+      ),
   });
   const classes = useCrop(crop)?.classes ?? [];
   const r = report.data;
@@ -30,7 +37,13 @@ export function ValidationPage() {
       <h1>{t("title")}</h1>
       <p className="muted small">{t("intro")}</p>
       <Field label={t("crop")}>
-        <CropSelect value={crop} onChange={setCrop} />
+        <CropSelect
+          value={crop}
+          onChange={(c) => {
+            setCrop(c);
+            setPage(0);
+          }}
+        />
       </Field>
       {report.isPending && <Spinner />}
       <ErrorNote error={report.error} />
@@ -133,6 +146,12 @@ export function ValidationPage() {
                   </li>
                 ))}
               </ul>
+              <Pager
+                total={r.total}
+                limit={SAMPLES_PAGE}
+                page={page}
+                onPage={setPage}
+              />
             </Card>
           )}
         </>

@@ -174,19 +174,28 @@ describe("contact form", () => {
       to: "site@owner.test",
       subject: "Website enquiry from Grace Buyer",
     });
-    const leads = await call<{ id: string; name: string; status: string }[]>(
-      owner,
-      "GET",
-      "/api/site/leads",
-    );
-    expect(leads.body[0]).toMatchObject({ name: "Grace Buyer", status: "new" });
+    const leads = await call<{
+      items: { id: string; name: string; status: string }[];
+      total: number;
+    }>(owner, "GET", "/api/site/leads");
+    expect(leads.body.items[0]).toMatchObject({
+      name: "Grace Buyer",
+      status: "new",
+    });
     const updated = await call(
       owner,
       "PATCH",
-      `/api/site/leads/${leads.body[0]!.id}`,
+      `/api/site/leads/${leads.body.items[0]!.id}`,
       { status: "contacted" },
     );
     expect(updated.body).toMatchObject({ status: "contacted" });
+    // The status filter runs on the server.
+    const fresh = await call<{ total: number }>(
+      owner,
+      "GET",
+      "/api/site/leads?status=new",
+    );
+    expect(fresh.body.total).toBe(0);
   });
 
   it("sends to the configured contact address when there is one", async () => {
@@ -232,16 +241,16 @@ describe("contact form", () => {
 
 describe("knowledge hub", () => {
   it("starts with published guides and glossary terms", async () => {
-    const list = await call<{ slug: string; kind: string }[]>(
-      null,
-      "GET",
-      "/api/public/articles",
-    );
-    expect(list.body.some((a) => a.kind === "guide")).toBe(true);
-    expect(list.body.some((a) => a.slug === "ergot")).toBe(true);
+    const list = await call<{
+      items: { slug: string; kind: string }[];
+      total: number;
+    }>(null, "GET", "/api/public/articles?limit=60");
+    expect(list.body.total).toBe(list.body.items.length);
+    expect(list.body.items.some((a) => a.kind === "guide")).toBe(true);
+    expect(list.body.items.some((a) => a.slug === "ergot")).toBe(true);
     // Nothing invented: no seeded news or case studies.
     expect(
-      list.body.some((a) => a.kind === "news" || a.kind === "case_study"),
+      list.body.items.some((a) => a.kind === "news" || a.kind === "case_study"),
     ).toBe(false);
     const ergot = await call<{ body: string }>(
       null,
@@ -249,6 +258,37 @@ describe("knowledge hub", () => {
       "/api/public/articles/ergot",
     );
     expect(ergot.body.body).toMatch(/Claviceps/);
+  });
+
+  it("pages lists on the server", async () => {
+    type Page = { items: { slug: string }[]; total: number; limit: number };
+    const first = await call<Page>(null, "GET", "/api/public/articles?limit=2");
+    expect(first.body.items).toHaveLength(2);
+    expect(first.body.limit).toBe(2);
+    expect(first.body.total).toBeGreaterThan(3);
+    const second = await call<Page>(
+      null,
+      "GET",
+      "/api/public/articles?limit=2&offset=2",
+    );
+    expect(second.body.items).toHaveLength(2);
+    // Pages don't overlap.
+    const slugs = new Set(first.body.items.map((a) => a.slug));
+    expect(second.body.items.some((a) => slugs.has(a.slug))).toBe(false);
+    const last = await call<Page>(
+      null,
+      "GET",
+      `/api/public/articles?limit=2&offset=${first.body.total - 1}`,
+    );
+    expect(last.body.items).toHaveLength(1);
+    // A client can't ask for everything at once.
+    expect(
+      (await call(null, "GET", "/api/public/articles?limit=1000")).status,
+    ).toBe(400);
+
+    const audit = await call<Page>(owner, "GET", "/api/audit?limit=1");
+    expect(audit.body.items).toHaveLength(1);
+    expect(audit.body.total).toBeGreaterThan(1);
   });
 
   it("lets the site admin write, publish and remove articles", async () => {

@@ -1,8 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client";
-import type { Invite, Role, UserRow } from "../api/types";
+import type { Invite, Page, Role, UserRow } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { Pager, useDebounced, usePage } from "../components/Pager";
 import {
   Badge,
   Card,
@@ -27,14 +33,27 @@ const ROLE_NAME = {
   viewer: "roleViewer",
 } as const satisfies Record<Role, keyof typeof common>;
 
+const USERS_PAGE = 25;
+
 export function UsersPage() {
   const { user: me } = useAuth();
   const t = useT(m);
   const tc = useT(common);
   const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const term = useDebounced(search.trim());
+  const [page, setPage] = usePage();
   const users = useQuery({
-    queryKey: ["users"],
-    queryFn: () => api.get<UserRow[]>("/users"),
+    queryKey: ["users", term, page],
+    placeholderData: keepPreviousData,
+    queryFn: () =>
+      api.get<Page<UserRow>>(
+        `/users?${new URLSearchParams({
+          limit: String(USERS_PAGE),
+          offset: String(page * USERS_PAGE),
+          ...(term && { search: term }),
+        }).toString()}`,
+      ),
   });
   const invites = useQuery({
     queryKey: ["invites"],
@@ -82,8 +101,18 @@ export function UsersPage() {
       <Card title={t("members")}>
         {users.isPending && <Spinner />}
         <ErrorNote error={users.error ?? update.error} />
-        <ul className="list">
-          {users.data?.map((u) => (
+        <input
+          type="search"
+          placeholder={t("searchMembers")}
+          aria-label={t("searchMembers")}
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
+        />
+        <ul className={users.isPlaceholderData ? "list refetching" : "list"}>
+          {users.data?.items.map((u) => (
             <li key={u.id} className="list-item wrap">
               <div>
                 <strong>{u.name}</strong>{" "}
@@ -120,6 +149,14 @@ export function UsersPage() {
             </li>
           ))}
         </ul>
+        {users.data && (
+          <Pager
+            total={users.data.total}
+            limit={USERS_PAGE}
+            page={page}
+            onPage={setPage}
+          />
+        )}
       </Card>
     </div>
   );

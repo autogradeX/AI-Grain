@@ -1,15 +1,23 @@
 import { kernelClassIds } from "@ai-grain/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { api } from "../api/client";
 import { useCrop } from "../api/crops";
 import { CropSelect } from "../components/CropSelect";
-import type { ReferenceImage } from "../api/types";
+import type { Page, ReferenceImage } from "../api/types";
+import { Pager, usePage } from "../components/Pager";
 import { useCan } from "../auth/AuthContext";
 import { AuthImage, Card, ErrorNote, Field, Spinner } from "../components/ui";
 import { useT } from "../i18n";
 import { useGrainLabels } from "../i18n/common";
 import { m } from "./ReferencesPage.i18n";
+
+const REFS_PAGE = 48;
 
 export function ReferencesPage() {
   const t = useT(m);
@@ -17,13 +25,17 @@ export function ReferencesPage() {
   const can = useCan();
   const qc = useQueryClient();
   const [crop, setCrop] = useState("wheat");
+  const [page, setPage] = usePage();
   const refs = useQuery({
-    queryKey: ["references", crop],
+    queryKey: ["references", crop, page],
+    placeholderData: keepPreviousData,
     queryFn: () =>
-      api.get<ReferenceImage[]>(
-        `/reference-images?crop=${encodeURIComponent(crop)}`,
+      api.get<Page<ReferenceImage>>(
+        `/reference-images?crop=${encodeURIComponent(crop)}&limit=${REFS_PAGE}&offset=${page * REFS_PAGE}`,
       ),
   });
+  // Counts per class are for this page when the images span several pages.
+  const paged = (refs.data?.total ?? 0) > REFS_PAGE;
   const remove = useMutation({
     mutationFn: (id: string) => api.delete(`/reference-images/${id}`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["references"] }),
@@ -31,7 +43,7 @@ export function ReferencesPage() {
   const cropProfile = useCrop(crop);
   const classes = cropProfile?.classes ?? [];
   const byClass = new Map<string, ReferenceImage[]>();
-  for (const r of refs.data ?? [])
+  for (const r of refs.data?.items ?? [])
     byClass.set(r.cls, [...(byClass.get(r.cls) ?? []), r]);
 
   return (
@@ -39,7 +51,13 @@ export function ReferencesPage() {
       <h1>{t("title")}</h1>
       <p className="muted small">{t("intro")}</p>
       <Field label={t("crop")}>
-        <CropSelect value={crop} onChange={setCrop} />
+        <CropSelect
+          value={crop}
+          onChange={(c) => {
+            setCrop(c);
+            setPage(0);
+          }}
+        />
       </Field>
       {can.write && <UploadReference crop={crop} />}
       {refs.isPending && <Spinner />}
@@ -54,7 +72,11 @@ export function ReferencesPage() {
         .map((c) => (
           <Card
             key={c}
-            title={`${classLabel(classes, c)} (${byClass.get(c)!.length})`}
+            title={
+              paged
+                ? classLabel(classes, c)
+                : `${classLabel(classes, c)} (${byClass.get(c)!.length})`
+            }
           >
             <div className="thumb-grid">
               {byClass.get(c)!.map((r) => (
@@ -80,10 +102,18 @@ export function ReferencesPage() {
             </div>
           </Card>
         ))}
-      {refs.data?.length === 0 && (
+      {refs.data?.total === 0 && (
         <p className="muted">
           {t("empty", { crop: cropLabel(cropProfile?.label ?? crop) })}
         </p>
+      )}
+      {refs.data && (
+        <Pager
+          total={refs.data.total}
+          limit={REFS_PAGE}
+          page={page}
+          onPage={setPage}
+        />
       )}
     </div>
   );

@@ -21,9 +21,6 @@ export const m = defineMessages({
   grade: { en: "Grade {grade}", hi: "ग्रेड {grade}" },
   noGrade: { en: "No grade", hi: "कोई ग्रेड नहीं" },
   defects: { en: "{pct} defects", hi: "{pct} दोष" },
-  previous: { en: "Previous", hi: "पिछला" },
-  next: { en: "Next", hi: "अगला" },
-  range: { en: "{from}–{to} of {total}", hi: "{total} में से {from}–{to}" },
   crop: { en: "Crop", hi: "फसल" },
   standard: { en: "Standard", hi: "मानक" },
   noStandardHint: {

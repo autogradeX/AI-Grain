@@ -244,6 +244,10 @@ export interface ValidationReport {
     methodGrade: string | null;
     referenceGrade: string | null;
   }[];
+  /** The summary covers every sample; `samples` is one page of them. */
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface AuditEntry {
@@ -253,4 +257,12 @@ export interface AuditEntry {
   ip: string | null;
   createdAt: string;
   user: { id: string; name: string; email: string } | null;
+}
+
+/** One page of a server-paginated list. */
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
 }
