@@ -6,6 +6,8 @@ import { ApiError } from "./api/client";
 import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
 import { LangProvider } from "./i18n";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/noto-sans-devanagari";
 import "./styles.css";
 
 const queryClient = new QueryClient({

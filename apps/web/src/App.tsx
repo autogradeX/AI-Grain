@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
-import { Layout, MorePage } from "./components/Layout";
+import { Layout } from "./components/Layout";
 import { Spinner } from "./components/ui";
 import {
   AcceptInvitePage,
@@ -98,7 +98,8 @@ export function App() {
         <Route path="users" element={<UsersPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="website" element={<WebsitePage />} />
-        <Route path="more" element={<MorePage />} />
+        {/* The phone "More" page became the drawer. */}
+        <Route path="more" element={<Navigate to="/app" replace />} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
