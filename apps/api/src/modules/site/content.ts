@@ -42,7 +42,7 @@ Results change with lighting and phone model. Use the same phone, stand height a
 1. Weigh the working sample, for example 20–25 g (about 500–600 wheat kernels).
 2. Spread 100–150 kernels on the board in one layer, not touching. Repeat in batches until the whole sample is done.
 3. Photograph straight down with every grid cell visible. Optionally flip the kernels for a crease-side photo.
-4. Claude flags suspect kernels by grid cell, class and confidence.
+4. Model Orchestration flags suspect kernels by grid cell, class and confidence.
 5. Pick out each flagged kernel with tweezers, check it by eye, and drop it into the cup for its class. You make the final call.
 6. Weigh each cup. Mass % per class is the cup weight divided by the sample weight, times 100.`,
   },
@@ -52,7 +52,7 @@ Results change with lighting and phone model. Use the same phone, stand height a
     title: "Validating the method against a certified grader",
     summary:
       "Before relying on the results, grade 30–50 samples both ways and compare them class by class.",
-    body: `Claude is a general-purpose AI, not trained on your grain. Its accuracy on your crops, with your setup, is unknown until you measure it.
+    body: `Model Orchestration runs general-purpose AI models, not trained on your grain. Its accuracy on your crops, with your setup, is unknown until you measure it.
 
 ## How to validate
 
@@ -77,7 +77,7 @@ This method is a screening and pre-check tool. It is not acceptable for official
     title: "Photo estimate or weighing?",
     summary:
       "How the instant estimate works, where it falls short, and when the scale is needed.",
-    body: `As soon as Claude has classified the kernels in your photos, AI-Grain shows an **instant estimate** of mass % per class and group.
+    body: `As soon as Model Orchestration has classified the kernels in your photos, AI-Grain shows an **instant estimate** of mass % per class and group.
 
 ## How the estimate works
 
@@ -97,8 +97,9 @@ Weighing the cups is the verified result, and it is closest to how official grad
     slug: "definitions-and-reference-images",
     kind: "guide",
     title: "Writing defect definitions and choosing reference images",
-    summary: "The two things that improve Claude's classifications the most.",
-    body: `Claude reads your defect definitions and up to 12 reference images with every request.
+    summary:
+      "The two things that improve Model Orchestration's classifications the most.",
+    body: `Model Orchestration reads your defect definitions and up to 12 reference images with every request.
 
 ## Definitions
 
@@ -109,7 +110,7 @@ Weighing the cups is the verified result, and it is closest to how official grad
 ## Reference images
 
 - Use close-ups from your own grain, photographed on the same board under the same light.
-- Cover the classes where Claude and your operators disagree most (see **Analytics → Claude against the operators**).
+- Cover the classes where Model Orchestration and your operators disagree most (see **Analytics → Model Orchestration against the operators**).
 - The quickest way to add one: on a reviewed kernel, choose **Use as a reference example**.`,
   },
   ...(

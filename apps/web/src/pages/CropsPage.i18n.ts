@@ -3,8 +3,8 @@ import { defineMessages } from "../i18n";
 export const m = defineMessages({
   title: { en: "Crops and classes", hi: "फ़सलें और वर्ग" },
   intro: {
-    en: "Each crop has its own defect classes in four groups: grain admixtures, broken & defective, impurities & foreign material, and harmful & disease. Claude sorts every kernel into one of them, and standards set limits per class and per group. Wheat, barley, oats, rapeseed and hemp start from presets you can change.",
-    hi: "हर फ़सल के अपने दोष-वर्ग होते हैं, चार समूहों में: अन्य अनाज की मिलावट, टूटे व दोषपूर्ण दाने, अशुद्धियाँ व बाहरी पदार्थ, और हानिकारक व रोगग्रस्त। Claude हर दाने को इनमें से किसी एक वर्ग में रखता है, और मानक हर वर्ग व हर समूह की सीमा तय करते हैं। गेहूँ, जौ, जई, सरसों और भांग पहले से बनी सूचियों से शुरू होते हैं, जिन्हें आप बदल सकते हैं।",
+    en: "Each crop has its own defect classes in four groups: grain admixtures, broken & defective, impurities & foreign material, and harmful & disease. Model Orchestration sorts every kernel into one of them, and standards set limits per class and per group. Wheat, barley, oats, rapeseed and hemp start from presets you can change.",
+    hi: "हर फ़सल के अपने दोष-वर्ग होते हैं, चार समूहों में: अन्य अनाज की मिलावट, टूटे व दोषपूर्ण दाने, अशुद्धियाँ व बाहरी पदार्थ, और हानिकारक व रोगग्रस्त। मॉडल ऑर्केस्ट्रेशन हर दाने को इनमें से किसी एक वर्ग में रखता है, और मानक हर वर्ग व हर समूह की सीमा तय करते हैं। गेहूँ, जौ, जई, सरसों और भांग पहले से बनी सूचियों से शुरू होते हैं, जिन्हें आप बदल सकते हैं।",
   },
   archived: { en: "Archived", hi: "संग्रहित" },
   groupCount: { en: "{count} {group}", hi: "{count} {group}" },
@@ -36,10 +36,13 @@ export const m = defineMessages({
     en: "For the photo estimate: weight relative to a sound kernel of the same size. Empty = 1.",
     hi: "फ़ोटो अनुमान के लिए: समान आकार के स्वस्थ दाने की तुलना में वज़न। खाली = 1।",
   },
-  description: { en: "Description for Claude", hi: "Claude के लिए विवरण" },
+  description: {
+    en: "Description for Model Orchestration",
+    hi: "मॉडल ऑर्केस्ट्रेशन के लिए विवरण",
+  },
   descriptionHint: {
-    en: "Written in English works best: Claude reads it.",
-    hi: "अंग्रेज़ी में लिखना सबसे अच्छा है: इसे Claude पढ़ता है।",
+    en: "Written in English works best: Model Orchestration reads it.",
+    hi: "अंग्रेज़ी में लिखना सबसे अच्छा है: इसे मॉडल ऑर्केस्ट्रेशन पढ़ता है।",
   },
   id: { en: "id: {id}", hi: "id: {id}" },
   moveUp: { en: "Move up", hi: "ऊपर करें" },

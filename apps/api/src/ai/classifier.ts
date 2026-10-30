@@ -96,11 +96,13 @@ function usageOf(u: Anthropic.Beta.BetaUsage): Usage {
 function checkStop(message: Anthropic.Beta.BetaMessage): void {
   if (message.stop_reason === "refusal") {
     throw new ClassifierError(
-      `Claude declined the request${message.stop_details?.explanation ? `: ${message.stop_details.explanation}` : ""}`,
+      `Model Orchestration declined the request${message.stop_details?.explanation ? `: ${message.stop_details.explanation}` : ""}`,
     );
   }
   if (message.stop_reason === "max_tokens") {
-    throw new ClassifierError("Claude's answer was cut off before it finished");
+    throw new ClassifierError(
+      "The Model Orchestration answer was cut off before it finished",
+    );
   }
 }
 
@@ -172,7 +174,9 @@ export class ClaudeClassifier implements Classifier {
     checkStop(message);
     const parsed = message.parsed_output;
     if (!parsed)
-      throw new ClassifierError("Claude's answer was not valid JSON");
+      throw new ClassifierError(
+        "The Model Orchestration answer was not valid JSON",
+      );
 
     const known = new Set(kernelClassIds(req.classes));
     const wanted = new Set(req.numbers);
@@ -192,7 +196,7 @@ export class ClaudeClassifier implements Classifier {
               number: k.number,
               cls: "unclear",
               confidence: "low",
-              reason: `Claude answered "${k.class}", which is not a class of this crop: ${k.reason}`,
+              reason: `Model Orchestration answered "${k.class}", which is not a class of this crop: ${k.reason}`,
             },
       );
     }
@@ -201,7 +205,7 @@ export class ClaudeClassifier implements Classifier {
         number: n,
         cls: "unclear",
         confidence: "low",
-        reason: "Claude returned no verdict for this kernel",
+        reason: "Model Orchestration returned no verdict for this kernel",
       });
     }
     return { verdicts, usage: usageOf(message.usage) };
@@ -235,7 +239,7 @@ export class UnconfiguredClassifier implements Classifier {
   classify(): Promise<never> {
     return Promise.reject(
       new ClassifierError(
-        "Claude is not configured: set ANTHROPIC_API_KEY on the server",
+        "Model Orchestration is not configured: set ANTHROPIC_API_KEY on the server",
       ),
     );
   }

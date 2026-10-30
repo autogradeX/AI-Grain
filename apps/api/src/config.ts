@@ -7,6 +7,17 @@ export const CLAUDE_MODELS = [
 ] as const;
 export type ClaudeModel = (typeof CLAUDE_MODELS)[number];
 
+/** What users see: tiers of "Model Orchestration", never model names. */
+export const MODEL_TIERS: Record<ClaudeModel, string> = {
+  "claude-sonnet-5-5": "Standard",
+  "claude-haiku-5-5": "Economy",
+  "claude-opus-5-5": "Advanced",
+};
+
+export function modelTier(model: string): string {
+  return MODEL_TIERS[model as ClaudeModel] ?? "Custom";
+}
+
 const bool = z
   .enum(["true", "false", "1", "0"])
   .transform((v) => v === "true" || v === "1");

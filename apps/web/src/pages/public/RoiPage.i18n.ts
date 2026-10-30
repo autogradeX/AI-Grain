@@ -2,16 +2,16 @@ import { defineMessages } from "../../i18n";
 
 export const m = defineMessages({
   modelSonnet: {
-    en: "Claude Sonnet 5.5 (default)",
-    hi: "Claude Sonnet 5.5 (डिफ़ॉल्ट)",
+    en: "Standard (default)",
+    hi: "स्टैंडर्ड (डिफ़ॉल्ट)",
   },
   modelHaiku: {
-    en: "Claude Haiku 5.5 (lowest cost)",
-    hi: "Claude Haiku 5.5 (सबसे कम लागत)",
+    en: "Economy (lowest cost)",
+    hi: "इकॉनमी (सबसे कम लागत)",
   },
   modelOpus: {
-    en: "Claude Opus 5.5 (difficult samples)",
-    hi: "Claude Opus 5.5 (कठिन नमूने)",
+    en: "Advanced (difficult samples)",
+    hi: "एडवांस्ड (कठिन नमूने)",
   },
   eyebrow: { en: "ROI calculator", hi: "लाभ (ROI) कैलकुलेटर" },
   title: {
@@ -53,10 +53,10 @@ export const m = defineMessages({
     en: "Scale, board, stand, light, tweezers.",
     hi: "तराज़ू, बोर्ड, स्टैंड, लाइट, चिमटी।",
   },
-  model: { en: "Claude model", hi: "Claude मॉडल" },
+  model: { en: "Model Orchestration tier", hi: "मॉडल ऑर्केस्ट्रेशन स्तर" },
   claudeCost: {
-    en: "Claude cost per sample (USD)",
-    hi: "प्रति नमूना Claude लागत (USD)",
+    en: "Model Orchestration cost per sample (USD)",
+    hi: "प्रति नमूना मॉडल ऑर्केस्ट्रेशन लागत (USD)",
   },
   claudeCostHint: {
     en: "A rough estimate for about 500 kernels at list prices. Signed-in users see their real cost on the Analytics page.",
@@ -67,7 +67,10 @@ export const m = defineMessages({
   hoursSaved: { en: "Hours saved", hi: "बचे घंटे" },
   hours: { en: "{hours} h", hi: "{hours} घंटे" },
   labourSaved: { en: "Labour saved", hi: "मज़दूरी की बचत" },
-  claudeCostTotal: { en: "Claude cost", hi: "Claude लागत" },
+  claudeCostTotal: {
+    en: "Model Orchestration cost",
+    hi: "मॉडल ऑर्केस्ट्रेशन लागत",
+  },
   netSaving: { en: "Net saving per year", hi: "प्रति वर्ष शुद्ध बचत" },
   noPayback: {
     en: "With these figures the method doesn't pay for itself; check the minutes per sample.",

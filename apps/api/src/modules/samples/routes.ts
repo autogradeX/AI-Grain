@@ -506,7 +506,7 @@ export function sampleRoutes(ctx: AppContext) {
         return row;
       } catch (err) {
         throw badRequest(
-          `Claude could not write the summary: ${err instanceof Error ? err.message : String(err)}`,
+          `Model Orchestration could not write the summary: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     });

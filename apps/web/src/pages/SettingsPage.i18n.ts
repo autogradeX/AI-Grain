@@ -39,13 +39,13 @@ export const m = defineMessages({
   },
   organisation: { en: "Organisation", hi: "संस्था" },
   claudeMissing: {
-    en: "Claude is not configured on the server (ANTHROPIC_API_KEY). Classification will fail.",
-    hi: "सर्वर पर Claude सेट नहीं है (ANTHROPIC_API_KEY)। वर्गीकरण नहीं हो पाएगा।",
+    en: "Model Orchestration is not configured on the server (API key missing). Classification will fail.",
+    hi: "सर्वर पर मॉडल ऑर्केस्ट्रेशन सेट नहीं है (API key नहीं है)। वर्गीकरण नहीं हो पाएगा।",
   },
   defaultModel: { en: "Default AI model", hi: "डिफ़ॉल्ट AI मॉडल" },
   defaultModelHint: {
-    en: "Sonnet is the default. Haiku costs least. Opus is for difficult samples. A sample can override this.",
-    hi: "Sonnet डिफ़ॉल्ट है। Haiku सबसे सस्ता है। Opus कठिन नमूनों के लिए है। हर नमूने में इसे बदला जा सकता है।",
+    en: "Standard is the default. Economy costs least. Advanced is for difficult samples. A sample can override this.",
+    hi: "स्टैंडर्ड डिफ़ॉल्ट है। इकॉनमी सबसे सस्ता है। एडवांस्ड कठिन नमूनों के लिए है। हर नमूने में इसे बदला जा सकता है।",
   },
   serverDefault: {
     en: "Server default ({model})",

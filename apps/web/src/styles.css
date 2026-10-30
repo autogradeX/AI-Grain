@@ -1679,3 +1679,25 @@ button.link {
   padding: 0.25rem 0.5rem;
   font-size: 0.9rem;
 }
+
+.site-header .brand {
+  white-space: nowrap;
+}
+
+.site-nav-extra {
+  display: none;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+@media (max-width: 599px) {
+  .site-cta .lang-select,
+  .site-cta .button.primary {
+    display: none;
+  }
+
+  .site-nav-extra {
+    display: flex;
+  }
+}

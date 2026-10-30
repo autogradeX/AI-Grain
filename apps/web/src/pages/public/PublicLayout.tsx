@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { LanguageSelect, useT } from "../../i18n";
@@ -28,6 +28,8 @@ export function PublicLayout() {
   const { user } = useAuth();
   const site = usePublicSite();
   const [open, setOpen] = useState(false);
+  // The home page is a dark, full-screen stage; the header floats over it.
+  const landing = useLocation().pathname === "/";
   const t = useT(m);
   const links = (
     <>
@@ -49,7 +51,7 @@ export function PublicLayout() {
     </>
   );
   return (
-    <div className="site">
+    <div className={landing ? "site site--landing" : "site"}>
       <header className="site-header">
         <Link to="/" className="brand">
           <img src="/icon.svg" alt="" width={28} height={28} /> AI-Grain
@@ -83,6 +85,17 @@ export function PublicLayout() {
       {open && (
         <nav className="site-nav-mobile" aria-label={t("websiteNav")}>
           {links}
+          {/* On narrow screens these leave the header for the menu. */}
+          <div className="site-nav-extra">
+            <LanguageSelect />
+            <Link
+              to="/contact"
+              className="button primary"
+              onClick={() => setOpen(false)}
+            >
+              {t("bookMeeting")}
+            </Link>
+          </div>
         </nav>
       )}
       <main>

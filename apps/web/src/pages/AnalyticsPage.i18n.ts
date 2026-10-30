@@ -23,8 +23,8 @@ export const m = defineMessages({
     hi: "बनाने से पूरा होने तक",
   },
   claudeConfirmed: {
-    en: "Claude confirmed by operators",
-    hi: "ऑपरेटरों ने Claude को सही माना",
+    en: "Model Orchestration confirmed by operators",
+    hi: "ऑपरेटरों ने मॉडल ऑर्केस्ट्रेशन को सही माना",
   },
   ofFlaggedChecked: {
     en: "of {count} flagged kernels checked",
@@ -38,7 +38,10 @@ export const m = defineMessages({
     en: "mean difference in total defects, {count} weighed samples",
     hi: "कुल दोषों में औसत अंतर, {count} तौले गए नमूने",
   },
-  claudeCost: { en: "Claude cost (estimate)", hi: "Claude खर्च (अनुमान)" },
+  claudeCost: {
+    en: "Model Orchestration cost (estimate)",
+    hi: "मॉडल ऑर्केस्ट्रेशन खर्च (अनुमान)",
+  },
   atListPrices: { en: "at list prices", hi: "सूची मूल्य पर" },
   perCompletedSample: {
     en: "{cost} per completed sample, list prices",
@@ -81,14 +84,14 @@ export const m = defineMessages({
     hi: "ऑपरेटरों में एकरूपता",
   },
   operatorNote: {
-    en: "How often each person changed Claude's verdict when checking flagged kernels. Large differences between operators on similar grain suggest they read the defect definitions differently: worth a calibration session with reference images.",
-    hi: "चिह्नित दाने जाँचते समय हर व्यक्ति ने कितनी बार Claude का फ़ैसला बदला। मिलते-जुलते अनाज पर ऑपरेटरों में बड़ा अंतर बताता है कि वे दोषों की परिभाषाएँ अलग-अलग समझ रहे हैं: संदर्भ चित्रों के साथ एक मिलान सत्र करना ठीक रहेगा।",
+    en: "How often each person changed Model Orchestration's verdict when checking flagged kernels. Large differences between operators on similar grain suggest they read the defect definitions differently: worth a calibration session with reference images.",
+    hi: "चिह्नित दाने जाँचते समय हर व्यक्ति ने कितनी बार मॉडल ऑर्केस्ट्रेशन का फ़ैसला बदला। मिलते-जुलते अनाज पर ऑपरेटरों में बड़ा अंतर बताता है कि वे दोषों की परिभाषाएँ अलग-अलग समझ रहे हैं: संदर्भ चित्रों के साथ एक मिलान सत्र करना ठीक रहेगा।",
   },
   operator: { en: "Operator", hi: "ऑपरेटर" },
   kernelsChecked: { en: "Kernels checked", hi: "जाँचे गए दाने" },
   changedVerdict: {
-    en: "Changed Claude's verdict",
-    hi: "Claude का फ़ैसला बदला",
+    en: "Changed Model Orchestration's verdict",
+    hi: "मॉडल ऑर्केस्ट्रेशन का फ़ैसला बदला",
   },
   changedVerdicts: {
     en: "{name} changed {count} verdicts",
@@ -99,14 +102,17 @@ export const m = defineMessages({
     hi: "इस अवधि में कोई दाना नहीं जाँचा गया।",
   },
   claudeByClass: {
-    en: "Claude against the operators, by class",
-    hi: "वर्ग के अनुसार Claude बनाम ऑपरेटर",
+    en: "Model Orchestration against the operators, by class",
+    hi: "वर्ग के अनुसार मॉडल ऑर्केस्ट्रेशन बनाम ऑपरेटर",
   },
   claudeByClassNote: {
-    en: "For each class Claude chose, the share of checked kernels the operator kept. Low rates show where Claude needs better definitions or more reference images.",
-    hi: "Claude के चुने हर वर्ग के लिए, जाँचे गए दानों में से कितने ऑपरेटर ने वैसे ही रखे। कम दर बताती है कि कहाँ Claude को बेहतर परिभाषाएँ या ज़्यादा संदर्भ चित्र चाहिए।",
+    en: "For each class Model Orchestration chose, the share of checked kernels the operator kept. Low rates show where Model Orchestration needs better definitions or more reference images.",
+    hi: "मॉडल ऑर्केस्ट्रेशन के चुने हर वर्ग के लिए, जाँचे गए दानों में से कितने ऑपरेटर ने वैसे ही रखे। कम दर बताती है कि कहाँ मॉडल ऑर्केस्ट्रेशन को बेहतर परिभाषाएँ या ज़्यादा संदर्भ चित्र चाहिए।",
   },
-  claudeSaid: { en: "Claude said", hi: "Claude ने कहा" },
+  claudeSaid: {
+    en: "Model Orchestration said",
+    hi: "मॉडल ऑर्केस्ट्रेशन ने कहा",
+  },
   checked: { en: "Checked", hi: "जाँचे गए" },
   operatorAgreed: { en: "Operator agreed", hi: "ऑपरेटर सहमत" },
   mostOftenChangedTo: {
@@ -114,7 +120,10 @@ export const m = defineMessages({
     hi: "अक्सर बदलकर किया गया",
   },
   agreedPct: { en: "{pct} % agreed", hi: "{pct} % सहमत" },
-  claudeUsage: { en: "Claude usage", hi: "Claude उपयोग" },
+  claudeUsage: {
+    en: "Model Orchestration usage",
+    hi: "मॉडल ऑर्केस्ट्रेशन उपयोग",
+  },
   model: { en: "Model", hi: "मॉडल" },
   requests: { en: "Requests", hi: "अनुरोध" },
   inputTokens: { en: "Input tokens", hi: "इनपुट टोकन" },
@@ -122,8 +131,8 @@ export const m = defineMessages({
   outputTokens: { en: "Output tokens", hi: "आउटपुट टोकन" },
   costList: { en: "Cost (list)", hi: "खर्च (सूची मूल्य)" },
   noRequests: {
-    en: "No Claude requests in this period.",
-    hi: "इस अवधि में Claude से कोई अनुरोध नहीं।",
+    en: "No Model Orchestration requests in this period.",
+    hi: "इस अवधि में मॉडल ऑर्केस्ट्रेशन से कोई अनुरोध नहीं।",
   },
   costNote: {
     en: "Estimated from token counts at list prices; your invoice is the reference.",

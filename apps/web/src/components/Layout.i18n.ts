@@ -22,8 +22,8 @@ export const m = defineMessages({
   cropsAndClasses: { en: "Crops and classes", hi: "फसलें और वर्ग" },
   referenceImages: { en: "Reference images", hi: "संदर्भ चित्र" },
   claudePrompt: {
-    en: "Claude app prompt (Level 1)",
-    hi: "Claude ऐप प्रॉम्प्ट (स्तर 1)",
+    en: "AI chat app prompt (Level 1)",
+    hi: "AI चैट ऐप प्रॉम्प्ट (स्तर 1)",
   },
   trainingDataset: { en: "Training dataset", hi: "प्रशिक्षण डेटासेट" },
   usersAndInvites: { en: "Users and invites", hi: "उपयोगकर्ता और आमंत्रण" },

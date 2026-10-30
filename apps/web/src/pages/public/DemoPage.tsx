@@ -14,7 +14,7 @@ import { Badge, ErrorNote, pct, Spinner } from "../../components/ui";
 import { useT } from "../../i18n";
 import { useGrainLabels } from "../../i18n/common";
 import { m } from "./DemoPage.i18n";
-import { CategorySection } from "./HomePage";
+import { CategorySection } from "./CategorySection";
 
 interface DemoListItem {
   id: string;

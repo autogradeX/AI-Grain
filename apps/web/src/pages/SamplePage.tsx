@@ -10,13 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, openFile } from "../api/client";
-import {
-  MODEL_LABELS,
-  type ClaudeModel,
-  type Org,
-  type Sample,
-  type Standard,
-} from "../api/types";
+import { type Org, type Sample, type Standard } from "../api/types";
 import { useCan } from "../auth/AuthContext";
 import {
   Badge,
@@ -29,6 +23,7 @@ import {
 } from "../components/ui";
 import { useT, type Translate } from "../i18n";
 import { common, useGrainLabels } from "../i18n/common";
+import { MODEL_TIERS, useModelLabel } from "../i18n/models";
 import { m } from "./SamplePage.i18n";
 
 type T = Translate<keyof typeof m>;
@@ -126,6 +121,7 @@ function DetailsCard({
   });
   const update = useSampleUpdate(sample.id);
   const t = useT(m);
+  const modelLabel = useModelLabel();
   const tc = useT(common);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -162,7 +158,7 @@ function DetailsCard({
           <dt>{t("standard")}</dt>
           <dd>{sample.standard?.name ?? t("noStandard")}</dd>
           <dt>{t("aiModel")}</dt>
-          <dd>{MODEL_LABELS[sample.effectiveModel]}</dd>
+          <dd>{modelLabel(sample.effectiveModel)}</dd>
           {sample.notes && (
             <>
               <dt>{t("notes")}</dt>
@@ -203,9 +199,9 @@ function DetailsCard({
             onChange={(e) => setForm({ ...form, model: e.target.value })}
           >
             <option value="">{t("orgDefault")}</option>
-            {(Object.keys(MODEL_LABELS) as ClaudeModel[]).map((m) => (
+            {MODEL_TIERS.map((m) => (
               <option key={m} value={m}>
-                {MODEL_LABELS[m]}
+                {modelLabel(m)}
               </option>
             ))}
           </select>

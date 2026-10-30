@@ -119,7 +119,7 @@ describe("ClaudeClassifier", () => {
         cls: "unclear",
         confidence: "low",
         reason:
-          'Claude answered "gold_nugget", which is not a class of this crop: shiny',
+          'Model Orchestration answered "gold_nugget", which is not a class of this crop: shiny',
       },
     ]);
     expect(result.usage).toEqual({

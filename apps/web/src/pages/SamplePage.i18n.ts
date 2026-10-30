@@ -63,12 +63,12 @@ export const m = defineMessages({
     hi: "कुल {count} दाने मिले।",
   },
   classifyBatches_one: {
-    en: "Classify the batch with Claude",
-    hi: "Claude से बैच का वर्गीकरण करें",
+    en: "Classify the batch with Model Orchestration",
+    hi: "मॉडल ऑर्केस्ट्रेशन से बैच का वर्गीकरण करें",
   },
   classifyBatches_other: {
-    en: "Classify {count} batches with Claude",
-    hi: "Claude से {count} बैच का वर्गीकरण करें",
+    en: "Classify {count} batches with Model Orchestration",
+    hi: "मॉडल ऑर्केस्ट्रेशन से {count} बैच का वर्गीकरण करें",
   },
 
   // Batch status
@@ -76,8 +76,8 @@ export const m = defineMessages({
   statusDetecting: { en: "Finding kernels…", hi: "दाने ढूँढे जा रहे हैं…" },
   statusDetected: { en: "Ready to classify", hi: "वर्गीकरण के लिए तैयार" },
   statusClassifying: {
-    en: "Claude is classifying…",
-    hi: "Claude वर्गीकरण कर रहा है…",
+    en: "Model Orchestration is classifying…",
+    hi: "मॉडल ऑर्केस्ट्रेशन वर्गीकरण कर रहा है…",
   },
   statusClassified: { en: "Classified", hi: "वर्गीकृत" },
   statusFailed: { en: "Needs attention", hi: "ध्यान देना ज़रूरी" },
@@ -89,8 +89,8 @@ export const m = defineMessages({
     hi: "पहले फ़ोटो का वर्गीकरण करें।",
   },
   flaggedOf: {
-    en: "Claude flagged {flagged} of {total} kernels. {pending} still need your check.",
-    hi: "Claude ने {total} में से {flagged} दाने चिह्नित किए। {pending} अभी आपकी जाँच के लिए बाकी हैं।",
+    en: "Model Orchestration flagged {flagged} of {total} kernels. {pending} still need your check.",
+    hi: "मॉडल ऑर्केस्ट्रेशन ने {total} में से {flagged} दाने चिह्नित किए। {pending} अभी आपकी जाँच के लिए बाकी हैं।",
   },
   reviewHint: {
     en: "Pick out each flagged kernel with tweezers, check it by eye (you make the final call) and drop it into the cup for its class.",
@@ -142,12 +142,12 @@ export const m = defineMessages({
     hi: "फ़ोटो से तुरंत अनुमान",
   },
   pendingNote_one: {
-    en: "Uses Claude's classes for the 1 flagged kernel(s) not checked yet.",
-    hi: "अभी न जाँचे गए 1 चिह्नित दाने के लिए Claude का वर्ग लिया गया है।",
+    en: "Uses Model Orchestration's classes for the 1 flagged kernel(s) not checked yet.",
+    hi: "अभी न जाँचे गए 1 चिह्नित दाने के लिए मॉडल ऑर्केस्ट्रेशन का वर्ग लिया गया है।",
   },
   pendingNote_other: {
-    en: "Uses Claude's classes for the {count} flagged kernel(s) not checked yet.",
-    hi: "अभी न जाँचे गए {count} चिह्नित दानों के लिए Claude के वर्ग लिए गए हैं।",
+    en: "Uses Model Orchestration's classes for the {count} flagged kernel(s) not checked yet.",
+    hi: "अभी न जाँचे गए {count} चिह्नित दानों के लिए मॉडल ऑर्केस्ट्रेशन के वर्ग लिए गए हैं।",
   },
   allDecided: {
     en: "Uses your decisions for every flagged kernel.",
@@ -202,19 +202,22 @@ export const m = defineMessages({
   },
   gradeFailures: { en: "Grade {grade}: {list}", hi: "ग्रेड {grade}: {list}" },
   writtenByClaude: {
-    en: "Written by Claude from the figures above",
-    hi: "ऊपर के आँकड़ों से Claude द्वारा लिखा गया",
+    en: "Written by Model Orchestration from the figures above",
+    hi: "ऊपर के आँकड़ों से मॉडल ऑर्केस्ट्रेशन द्वारा लिखा गया",
   },
   screeningNote: {
     en: "This is a screening and pre-check result. It is not acceptable for official trade grading unless the method has been validated and approved.",
     hi: "यह जाँच और पूर्व-परीक्षण का परिणाम है। जब तक विधि सत्यापित और स्वीकृत न हो, यह आधिकारिक व्यापारिक ग्रेडिंग के लिए मान्य नहीं है।",
   },
   pdfReport: { en: "PDF report", hi: "PDF रिपोर्ट" },
-  claudeWriting: { en: "Claude is writing…", hi: "Claude लिख रहा है…" },
+  claudeWriting: {
+    en: "Model Orchestration is writing…",
+    hi: "मॉडल ऑर्केस्ट्रेशन लिख रहा है…",
+  },
   rewriteSummary: { en: "Rewrite summary", hi: "सारांश फिर से लिखें" },
   writeSummary: {
-    en: "Write summary with Claude",
-    hi: "Claude से सारांश लिखवाएँ",
+    en: "Write summary with Model Orchestration",
+    hi: "मॉडल ऑर्केस्ट्रेशन से सारांश लिखवाएँ",
   },
   completeSample: { en: "Complete sample", hi: "नमूना पूरा करें" },
   reopen: { en: "Reopen", hi: "फिर से खोलें" },
@@ -239,8 +242,8 @@ export const m = defineMessages({
   publicDemo: { en: "Public demo", hi: "सार्वजनिक डेमो" },
   onWebsite: { en: "on the website", hi: "वेबसाइट पर" },
   publicDemoHint: {
-    en: "Anyone can open this sample on the website's demo page: its photos, kernels, Claude's verdicts and the result. Names, notes and the source are not shown.",
-    hi: "कोई भी इस नमूने को वेबसाइट के डेमो पेज पर खोल सकता है: इसकी फ़ोटो, दाने, Claude के फ़ैसले और परिणाम। नाम, टिप्पणी और स्रोत नहीं दिखाए जाते।",
+    en: "Anyone can open this sample on the website's demo page: its photos, kernels, Model Orchestration's verdicts and the result. Names, notes and the source are not shown.",
+    hi: "कोई भी इस नमूने को वेबसाइट के डेमो पेज पर खोल सकता है: इसकी फ़ोटो, दाने, मॉडल ऑर्केस्ट्रेशन के फ़ैसले और परिणाम। नाम, टिप्पणी और स्रोत नहीं दिखाए जाते।",
   },
   demoTitle: { en: "Title on the demo page", hi: "डेमो पेज पर शीर्षक" },
   demoTitlePlaceholder: {

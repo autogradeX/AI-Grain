@@ -3,8 +3,8 @@ import { defineMessages } from "../i18n";
 export const m = defineMessages({
   title: { en: "Reference images", hi: "संदर्भ चित्र" },
   intro: {
-    en: "Close-ups of kernels from your own grain, one per defect type or more. Up to 12 per crop, spread across classes, are sent to Claude with every request. They improve accuracy more than anything else you can add. The quickest way to add one is “Use as a reference example” on a reviewed kernel.",
-    hi: "अपने ही अनाज के दानों के नज़दीकी फ़ोटो, हर दोष के लिए कम से कम एक। हर फ़सल के 12 तक चित्र, अलग-अलग वर्गों से, हर अनुरोध के साथ Claude को भेजे जाते हैं। सटीकता बढ़ाने का यह सबसे असरदार तरीका है। सबसे जल्दी तरीका: जाँचे गए दाने पर “संदर्भ उदाहरण के रूप में उपयोग करें” दबाएँ।",
+    en: "Close-ups of kernels from your own grain, one per defect type or more. Up to 12 per crop, spread across classes, are sent to Model Orchestration with every request. They improve accuracy more than anything else you can add. The quickest way to add one is “Use as a reference example” on a reviewed kernel.",
+    hi: "अपने ही अनाज के दानों के नज़दीकी फ़ोटो, हर दोष के लिए कम से कम एक। हर फ़सल के 12 तक चित्र, अलग-अलग वर्गों से, हर अनुरोध के साथ मॉडल ऑर्केस्ट्रेशन को भेजे जाते हैं। सटीकता बढ़ाने का यह सबसे असरदार तरीका है। सबसे जल्दी तरीका: जाँचे गए दाने पर “संदर्भ उदाहरण के रूप में उपयोग करें” दबाएँ।",
   },
   crop: { en: "Crop", hi: "फ़सल" },
   remove: { en: "Remove", hi: "हटाएँ" },

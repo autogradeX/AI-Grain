@@ -1,4 +1,4 @@
-import { defineMessages } from "../../i18n";
+import { defineMessages } from "../../../i18n";
 
 export const m = defineMessages({
   // Category groups
@@ -42,8 +42,8 @@ export const m = defineMessages({
     hi: "हर फसल के लिए वर्ग सूची",
   },
   cropsText: {
-    en: "Each crop has its own classes and descriptions, which Claude uses to judge kernels. Edit the presets, or add any crop with its own classes.",
-    hi: "हर फसल के अपने वर्ग और विवरण हैं, जिनसे Claude दानों को परखता है। तैयार सूचियाँ बदलें, या अपने वर्गों के साथ कोई भी फसल जोड़ें।",
+    en: "Each crop has its own classes and descriptions, which Model Orchestration uses to judge kernels. Edit the presets, or add any crop with its own classes.",
+    hi: "हर फसल के अपने वर्ग और विवरण हैं, जिनसे मॉडल ऑर्केस्ट्रेशन दानों को परखता है। तैयार सूचियाँ बदलें, या अपने वर्गों के साथ कोई भी फसल जोड़ें।",
   },
   classCount_one: { en: "{count} class", hi: "{count} वर्ग" },
   classCount_other: { en: "{count} classes", hi: "{count} वर्ग" },
@@ -66,12 +66,12 @@ export const m = defineMessages({
     hi: "AI की मदद से अनाज अशुद्धि विश्लेषण",
   },
   heroTitle: {
-    en: "Grain quality screening with a phone, a scale and Claude",
-    hi: "फ़ोन, तराज़ू और Claude से अनाज की गुणवत्ता जाँच",
+    en: "Grain quality screening with a phone, a scale and AI Model Orchestration",
+    hi: "फ़ोन, तराज़ू और मॉडल ऑर्केस्ट्रेशन से अनाज की गुणवत्ता जाँच",
   },
   heroLead: {
-    en: "Photograph a sample on a grid board. Claude flags every suspect kernel, a person confirms it, and the scale gives the mass percentage. You get a grade and a report anyone can verify, for about US$50 of equipment on top of a phone.",
-    hi: "ग्रिड बोर्ड पर रखे नमूने की फ़ोटो लें। Claude हर संदिग्ध दाने को चिह्नित करता है, एक व्यक्ति उसकी पुष्टि करता है, और तराज़ू से वज़न प्रतिशत मिलता है। फ़ोन के अलावा लगभग US$50 के उपकरण में आपको ग्रेड और ऐसी रिपोर्ट मिलती है जिसे कोई भी सत्यापित कर सके।",
+    en: "Photograph a sample on a grid board. Model Orchestration flags every suspect kernel, a person confirms it, and the scale gives the mass percentage. You get a grade and a report anyone can verify, for about US$50 of equipment on top of a phone.",
+    hi: "ग्रिड बोर्ड पर रखे नमूने की फ़ोटो लें। मॉडल ऑर्केस्ट्रेशन हर संदिग्ध दाने को चिह्नित करता है, एक व्यक्ति उसकी पुष्टि करता है, और तराज़ू से वज़न प्रतिशत मिलता है। फ़ोन के अलावा लगभग US$50 के उपकरण में आपको ग्रेड और ऐसी रिपोर्ट मिलती है जिसे कोई भी सत्यापित कर सके।",
   },
   tryDemo: { en: "Try the demo analysis", hi: "डेमो विश्लेषण आज़माएँ" },
   talkToUs: { en: "Talk to us", hi: "हमसे बात करें" },
@@ -93,8 +93,8 @@ export const m = defineMessages({
   },
   step3Title: { en: "AI analysis", hi: "AI विश्लेषण" },
   step3Text: {
-    en: "Claude classifies a close-up of each kernel into your crop's classes, with a confidence and a reason.",
-    hi: "Claude हर दाने की नज़दीकी तस्वीर को आपकी फसल के वर्गों में बाँटता है, भरोसे के स्तर और कारण के साथ।",
+    en: "Model Orchestration classifies a close-up of each kernel into your crop's classes, with a confidence and a reason.",
+    hi: "मॉडल ऑर्केस्ट्रेशन हर दाने की नज़दीकी तस्वीर को आपकी फसल के वर्गों में बाँटता है, भरोसे के स्तर और कारण के साथ।",
   },
   step4Title: { en: "Verified report", hi: "सत्यापित रिपोर्ट" },
   step4Text: {
@@ -126,8 +126,8 @@ export const m = defineMessages({
   },
   withAiTitle: { en: "With AI-Grain", hi: "AI-Grain के साथ" },
   withAi1: {
-    en: "Claude flags suspect kernels; an operator only checks the flagged ones",
-    hi: "Claude संदिग्ध दाने चिह्नित करता है; ऑपरेटर सिर्फ़ चिह्नित दाने जाँचता है",
+    en: "Model Orchestration flags suspect kernels; an operator only checks the flagged ones",
+    hi: "मॉडल ऑर्केस्ट्रेशन संदिग्ध दाने चिह्नित करता है; ऑपरेटर सिर्फ़ चिह्नित दाने जाँचता है",
   },
   withAi2: {
     en: "The same definitions and reference images every time",
@@ -149,8 +149,8 @@ export const m = defineMessages({
     hi: "तौल या तुरंत अनुमान",
   },
   feature1Text: {
-    en: "The scale gives the verified result. An estimate from kernel areas is ready as soon as Claude has classified the photos, for fast pre-checks.",
-    hi: "तराज़ू से सत्यापित नतीजा मिलता है। Claude के फ़ोटो वर्गीकृत करते ही दानों के क्षेत्रफल से अनुमान तैयार हो जाता है, तेज़ पूर्व-जाँच के लिए।",
+    en: "The scale gives the verified result. An estimate from kernel areas is ready as soon as Model Orchestration has classified the photos, for fast pre-checks.",
+    hi: "तराज़ू से सत्यापित नतीजा मिलता है। मॉडल ऑर्केस्ट्रेशन के फ़ोटो वर्गीकृत करते ही दानों के क्षेत्रफल से अनुमान तैयार हो जाता है, तेज़ पूर्व-जाँच के लिए।",
   },
   feature2Title: {
     en: "Reports anyone can verify",
@@ -165,13 +165,13 @@ export const m = defineMessages({
     hi: "हर दाने तक पारदर्शिता",
   },
   feature3Text: {
-    en: "The report includes the image of every kernel not judged sound, with Claude's class, its confidence and the operator's decision.",
-    hi: "रिपोर्ट में हर उस दाने की तस्वीर होती है जो स्वस्थ नहीं माना गया, साथ में Claude का वर्ग, उसका भरोसा और ऑपरेटर का निर्णय।",
+    en: "The report includes the image of every kernel not judged sound, with Model Orchestration's class, its confidence and the operator's decision.",
+    hi: "रिपोर्ट में हर उस दाने की तस्वीर होती है जो स्वस्थ नहीं माना गया, साथ में मॉडल ऑर्केस्ट्रेशन का वर्ग, उसका भरोसा और ऑपरेटर का निर्णय।",
   },
   feature4Title: { en: "Analytics", hi: "विश्लेषण" },
   feature4Text: {
-    en: "Throughput, grades and defect trends by source, how often operators change Claude's verdicts, and how the photo estimate compares with the scale.",
-    hi: "स्रोत के अनुसार जाँचों की संख्या, ग्रेड और दोषों का रुझान, ऑपरेटर कितनी बार Claude का फ़ैसला बदलते हैं, और फ़ोटो अनुमान तराज़ू से कितना मेल खाता है।",
+    en: "Throughput, grades and defect trends by source, how often operators change Model Orchestration's verdicts, and how the photo estimate compares with the scale.",
+    hi: "स्रोत के अनुसार जाँचों की संख्या, ग्रेड और दोषों का रुझान, ऑपरेटर कितनी बार मॉडल ऑर्केस्ट्रेशन का फ़ैसला बदलते हैं, और फ़ोटो अनुमान तराज़ू से कितना मेल खाता है।",
   },
   feature5Title: { en: "Your standards", hi: "आपके मानक" },
   feature5Text: {
@@ -251,8 +251,8 @@ export const m = defineMessages({
   },
   faq5Q: { en: "How fast is it?", hi: "यह कितना तेज़ है?" },
   faq5A: {
-    en: "Kernel detection takes seconds per photo, and Claude classifies a batch of 100–150 kernels in parallel sheets, typically within a minute or two. The instant estimate is ready then; checking flagged kernels and weighing cups take a few more minutes.",
-    hi: "दाने ढूँढने में हर फ़ोटो पर कुछ सेकंड लगते हैं, और Claude 100–150 दानों के बैच को साथ-साथ चलने वाली शीटों में आम तौर पर एक-दो मिनट में वर्गीकृत कर देता है। तब तक तुरंत अनुमान तैयार हो जाता है; चिह्नित दाने जाँचने और कप तौलने में कुछ मिनट और लगते हैं।",
+    en: "Kernel detection takes seconds per photo, and Model Orchestration classifies a batch of 100–150 kernels in parallel sheets, typically within a minute or two. The instant estimate is ready then; checking flagged kernels and weighing cups take a few more minutes.",
+    hi: "दाने ढूँढने में हर फ़ोटो पर कुछ सेकंड लगते हैं, और मॉडल ऑर्केस्ट्रेशन 100–150 दानों के बैच को साथ-साथ चलने वाली शीटों में आम तौर पर एक-दो मिनट में वर्गीकृत कर देता है। तब तक तुरंत अनुमान तैयार हो जाता है; चिह्नित दाने जाँचने और कप तौलने में कुछ मिनट और लगते हैं।",
   },
   faq6Q: {
     en: "Can it be tuned to our grain?",
@@ -264,8 +264,8 @@ export const m = defineMessages({
   },
   faq7Q: { en: "How is data handled?", hi: "डेटा कैसे संभाला जाता है?" },
   faq7A: {
-    en: "Photos and results are stored by your installation of AI-Grain. Kernel close-ups are sent to the Claude API for classification; nothing is processed on the phone itself. Access is by signed-in account, with roles and an activity log.",
-    hi: "फ़ोटो और नतीजे आपके AI-Grain इंस्टॉलेशन में रखे जाते हैं। दानों की नज़दीकी तस्वीरें वर्गीकरण के लिए Claude API को भेजी जाती हैं; फ़ोन पर ख़ुद कोई प्रोसेसिंग नहीं होती। पहुँच साइन-इन खाते से होती है, भूमिकाओं और गतिविधि लॉग के साथ।",
+    en: "Photos and results are stored by your installation of AI-Grain. Kernel close-ups are sent to the Model Orchestration service for classification; nothing is processed on the phone itself. Access is by signed-in account, with roles and an activity log.",
+    hi: "फ़ोटो और नतीजे आपके AI-Grain इंस्टॉलेशन में रखे जाते हैं। दानों की नज़दीकी तस्वीरें वर्गीकरण के लिए मॉडल ऑर्केस्ट्रेशन सेवा को भेजी जाती हैं; फ़ोन पर ख़ुद कोई प्रोसेसिंग नहीं होती। पहुँच साइन-इन खाते से होती है, भूमिकाओं और गतिविधि लॉग के साथ।",
   },
   faq8Q: {
     en: "How is it different from a NIR analyser?",
@@ -283,4 +283,80 @@ export const m = defineMessages({
     hi: "डेमो बुक करें, या अपनी फसलों और मानकों के बारे में हमें सवाल भेजें।",
   },
   bookMeeting: { en: "Book a meeting", hi: "मीटिंग बुक करें" },
+
+  // Landing page story and motion sections.
+  scrollHint: {
+    en: "Scroll to see how it works",
+    hi: "यह कैसे काम करता है, देखने के लिए स्क्रॉल करें",
+  },
+  storyLabel: { en: "How it works", hi: "यह कैसे काम करता है" },
+  story1Title: {
+    en: "Spread the sample on the grid board",
+    hi: "नमूने को ग्रिड बोर्ड पर फैलाएँ",
+  },
+  story1Text: {
+    en: "Weigh the working sample on a 0.01 g scale, then spread 100–150 kernels on a printed 1 cm grid.",
+    hi: "जाँच वाले नमूने को 0.01 g तराज़ू पर तौलें, फिर 100–150 दाने छपे हुए 1 cm ग्रिड पर फैलाएँ।",
+  },
+  story2Title: {
+    en: "One photo, every kernel found",
+    hi: "एक फ़ोटो, हर दाना पहचाना गया",
+  },
+  story2Text: {
+    en: "The phone photographs the board. Image processing straightens the photo and finds each kernel, without AI.",
+    hi: "फ़ोन बोर्ड की फ़ोटो लेता है। इमेज प्रोसेसिंग फ़ोटो को सीधा करके हर दाना ढूँढती है, बिना AI के।",
+  },
+  story3Title: {
+    en: "Model Orchestration flags the suspect kernels",
+    hi: "मॉडल ऑर्केस्ट्रेशन संदिग्ध दानों को चिह्नित करता है",
+  },
+  story3Text: {
+    en: "Green rings are sound kernels, orange rings are defects. A person checks every flagged kernel and has the final say.",
+    hi: "हरे घेरे स्वस्थ दाने हैं, नारंगी घेरे दोष। हर चिह्नित दाने की जाँच एक व्यक्ति करता है, और अंतिम फ़ैसला उसी का होता है।",
+  },
+  story4Title: {
+    en: "Sorted into cups, weighed on the scale",
+    hi: "कपों में छाँटें, तराज़ू पर तौलें",
+  },
+  story4Text: {
+    en: "Defects go into one cup per group. Weighing the cups gives the mass percentages and the grade.",
+    hi: "दोष वाले दाने हर समूह के अपने कप में जाते हैं। कपों को तौलने से द्रव्यमान प्रतिशत और ग्रेड निकलते हैं।",
+  },
+  story5Title: {
+    en: "A report anyone can verify",
+    hi: "ऐसी रिपोर्ट जिसे कोई भी सत्यापित कर सके",
+  },
+  story5Text: {
+    en: "Purity, defect groups and the grade, with a code and QR code to check the figures online.",
+    hi: "शुद्धता, दोष समूह और ग्रेड, साथ में कोड और QR कोड, ताकि आँकड़े ऑनलाइन जाँचे जा सकें।",
+  },
+  exampleResult: { en: "Example result", hi: "उदाहरण परिणाम" },
+  kernels_one: { en: "{count} kernel", hi: "{count} दाना" },
+  kernels_other: { en: "{count} kernels", hi: "{count} दाने" },
+  purityByCount: { en: "Purity by count", hi: "गिनती से शुद्धता" },
+  exampleNote: {
+    en: "Illustration. In the app, percentages come from weighing the cups.",
+    hi: "यह केवल चित्रण है। ऐप में प्रतिशत कपों को तौलकर निकलते हैं।",
+  },
+  verifiable: { en: "Verifiable report", hi: "सत्यापन योग्य रिपोर्ट" },
+  factsLabel: { en: "At a glance", hi: "एक नज़र में" },
+  fact1: { en: "100–150 kernels per photo", hi: "हर फ़ोटो में 100–150 दाने" },
+  fact2: {
+    en: "0.01 g scale for verified mass %",
+    hi: "सत्यापित द्रव्यमान % के लिए 0.01 g तराज़ू",
+  },
+  fact3: {
+    en: "4 impurity groups, EN 15587 style",
+    hi: "EN 15587 जैसे 4 अशुद्धि समूह",
+  },
+  fact4: { en: "About US$50 of equipment", hi: "लगभग US$50 के उपकरण" },
+  fact5: {
+    en: "Every figure tied to a kernel image",
+    hi: "हर आँकड़ा किसी दाने की तस्वीर से जुड़ा",
+  },
+  fact6: {
+    en: "Reports verifiable by QR code",
+    hi: "QR कोड से सत्यापन योग्य रिपोर्ट",
+  },
+  fact7: { en: "English and Hindi", hi: "अंग्रेज़ी और हिन्दी" },
 });

@@ -12,8 +12,8 @@ export const m = defineMessages({
   bookMeeting: { en: "Book a meeting", hi: "मीटिंग बुक करें" },
   menu: { en: "Menu", hi: "मेनू" },
   footerAbout: {
-    en: "Grain impurity screening with a phone, a precise scale and Claude. A screening and pre-check tool, not an official grading method unless validated and approved.",
-    hi: "फ़ोन, सटीक तराज़ू और Claude से अनाज की अशुद्धि जाँच। यह जाँच और पूर्व-परीक्षण का साधन है; सत्यापित और स्वीकृत होने तक आधिकारिक ग्रेडिंग विधि नहीं।",
+    en: "Grain impurity screening with a phone, a precise scale and AI Model Orchestration. A screening and pre-check tool, not an official grading method unless validated and approved.",
+    hi: "फ़ोन, सटीक तराज़ू और मॉडल ऑर्केस्ट्रेशन से अनाज की अशुद्धि जाँच। यह जाँच और पूर्व-परीक्षण का साधन है; सत्यापित और स्वीकृत होने तक आधिकारिक ग्रेडिंग विधि नहीं।",
   },
   product: { en: "Product", hi: "उत्पाद" },
   resources: { en: "Resources", hi: "संसाधन" },

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { Layout, MorePage } from "./components/Layout";
@@ -28,10 +29,14 @@ import { VerifyPage } from "./pages/VerifyPage";
 import { WebsitePage } from "./pages/WebsitePage";
 import { ContactPage } from "./pages/public/ContactPage";
 import { DemoPage } from "./pages/public/DemoPage";
-import { HomePage } from "./pages/public/HomePage";
 import { ArticlePage, HubPage } from "./pages/public/HubPage";
 import { PublicLayout } from "./pages/public/PublicLayout";
 import { RoiPage } from "./pages/public/RoiPage";
+
+// The landing page carries the 3D scene; the rest of the site doesn't load it.
+const HomePage = lazy(() =>
+  import("./pages/public/home/HomePage").then((m) => ({ default: m.HomePage })),
+);
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -52,7 +57,14 @@ export function App() {
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
       <Route element={<PublicLayout />}>
-        <Route index element={<HomePage />} />
+        <Route
+          index
+          element={
+            <Suspense fallback={<div className="landing-loading" />}>
+              <HomePage />
+            </Suspense>
+          }
+        />
         <Route path="demo" element={<DemoPage />} />
         <Route path="roi" element={<RoiPage />} />
         <Route path="contact" element={<ContactPage />} />

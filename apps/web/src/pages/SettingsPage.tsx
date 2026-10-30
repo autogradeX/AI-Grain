@@ -2,16 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, type CurrentUser, type Session } from "../api/client";
-import {
-  MODEL_LABELS,
-  type AuditEntry,
-  type ClaudeModel,
-  type Org,
-} from "../api/types";
+import { type AuditEntry, type ClaudeModel, type Org } from "../api/types";
 import { useAuth, useCan } from "../auth/AuthContext";
 import { Badge, Card, ErrorNote, Field, formatDate } from "../components/ui";
 import { LanguageSelect, useT } from "../i18n";
 import { common } from "../i18n/common";
+import { useModelLabel } from "../i18n/models";
 import { m } from "./SettingsPage.i18n";
 
 const ROLE_NAME = {
@@ -181,6 +177,7 @@ function SessionsCard() {
 function OrgCard() {
   const can = useCan();
   const t = useT(m);
+  const modelLabel = useModelLabel();
   const qc = useQueryClient();
   const org = useQuery({
     queryKey: ["org"],
@@ -221,11 +218,11 @@ function OrgCard() {
             }
           >
             <option value="">
-              {t("serverDefault", { model: MODEL_LABELS[o.effectiveModel] })}
+              {t("serverDefault", { model: modelLabel(o.effectiveModel) })}
             </option>
             {o.models.map((model) => (
               <option key={model} value={model}>
-                {MODEL_LABELS[model]}
+                {modelLabel(model)}
               </option>
             ))}
           </select>

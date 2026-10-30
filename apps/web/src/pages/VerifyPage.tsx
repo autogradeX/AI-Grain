@@ -13,6 +13,7 @@ import {
 } from "../components/ui";
 import { useLang, useT } from "../i18n";
 import { presetLabel, useGrainLabels } from "../i18n/common";
+import { useModelLabel } from "../i18n/models";
 import { m } from "./VerifyPage.i18n";
 
 interface Verification {
@@ -111,6 +112,7 @@ function Result({ v }: { v: Verification }) {
   const p = v.payload;
   const ok = v.status === "valid" && v.intact;
   const t = useT(m);
+  const modelLabel = useModelLabel();
   const { lang } = useLang();
   const { groupLabel, cropLabel } = useGrainLabels();
   return (
@@ -179,7 +181,7 @@ function Result({ v }: { v: Verification }) {
             {t("methodDetail", {
               source:
                 p.result.source === "estimate" ? t("estimated") : t("weighed"),
-              model: p.model,
+              model: modelLabel(p.model),
               reviewed: p.kernels.reviewed,
               flagged: p.kernels.flagged,
               operators: p.operators.join(", "),

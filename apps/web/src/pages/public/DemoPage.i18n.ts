@@ -12,7 +12,7 @@ export const m = defineMessages({
     en: "Photographs the board from 20–25 cm with even light. Kernels are found by classic image processing, not AI.",
     hi: "एक समान रोशनी में 20–25 cm ऊपर से बोर्ड की फ़ोटो लेता है। दाने AI से नहीं, पारंपरिक इमेज प्रोसेसिंग से ढूँढे जाते हैं।",
   },
-  setup3Title: { en: "Claude", hi: "Claude" },
+  setup3Title: { en: "Model Orchestration", hi: "मॉडल ऑर्केस्ट्रेशन" },
   setup3Text: {
     en: "Classifies a close-up of each kernel against the crop's class definitions and reference images, with a confidence and a reason.",
     hi: "हर दाने की नज़दीकी तस्वीर को फसल के वर्गों की परिभाषाओं और संदर्भ चित्रों से मिलाकर वर्गीकृत करता है, भरोसे के स्तर और कारण के साथ।",
@@ -29,13 +29,13 @@ export const m = defineMessages({
     hi: "AI अनाज अशुद्धि विश्लेषण क्या है?",
   },
   faq1A: {
-    en: "Finding and classifying the objects in a grain sample that are not sound kernels: broken and damaged kernels, other cereals, weed seeds, debris and harmful material such as ergot. Here, Claude does the first pass on a photo and a person confirms it.",
-    hi: "अनाज के नमूने में उन चीज़ों को ढूँढना और वर्गीकृत करना जो स्वस्थ दाने नहीं हैं: टूटे और क्षतिग्रस्त दाने, दूसरे अनाज, खरपतवार के बीज, कचरा और अरगट जैसे हानिकारक पदार्थ। यहाँ Claude फ़ोटो पर पहली जाँच करता है और एक व्यक्ति उसकी पुष्टि करता है।",
+    en: "Finding and classifying the objects in a grain sample that are not sound kernels: broken and damaged kernels, other cereals, weed seeds, debris and harmful material such as ergot. Here, Model Orchestration does the first pass on a photo and a person confirms it.",
+    hi: "अनाज के नमूने में उन चीज़ों को ढूँढना और वर्गीकृत करना जो स्वस्थ दाने नहीं हैं: टूटे और क्षतिग्रस्त दाने, दूसरे अनाज, खरपतवार के बीज, कचरा और अरगट जैसे हानिकारक पदार्थ। यहाँ मॉडल ऑर्केस्ट्रेशन फ़ोटो पर पहली जाँच करता है और एक व्यक्ति उसकी पुष्टि करता है।",
   },
   faq2Q: { en: "Is the demo a real sample?", hi: "क्या डेमो असली नमूना है?" },
   faq2A: {
-    en: "Yes. It is a sample analysed in the app and published by our team, with the kernel images, Claude's verdicts and the operator's decisions as they were recorded.",
-    hi: "हाँ। यह ऐप में विश्लेषित और हमारी टीम द्वारा प्रकाशित नमूना है, जिसमें दानों की तस्वीरें, Claude के फ़ैसले और ऑपरेटर के निर्णय वैसे ही हैं जैसे दर्ज हुए थे।",
+    en: "Yes. It is a sample analysed in the app and published by our team, with the kernel images, Model Orchestration's verdicts and the operator's decisions as they were recorded.",
+    hi: "हाँ। यह ऐप में विश्लेषित और हमारी टीम द्वारा प्रकाशित नमूना है, जिसमें दानों की तस्वीरें, मॉडल ऑर्केस्ट्रेशन के फ़ैसले और ऑपरेटर के निर्णय वैसे ही हैं जैसे दर्ज हुए थे।",
   },
   faq3Q: {
     en: "Why do the result and the photo estimate differ?",
@@ -63,8 +63,8 @@ export const m = defineMessages({
   eyebrow: { en: "Interactive demo", hi: "इंटरैक्टिव डेमो" },
   title: { en: "AI grain impurity analysis", hi: "AI अनाज अशुद्धि विश्लेषण" },
   lead: {
-    en: "A real sample, photographed, classified by Claude and checked by an operator. Open it and explore every kernel the system found.",
-    hi: "एक असली नमूना: फ़ोटो लिया गया, Claude ने वर्गीकृत किया और ऑपरेटर ने जाँचा। इसे खोलें और सिस्टम को मिला हर दाना देखें।",
+    en: "A real sample, photographed, classified by Model Orchestration and checked by an operator. Open it and explore every kernel the system found.",
+    hi: "एक असली नमूना: फ़ोटो लिया गया, मॉडल ऑर्केस्ट्रेशन ने वर्गीकृत किया और ऑपरेटर ने जाँचा। इसे खोलें और सिस्टम को मिला हर दाना देखें।",
   },
   noDemo: {
     en: "No demo sample has been published yet.",
@@ -125,18 +125,21 @@ export const m = defineMessages({
 
   // Kernel detail
   tapKernel: {
-    en: "Tap any kernel on the photo to see what Claude saw and what the operator decided.",
-    hi: "फ़ोटो में किसी भी दाने पर टैप करें और देखें कि Claude ने क्या देखा और ऑपरेटर ने क्या तय किया।",
+    en: "Tap any kernel on the photo to see what Model Orchestration saw and what the operator decided.",
+    hi: "फ़ोटो में किसी भी दाने पर टैप करें और देखें कि मॉडल ऑर्केस्ट्रेशन ने क्या देखा और ऑपरेटर ने क्या तय किया।",
   },
   kernelAlt: { en: "Kernel {number}", hi: "दाना {number}" },
   kernelTitle: {
     en: "Kernel #{number} · cell {cell}",
     hi: "दाना #{number} · ख़ाना {cell}",
   },
-  claudeSaid: { en: "Claude: {cls}", hi: "Claude: {cls}" },
+  claudeSaid: {
+    en: "Model Orchestration: {cls}",
+    hi: "मॉडल ऑर्केस्ट्रेशन: {cls}",
+  },
   claudeSaidConfidence: {
-    en: "Claude: {cls} ({confidence} confidence)",
-    hi: "Claude: {cls} ({confidence} भरोसा)",
+    en: "Model Orchestration: {cls} ({confidence} confidence)",
+    hi: "मॉडल ऑर्केस्ट्रेशन: {cls} ({confidence} भरोसा)",
   },
   confidenceHigh: { en: "high", hi: "उच्च" },
   confidenceMedium: { en: "medium", hi: "मध्यम" },

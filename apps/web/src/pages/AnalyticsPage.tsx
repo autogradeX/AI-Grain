@@ -7,6 +7,7 @@ import { BarList, ColumnChart, LineChart, Meter } from "../components/charts";
 import { Card, ErrorNote, Spinner } from "../components/ui";
 import { locale, useT, type Translate } from "../i18n";
 import { useGrainLabels } from "../i18n/common";
+import { useModelLabel } from "../i18n/models";
 import { m } from "./AnalyticsPage.i18n";
 
 interface Analytics {
@@ -108,6 +109,7 @@ export function AnalyticsPage() {
   const [crop, setCrop] = useState("");
   const crops = useCrops(true);
   const t = useT(m);
+  const modelLabel = useModelLabel();
   const { groupLabel, classLabel, cropLabel } = useGrainLabels();
   const q = useQuery({
     queryKey: ["analytics", days, crop],
@@ -411,7 +413,7 @@ export function AnalyticsPage() {
                   <tbody>
                     {a.claude.map((c) => (
                       <tr key={c.model}>
-                        <td>{c.model}</td>
+                        <td>{modelLabel(c.model)}</td>
                         <td className="num">{c.requests}</td>
                         <td className="num">
                           {c.inputTokens.toLocaleString(locale())}

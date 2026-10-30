@@ -11,6 +11,7 @@ import {
 } from "@ai-grain/core";
 import PDFDocument from "pdfkit";
 import type { SampleRow } from "../samples/service.js";
+import { modelTier } from "../../config.js";
 
 export interface ReportData {
   orgName: string;
@@ -197,7 +198,7 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     "Kernels photographed",
     `${data.kernels.total} (${data.kernels.flagged} flagged, ${data.kernels.reviewed} checked by the operator)`,
   );
-  line("AI model", data.model);
+  line("Model Orchestration", modelTier(data.model));
 
   doc.moveDown(1);
   const grade = sample.result?.grade.grade;
@@ -326,7 +327,7 @@ export function renderReport(data: ReportData): Promise<Buffer> {
       .moveDown(0.8)
       .font("Helvetica-Bold")
       .fontSize(10)
-      .text("Summary (written by Claude from the figures above)");
+      .text("Summary (written by Model Orchestration from the figures above)");
     doc.font("Helvetica").fontSize(9.5).text(sample.aiSummary, { width });
   }
 
@@ -372,7 +373,7 @@ export function renderReport(data: ReportData): Promise<Buffer> {
       .fontSize(8)
       .fillColor("#555")
       .text(
-        `Each image is the crop Claude classified, at the same scale. "Decided" is the operator's call after checking the kernel by eye.${
+        `Each image is the crop Model Orchestration classified, at the same scale. "Decided" is the operator's call after checking the kernel by eye.${
           data.galleryTotal > data.gallery.length
             ? ` First ${data.gallery.length} of ${data.galleryTotal} shown.`
             : ""
@@ -411,7 +412,7 @@ export function renderReport(data: ReportData): Promise<Buffer> {
         })
         .fillColor("#555")
         .text(
-          `Claude: ${classLabel(data.classes, k.aiClass)}${k.aiConfidence ? ` (${k.aiConfidence})` : ""}`,
+          `Model Orchestration: ${classLabel(data.classes, k.aiClass)}${k.aiConfidence ? ` (${k.aiConfidence})` : ""}`,
           x,
           y + tile + 20,
           {

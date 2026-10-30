@@ -4,8 +4,8 @@ export const m = defineMessages({
   title: { en: "Grading standards", hi: "ग्रेडिंग मानक" },
   newStandard: { en: "New standard", hi: "नया मानक" },
   intro: {
-    en: "A standard holds the grade limits (maximum mass % per defect class) and the defect definitions Claude is given. Copy the limits from the official standard you grade against; the app ships with none built in.",
-    hi: "मानक में ग्रेड की सीमाएँ (हर दोष-वर्ग का अधिकतम भार %) और Claude को दी जाने वाली दोषों की परिभाषाएँ होती हैं। सीमाएँ उस आधिकारिक मानक से लें जिसके अनुसार आप ग्रेडिंग करते हैं; ऐप में कोई मानक पहले से नहीं है।",
+    en: "A standard holds the grade limits (maximum mass % per defect class) and the defect definitions Model Orchestration is given. Copy the limits from the official standard you grade against; the app ships with none built in.",
+    hi: "मानक में ग्रेड की सीमाएँ (हर दोष-वर्ग का अधिकतम भार %) और मॉडल ऑर्केस्ट्रेशन को दी जाने वाली दोषों की परिभाषाएँ होती हैं। सीमाएँ उस आधिकारिक मानक से लें जिसके अनुसार आप ग्रेडिंग करते हैं; ऐप में कोई मानक पहले से नहीं है।",
   },
   showArchived: { en: "Show archived", hi: "संग्रहित भी दिखाएँ" },
   noStandards: { en: "No standards yet.", hi: "अभी कोई मानक नहीं है।" },
@@ -63,12 +63,12 @@ export const m = defineMessages({
     hi: "टेस्ट वेट ग्रेड {grade}",
   },
   definitionsTitle: {
-    en: "Defect definitions for Claude",
-    hi: "Claude के लिए दोषों की परिभाषाएँ",
+    en: "Defect definitions for Model Orchestration",
+    hi: "मॉडल ऑर्केस्ट्रेशन के लिए दोषों की परिभाषाएँ",
   },
   definitionsHint: {
-    en: "Claude reads these with every request. Leave a box empty to use the crop's own description (shown greyed). Paste the standard's wording where it differs, plus any local guidance (for example how to tell Fusarium from weather bleaching in your region).",
-    hi: "Claude हर अनुरोध के साथ इन्हें पढ़ता है। फ़सल का अपना विवरण (हल्के रंग में दिखा) इस्तेमाल करने के लिए खाना खाली छोड़ें। जहाँ मानक की भाषा अलग हो, वहाँ उसे चिपकाएँ, साथ में कोई स्थानीय निर्देश भी (जैसे आपके इलाके में फ्यूज़ेरियम और मौसम से पड़ी सफ़ेदी में फ़र्क कैसे करें)। अंग्रेज़ी में लिखना सबसे अच्छा है।",
+    en: "Model Orchestration reads these with every request. Leave a box empty to use the crop's own description (shown greyed). Paste the standard's wording where it differs, plus any local guidance (for example how to tell Fusarium from weather bleaching in your region).",
+    hi: "मॉडल ऑर्केस्ट्रेशन हर अनुरोध के साथ इन्हें पढ़ता है। फ़सल का अपना विवरण (हल्के रंग में दिखा) इस्तेमाल करने के लिए खाना खाली छोड़ें। जहाँ मानक की भाषा अलग हो, वहाँ उसे चिपकाएँ, साथ में कोई स्थानीय निर्देश भी (जैसे आपके इलाके में फ्यूज़ेरियम और मौसम से पड़ी सफ़ेदी में फ़र्क कैसे करें)। अंग्रेज़ी में लिखना सबसे अच्छा है।",
   },
   restore: { en: "Restore", hi: "वापस लाएँ" },
   archive: { en: "Archive", hi: "संग्रहित करें" },

@@ -9,12 +9,6 @@ export type Role = "admin" | "grader" | "viewer";
 export type ClaudeModel =
   "claude-sonnet-5-5" | "claude-haiku-5-5" | "claude-opus-5-5";
 
-export const MODEL_LABELS: Record<ClaudeModel, string> = {
-  "claude-sonnet-5-5": "Claude Sonnet 5.5 (default)",
-  "claude-haiku-5-5": "Claude Haiku 5.5 (lowest cost)",
-  "claude-opus-5-5": "Claude Opus 5.5 (difficult samples)",
-};
-
 export interface Org {
   id: string;
   name: string;

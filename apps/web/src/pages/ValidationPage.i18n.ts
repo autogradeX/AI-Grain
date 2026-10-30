@@ -3,8 +3,8 @@ import { defineMessages } from "../i18n";
 export const m = defineMessages({
   title: { en: "Validation", hi: "सत्यापन" },
   intro: {
-    en: "Claude is a general-purpose AI, not trained on your grain, so its accuracy is unknown until tested. Grade 30–50 samples both ways (a certified grader and this method), enter the grader's result on each sample, and compare per class here before relying on the results.",
-    hi: "Claude एक सामान्य AI है, आपके अनाज पर प्रशिक्षित नहीं, इसलिए जाँचे बिना उसकी सटीकता पता नहीं। 30–50 नमूनों को दोनों तरह से ग्रेड करें (प्रमाणित ग्रेडर से और इस विधि से), हर नमूने पर ग्रेडर का परिणाम दर्ज करें, और नतीजों पर भरोसा करने से पहले यहाँ हर वर्ग की तुलना करें।",
+    en: "Model Orchestration runs general-purpose AI, not trained on your grain, so its accuracy is unknown until tested. Grade 30–50 samples both ways (a certified grader and this method), enter the grader's result on each sample, and compare per class here before relying on the results.",
+    hi: "मॉडल ऑर्केस्ट्रेशन एक सामान्य AI है, आपके अनाज पर प्रशिक्षित नहीं, इसलिए जाँचे बिना उसकी सटीकता पता नहीं। 30–50 नमूनों को दोनों तरह से ग्रेड करें (प्रमाणित ग्रेडर से और इस विधि से), हर नमूने पर ग्रेडर का परिणाम दर्ज करें, और नतीजों पर भरोसा करने से पहले यहाँ हर वर्ग की तुलना करें।",
   },
   crop: { en: "Crop", hi: "फसल" },
   progress: { en: "Progress", hi: "प्रगति" },

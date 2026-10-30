@@ -4,8 +4,8 @@ export const m = defineMessages({
   backToSample: { en: "← Sample {number}", hi: "← नमूना {number}" },
   title: { en: "Check flagged kernels", hi: "चिह्नित दाने जाँचें" },
   intro: {
-    en: "For each kernel: find it on the board by its cell, pick it out with tweezers, look at it, then confirm or correct the class and drop it into that cup. Your decision is final; Claude only points.",
-    hi: "हर दाने के लिए: उसके खाने (सेल) से बोर्ड पर उसे ढूँढें, चिमटी से उठाएँ, ध्यान से देखें, फिर वर्ग पक्का करें या सुधारें और उसे उसी कप में डालें। अंतिम फ़ैसला आपका है; Claude केवल संकेत देता है।",
+    en: "For each kernel: find it on the board by its cell, pick it out with tweezers, look at it, then confirm or correct the class and drop it into that cup. Your decision is final; Model Orchestration only points.",
+    hi: "हर दाने के लिए: उसके खाने (सेल) से बोर्ड पर उसे ढूँढें, चिमटी से उठाएँ, ध्यान से देखें, फिर वर्ग पक्का करें या सुधारें और उसे उसी कप में डालें। अंतिम फ़ैसला आपका है; मॉडल ऑर्केस्ट्रेशन केवल संकेत देता है।",
   },
   toCheck: { en: "To check", hi: "जाँचने बाकी" },
   allFlagged: { en: "All flagged", hi: "सभी चिह्नित" },
@@ -32,7 +32,7 @@ export const m = defineMessages({
     hi: "संदर्भ उदाहरण के रूप में सहेजा गया",
   },
   useAsReference: {
-    en: "Use as a reference example for Claude",
-    hi: "Claude के लिए संदर्भ उदाहरण बनाएँ",
+    en: "Use as a reference example for Model Orchestration",
+    hi: "मॉडल ऑर्केस्ट्रेशन के लिए संदर्भ उदाहरण बनाएँ",
   },
 });
