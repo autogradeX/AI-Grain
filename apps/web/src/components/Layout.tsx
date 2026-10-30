@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   BadgeCheck,
   ChartColumn,
+  ChevronLeft,
   Database,
   ExternalLink,
   Globe,
@@ -11,6 +12,7 @@ import {
   MessageSquareText,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   Ruler,
   ScanSearch,
   Settings,
@@ -27,12 +29,20 @@ import {
   useSyncExternalStore,
   type RefObject,
 } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import {
+  Link,
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { api } from "../api/client";
 import type { Org } from "../api/types";
 import { useAuth, useCan } from "../auth/AuthContext";
 import { LanguageSelect, useT } from "../i18n";
 import { common } from "../i18n/common";
+import { InstallButton, OfflineBanner } from "../pwa/Pwa";
+import { usePhoneView } from "../pwa/pwa";
 import { m } from "./Layout.i18n";
 
 type Key = keyof typeof m;
@@ -78,6 +88,29 @@ const SECTIONS: { key: Key; items: Item[] }[] = [
     ],
   },
 ];
+
+/** Which section a path belongs to, and where "back" goes from a detail page. */
+const ROUTES: [RegExp, Key, string?][] = [
+  [/^\/app\/(samples|batches)\/[^/]+/, "samples", "/app"],
+  [/^\/app\/crops\/[^/]+/, "crops", "/app/crops"],
+  [/^\/app\/standards\/[^/]+/, "standards", "/app/standards"],
+  [/^\/app\/analytics/, "analytics"],
+  [/^\/app\/crops/, "crops"],
+  [/^\/app\/standards/, "standards"],
+  [/^\/app\/references/, "references"],
+  [/^\/app\/validation/, "validation"],
+  [/^\/app\/dataset/, "dataset"],
+  [/^\/app\/prompt/, "prompt"],
+  [/^\/app\/users/, "users"],
+  [/^\/app\/website/, "website"],
+  [/^\/app\/settings/, "settings"],
+];
+
+function routeInfo(path: string): { key: Key; parent?: string } {
+  for (const [re, key, parent] of ROUTES)
+    if (re.test(path)) return parent ? { key, parent } : { key };
+  return { key: "samples" };
+}
 
 /** Admins of the organisation that runs the public website also manage it. */
 function useManagesWebsite(): boolean {
@@ -198,6 +231,7 @@ function Account({
     <div className="side-account">
       <div className="side-tools">
         <LanguageSelect className="side-label" />
+        <InstallButton className="side-link" />
         <Link
           to="/"
           className="side-link"
@@ -301,23 +335,54 @@ export function Layout() {
     }
   };
   const onNavigate = drawer ? close : undefined;
+  const can = useCan();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [view] = usePhoneView();
+  // On phones: a native-style app with bottom tabs, unless switched to classic.
+  const appView = drawer && view === "app";
+  const here = routeInfo(pathname);
+  const goBack = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx > 0) void navigate(-1);
+    else void navigate(here.parent ?? "/app");
+  };
 
   return (
     <div
-      className={`app-shell ${collapsed ? "is-collapsed" : ""} ${drawerOpen ? "drawer-open" : ""}`}
+      className={`app-shell ${collapsed ? "is-collapsed" : ""} ${drawerOpen ? "drawer-open" : ""} ${appView ? "app-view" : ""}`}
     >
       <header className="app-bar">
-        <button
-          ref={opener}
-          className="icon-button"
-          aria-label={t("openMenu")}
-          aria-expanded={drawerOpen}
-          aria-controls="app-sidebar"
-          onClick={() => setOpen(true)}
-        >
-          <Menu size={22} aria-hidden />
-        </button>
-        <Brand />
+        {appView ? (
+          <>
+            {here.parent ? (
+              <button
+                className="icon-button"
+                aria-label={t("back")}
+                onClick={goBack}
+              >
+                <ChevronLeft size={24} aria-hidden />
+              </button>
+            ) : (
+              <img src="/icon.svg" alt="" width={30} height={30} />
+            )}
+            <div className="app-bar-title">{t(here.key)}</div>
+          </>
+        ) : (
+          <>
+            <button
+              ref={opener}
+              className="icon-button"
+              aria-label={t("openMenu")}
+              aria-expanded={drawerOpen}
+              aria-controls="app-sidebar"
+              onClick={() => setOpen(true)}
+            >
+              <Menu size={22} aria-hidden />
+            </button>
+            <Brand />
+          </>
+        )}
         {user && (
           <Link
             to="/app/settings"
@@ -374,15 +439,84 @@ export function Layout() {
       </aside>
 
       <div className="app-main">
+        <OfflineBanner />
         {user && !user.emailVerified && (
           <div className="banner">
             {t("confirmEmail", { email: user.email })}
           </div>
         )}
-        <main className="content">
+        <main
+          // In the app view each screen slides in, like a native app.
+          key={appView ? pathname : undefined}
+          className={appView ? "content page-enter" : "content"}
+        >
           <Outlet />
         </main>
       </div>
+
+      {appView && (
+        <nav className="tab-bar" aria-label={t("mainNav")}>
+          <TabLink to="/app" icon={ScanSearch} active={here.key === "samples"}>
+            {t("samplesTab")}
+          </TabLink>
+          <TabLink
+            to="/app/analytics"
+            icon={ChartColumn}
+            active={here.key === "analytics"}
+          >
+            {t("analyticsTab")}
+          </TabLink>
+          {can.write && (
+            <Link
+              to="/app?new=1"
+              className="tab-new"
+              aria-label={t("newSample")}
+            >
+              <Plus size={26} strokeWidth={2.4} aria-hidden />
+            </Link>
+          )}
+          <TabLink
+            to="/app/standards"
+            icon={Ruler}
+            active={here.key === "standards"}
+          >
+            {t("standardsTab")}
+          </TabLink>
+          <button
+            ref={opener}
+            className={`tab ${drawerOpen ? "active" : ""}`}
+            aria-expanded={drawerOpen}
+            aria-controls="app-sidebar"
+            onClick={() => setOpen(true)}
+          >
+            <Menu size={22} strokeWidth={1.9} aria-hidden />
+            <span>{t("menuTab")}</span>
+          </button>
+        </nav>
+      )}
     </div>
+  );
+}
+
+function TabLink({
+  to,
+  icon: Icon,
+  active,
+  children,
+}: {
+  to: string;
+  icon: LucideIcon;
+  active: boolean;
+  children: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className={`tab ${active ? "active" : ""}`}
+      aria-current={active ? "page" : undefined}
+    >
+      <Icon size={22} strokeWidth={active ? 2.2 : 1.9} aria-hidden />
+      <span>{children}</span>
+    </Link>
   );
 }

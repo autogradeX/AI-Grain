@@ -1,9 +1,26 @@
+import { noteNetwork } from "../pwa/pwa";
+
 /**
  * Fetch wrapper for the API. The access token lives only in memory; the
  * refresh token is an httpOnly cookie the browser sends to /api/auth. On a
  * 401 the client refreshes once (shared between concurrent requests) and
  * retries.
  */
+
+/** fetch that tells the offline banner whether the server was reachable. */
+async function trackedFetch(
+  input: string,
+  init: RequestInit,
+): Promise<Response> {
+  try {
+    const res = await fetch(input, init);
+    noteNetwork(true);
+    return res;
+  } catch (err) {
+    noteNetwork(false);
+    throw err;
+  }
+}
 
 export class ApiError extends Error {
   constructor(
@@ -74,20 +91,16 @@ async function parseError(res: Response): Promise<ApiError> {
 export function refreshSession(): Promise<Session | null> {
   refreshing ??= (async () => {
     try {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const res = await fetch("/api/auth/refresh", {
-          method: "POST",
-          credentials: "same-origin",
-        });
-        if (res.ok) {
-          const session = (await res.json()) as Session;
-          applySession(session);
-          return session;
-        }
-        const err = await parseError(res);
-        // Another tab rotated the cookie a moment ago; the browser now holds the new one.
-        if (err.code === "refresh_race") continue;
-        break;
+      // A just-rotated cookie is still accepted for a short grace period, so
+      // a parallel refresh from another tab doesn't sign this one out.
+      const res = await trackedFetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (res.ok) {
+        const session = (await res.json()) as Session;
+        applySession(session);
+        return session;
       }
       applySession(null);
       return null;
@@ -105,7 +118,7 @@ async function send(
 ): Promise<Response> {
   const headers = new Headers(init.headers);
   if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
-  const res = await fetch(`/api${path}`, {
+  const res = await trackedFetch(`/api${path}`, {
     ...init,
     headers,
     credentials: "same-origin",

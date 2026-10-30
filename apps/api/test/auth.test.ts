@@ -92,10 +92,11 @@ describe("registration and sessions", () => {
     const next = refreshCookie(first);
     expect(next).not.toBe(cookie);
 
-    // Within the grace window a reused token is treated as a tab race.
-    expect((await refresh(cookie)).json()).toMatchObject({
-      code: "refresh_race",
-    });
+    // Within the grace window the old token still works: the response that
+    // carried the new cookie may have been lost (dropped signal, page change).
+    const retry = await refresh(cookie);
+    expect(retry.statusCode).toBe(200);
+    expect(refreshCookie(retry)).not.toBe(next);
 
     // Outside it, reuse signals theft: the whole family is revoked.
     await t.ctx.db.execute(

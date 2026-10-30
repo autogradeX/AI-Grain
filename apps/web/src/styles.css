@@ -2296,3 +2296,276 @@ details.small > summary {
     gap: 0.75rem;
   }
 }
+
+/*
+ * Installed app and the phone app view. Safe-area insets keep bars clear of
+ * notches and home indicators (the status bar is translucent on iOS).
+ */
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-bar {
+  padding-top: env(safe-area-inset-top);
+  height: calc(56px + env(safe-area-inset-top));
+}
+
+.site-header {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+.side-top {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+
+.side-account {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.app-bar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.app-bar img {
+  flex: none;
+  border-radius: 8px;
+}
+
+.app-view .app-main {
+  padding-bottom: calc(68px + env(safe-area-inset-bottom));
+}
+
+.tab-bar {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 25;
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  align-items: center;
+  height: calc(64px + env(safe-area-inset-bottom));
+  padding: 0 0.25rem env(safe-area-inset-bottom);
+  background: color-mix(in srgb, var(--surface), transparent 8%);
+  backdrop-filter: blur(16px) saturate(160%);
+  border-top: 1px solid var(--border);
+  user-select: none;
+}
+
+.tab,
+.tab:hover:not(:disabled) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 0;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 550;
+  text-decoration: none;
+}
+
+.tab.active,
+.tab.active:hover:not(:disabled) {
+  color: var(--primary);
+}
+
+.tab:active {
+  transform: scale(0.94);
+}
+
+.tab-new {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  margin-top: -22px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #3b7a42, var(--primary));
+  color: #fff;
+  box-shadow:
+    0 6px 16px rgb(47 93 52 / 35%),
+    0 0 0 4px var(--bg);
+  transition: transform 0.12s;
+}
+
+.tab-new:active {
+  transform: scale(0.92);
+}
+
+.page-enter {
+  animation: page-enter 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+/* Update toast, above the tab bar on phones */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 0.6rem 0.6rem 0.6rem 1rem;
+  border-radius: 14px;
+  background: #13201a;
+  color: #eef2ea;
+  box-shadow: var(--shadow-lg);
+  translate: -50% 0;
+  animation: toast-in 0.25s ease-out;
+}
+
+.toast button.primary {
+  min-height: 36px;
+  background: #f0c565;
+  border-color: #f0c565;
+  color: #17120a;
+}
+
+.toast button.link {
+  color: #c9d4c7;
+}
+
+.app-view ~ .toast,
+body:has(.app-view) .toast {
+  bottom: calc(80px + env(safe-area-inset-bottom));
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    translate: -50% 12px;
+  }
+}
+
+.offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #2b2f33;
+  color: #f1f1ef;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+/* Bottom sheet dialog (install steps) */
+.sheet {
+  width: min(480px, 100vw);
+  max-width: 100vw;
+  margin: auto auto 0;
+  padding: 1.25rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
+  border: 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+
+.sheet::backdrop {
+  background: rgb(8 12 9 / 55%);
+}
+
+@media (min-width: 640px) {
+  .sheet {
+    margin: auto;
+    border-radius: 20px;
+    padding-bottom: 1.5rem;
+  }
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sheet-head img {
+  border-radius: 12px;
+}
+
+.sheet-head strong {
+  flex: 1;
+  font-size: 1.05rem;
+}
+
+.sheet .icon-button:hover {
+  background: var(--surface-2);
+}
+
+.install-steps {
+  margin: 0.5rem 0 0;
+  padding-left: 1.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.install-steps svg {
+  vertical-align: -3px;
+  color: var(--info);
+}
+
+/* Running installed: no rubber-band scrolling of the whole page. */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .toast {
+    animation: none;
+  }
+}
+
+/* A button that sits in the sidebar list (Install app) looks like its links. */
+.sidebar button.side-link,
+.sidebar button.side-link:hover:not(:disabled) {
+  width: 100%;
+  justify-content: flex-start;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--side-text);
+  font-size: 0.93rem;
+  font-weight: 500;
+}
+
+.sidebar button.side-link:hover:not(:disabled) {
+  background: var(--side-hover);
+  color: #fff;
+}
+
+.is-collapsed .sidebar button.side-link {
+  justify-content: center;
+}

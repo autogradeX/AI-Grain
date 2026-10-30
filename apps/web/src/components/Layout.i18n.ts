@@ -28,4 +28,10 @@ export const m = defineMessages({
     en: "Check your inbox to confirm your email address ({email}).",
     hi: "अपना ईमेल पता ({email}) पक्का करने के लिए अपना इनबॉक्स देखें।",
   },
+  back: { en: "Back", hi: "वापस" },
+  newSample: { en: "New sample", hi: "नया नमूना" },
+  samplesTab: { en: "Samples", hi: "नमूने" },
+  analyticsTab: { en: "Analytics", hi: "विश्लेषण" },
+  standardsTab: { en: "Standards", hi: "मानक" },
+  menuTab: { en: "Menu", hi: "मेनू" },
 });

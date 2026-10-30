@@ -4,6 +4,7 @@ import {
   ApiError,
   applySession,
   refreshSession,
+  setSessionListener,
   type Session,
 } from "../src/api/client";
 
@@ -67,15 +68,28 @@ describe("api client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("retries a refresh that raced another tab", async () => {
-    const replies = [json(401, { code: "refresh_race" }), json(200, session)];
+  it("keeps the session when there is no network to refresh it", async () => {
+    // Offline, the refresh fails without an answer from the server: the app
+    // must not treat that as "signed out".
+    const changes: (Session | null)[] = [];
+    setSessionListener((s) => changes.push(s));
     vi.stubGlobal(
       "fetch",
-      vi.fn(() => Promise.resolve(replies.shift()!)),
+      vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))),
     );
-    await expect(refreshSession()).resolves.toMatchObject({
-      accessToken: "new-token",
-    });
+    await expect(refreshSession()).rejects.toThrow("Failed to fetch");
+    expect(changes).toEqual([]);
+  });
+
+  it("signs out when the server rejects the refresh", async () => {
+    const changes: (Session | null)[] = [];
+    setSessionListener((s) => changes.push(s));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(json(401, { code: "refresh_invalid" }))),
+    );
+    await expect(refreshSession()).resolves.toBeNull();
+    expect(changes).toEqual([null]);
   });
 
   it("turns validation errors into readable messages", async () => {

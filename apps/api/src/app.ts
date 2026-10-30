@@ -122,7 +122,32 @@ export async function buildApp(
     ? resolve(ctx.config.WEB_DIST_DIR)
     : null;
   if (webDir && existsSync(webDir)) {
-    await app.register(fastifyStatic, { root: webDir });
+    await app.register(fastifyStatic, {
+      root: webDir,
+      setHeaders: (res, path) => {
+        // @fastify/static 10 passes the Fastify reply here, though its types
+        // still describe a Node response; support both.
+        const target = res as unknown as {
+          header?: (name: string, value: string) => void;
+          setHeader?: (name: string, value: string) => void;
+        };
+        const set = (key: string, value: string) =>
+          target.header
+            ? target.header(key, value)
+            : target.setHeader?.(key, value);
+        const name = path.replace(/\\/g, "/");
+        if (name.endsWith("/sw.js") || name.endsWith("/index.html")) {
+          // Checked on every load, so a deploy reaches installed apps.
+          set("cache-control", "no-cache");
+        } else if (name.includes("/assets/")) {
+          // Hashed file names: a changed file gets a new name.
+          set("cache-control", "public, max-age=31536000, immutable");
+        }
+        if (name.endsWith(".webmanifest")) {
+          set("content-type", "application/manifest+json");
+        }
+      },
+    });
     app.setNotFoundHandler((request, reply) => {
       const path = request.url.split("?")[0] ?? "";
       // App routes like /samples/123 get index.html; missing files and API paths get a real 404.

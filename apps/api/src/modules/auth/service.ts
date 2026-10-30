@@ -16,7 +16,13 @@ import { signAccessToken } from "./guard.js";
 
 export const REFRESH_COOKIE = "ag_rt";
 const REFRESH_COOKIE_PATH = "/api/auth";
-/** A rotated token presented again within this window is a race between tabs, not theft. */
+/**
+ * A rotated token presented again within this window is a lost response
+ * (the connection dropped, or the page changed, after the server rotated
+ * but before the browser stored the new cookie) or two tabs refreshing at
+ * once, not theft. It gets a new session in the same family; reuse later
+ * than this revokes the family.
+ */
 const ROTATION_GRACE_MS = 30_000;
 export const MAX_FAILED_LOGINS = 10;
 export const LOCK_MINUTES = 15;
@@ -135,7 +141,7 @@ export type RefreshOutcome =
   | { ok: true; userId: string; familyId: string }
   | {
       ok: false;
-      reason: "missing" | "invalid" | "expired" | "race" | "reused";
+      reason: "missing" | "invalid" | "expired" | "reused";
     };
 
 /** Checks a presented refresh token and marks it rotated. Reuse of a rotated token revokes its family. */
@@ -150,10 +156,10 @@ export async function consumeRefreshToken(
     .from(refreshTokens)
     .where(eq(refreshTokens.tokenHash, hashToken(token)));
   if (!row || row.revokedAt) return { ok: false, reason: "invalid" };
+  const withinGrace = (at: Date) =>
+    Date.now() - at.getTime() < ROTATION_GRACE_MS;
   if (row.rotatedAt) {
-    if (Date.now() - row.rotatedAt.getTime() < ROTATION_GRACE_MS) {
-      return { ok: false, reason: "race" };
-    }
+    if (withinGrace(row.rotatedAt)) return activeUser(ctx, row);
     await revokeFamily(ctx, row.familyId);
     await audit(ctx.db, {
       userId: row.userId,
@@ -167,13 +173,18 @@ export async function consumeRefreshToken(
     return { ok: false, reason: "expired" };
 
   // Conditional update, so two concurrent requests can't both rotate the same token.
-  const rotated = await ctx.db
+  await ctx.db
     .update(refreshTokens)
     .set({ rotatedAt: new Date() })
-    .where(and(eq(refreshTokens.id, row.id), isNull(refreshTokens.rotatedAt)))
-    .returning({ id: refreshTokens.id });
-  if (rotated.length === 0) return { ok: false, reason: "race" };
+    .where(and(eq(refreshTokens.id, row.id), isNull(refreshTokens.rotatedAt)));
+  // Another request rotated it a moment ago: the same grace applies.
+  return activeUser(ctx, row);
+}
 
+async function activeUser(
+  ctx: AppContext,
+  row: { userId: string; familyId: string },
+): Promise<RefreshOutcome> {
   const [user] = await ctx.db
     .select({ active: users.active })
     .from(users)

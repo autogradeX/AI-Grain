@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { Layout } from "./components/Layout";
+import { UpdateToast } from "./pwa/Pwa";
 import { Spinner } from "./components/ui";
 import {
   AcceptInvitePage,
@@ -49,60 +50,63 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/verify-email" element={<VerifyEmailPage />} />
-      <Route path="/accept-invite" element={<AcceptInvitePage />} />
-      <Route element={<PublicLayout />}>
+    <>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/accept-invite" element={<AcceptInvitePage />} />
+        <Route element={<PublicLayout />}>
+          <Route
+            index
+            element={
+              <Suspense fallback={<div className="landing-loading" />}>
+                <HomePage />
+              </Suspense>
+            }
+          />
+          <Route path="demo" element={<DemoPage />} />
+          <Route path="roi" element={<RoiPage />} />
+          <Route path="contact" element={<ContactPage />} />
+          <Route path="hub" element={<HubPage />} />
+          <Route path="hub/:slug" element={<ArticlePage />} />
+          <Route path="verify" element={<VerifyPage />} />
+          <Route path="verify/:code" element={<VerifyPage />} />
+        </Route>
         <Route
-          index
+          path="/app"
           element={
-            <Suspense fallback={<div className="landing-loading" />}>
-              <HomePage />
-            </Suspense>
+            <RequireAuth>
+              <Layout />
+            </RequireAuth>
           }
-        />
-        <Route path="demo" element={<DemoPage />} />
-        <Route path="roi" element={<RoiPage />} />
-        <Route path="contact" element={<ContactPage />} />
-        <Route path="hub" element={<HubPage />} />
-        <Route path="hub/:slug" element={<ArticlePage />} />
-        <Route path="verify" element={<VerifyPage />} />
-        <Route path="verify/:code" element={<VerifyPage />} />
-      </Route>
-      <Route
-        path="/app"
-        element={
-          <RequireAuth>
-            <Layout />
-          </RequireAuth>
-        }
-      >
-        <Route index element={<SamplesPage />} />
-        <Route path="samples/:id" element={<SamplePage />} />
-        <Route path="samples/:id/capture" element={<CapturePage />} />
-        <Route path="samples/:id/review" element={<ReviewPage />} />
-        <Route path="batches/:id" element={<BatchPage />} />
-        <Route path="analytics" element={<AnalyticsPage />} />
-        <Route path="crops" element={<CropsPage />} />
-        <Route path="crops/:key" element={<CropEditPage />} />
-        <Route path="standards" element={<StandardsPage />} />
-        <Route path="standards/:id" element={<StandardEditPage />} />
-        <Route path="references" element={<ReferencesPage />} />
-        <Route path="validation" element={<ValidationPage />} />
-        <Route path="prompt" element={<PromptPage />} />
-        <Route path="dataset" element={<DatasetPage />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="website" element={<WebsitePage />} />
-        {/* The phone "More" page became the drawer. */}
-        <Route path="more" element={<Navigate to="/app" replace />} />
-        <Route path="*" element={<Navigate to="/app" replace />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        >
+          <Route index element={<SamplesPage />} />
+          <Route path="samples/:id" element={<SamplePage />} />
+          <Route path="samples/:id/capture" element={<CapturePage />} />
+          <Route path="samples/:id/review" element={<ReviewPage />} />
+          <Route path="batches/:id" element={<BatchPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="crops" element={<CropsPage />} />
+          <Route path="crops/:key" element={<CropEditPage />} />
+          <Route path="standards" element={<StandardsPage />} />
+          <Route path="standards/:id" element={<StandardEditPage />} />
+          <Route path="references" element={<ReferencesPage />} />
+          <Route path="validation" element={<ValidationPage />} />
+          <Route path="prompt" element={<PromptPage />} />
+          <Route path="dataset" element={<DatasetPage />} />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="website" element={<WebsitePage />} />
+          {/* The phone "More" page became the drawer. */}
+          <Route path="more" element={<Navigate to="/app" replace />} />
+          <Route path="*" element={<Navigate to="/app" replace />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <UpdateToast />
+    </>
   );
 }

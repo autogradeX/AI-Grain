@@ -162,13 +162,8 @@ export function authRoutes(ctx: AppContext) {
         request.ip,
       );
       if (!outcome.ok) {
-        if (outcome.reason !== "race") clearRefreshCookie(reply);
-        throw unauthorized(
-          outcome.reason === "race"
-            ? "Session refreshed elsewhere, retry"
-            : "Please sign in again",
-          outcome.reason === "race" ? "refresh_race" : "refresh_invalid",
-        );
+        clearRefreshCookie(reply);
+        throw unauthorized("Please sign in again", "refresh_invalid");
       }
       await issueRefreshToken(
         ctx,

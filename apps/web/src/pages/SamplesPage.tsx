@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { ScanSearch } from "lucide-react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, download } from "../api/client";
 import { useCrops } from "../api/crops";
 import { CropSelect } from "../components/CropSelect";
@@ -33,7 +33,17 @@ export function SamplesPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = usePage();
   const term = useDebounced(search.trim());
-  const [creating, setCreating] = useState(false);
+  // The form's state is in the URL (?new=1): the + button and the app
+  // shortcut open it, and Back closes it.
+  const [params, setParams] = useSearchParams();
+  const creating = can.write && params.get("new") === "1";
+  const setCreating = (open: boolean) =>
+    setParams((prev) => {
+      const p = new URLSearchParams(prev);
+      if (open) p.set("new", "1");
+      else p.delete("new");
+      return p;
+    });
 
   const query = new URLSearchParams({
     limit: String(PAGE),

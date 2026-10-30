@@ -1,17 +1,63 @@
 {
+  "id": "/app",
   "name": "AI-Grain",
   "short_name": "AI-Grain",
-  "description": "Grain screening with a phone, a precise scale and Claude",
-  "start_url": "/",
+  "description": "Grain impurity screening with a phone, a precise scale and AI Model Orchestration",
+  "lang": "en",
+  "start_url": "/app?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#f6f4ee",
-  "theme_color": "#2f5d34",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#13201a",
+  "theme_color": "#13201a",
+  "categories": ["productivity", "business", "utilities"],
   "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New sample",
+      "url": "/app?new=1",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Samples",
+      "url": "/app",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Analytics",
+      "url": "/app/analytics",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }
