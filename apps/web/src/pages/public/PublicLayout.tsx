@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { LanguageSelect, useT } from "../../i18n";
+import { HeadSync } from "../../seo/HeadSync";
 import { m } from "./PublicLayout.i18n";
 
 export interface PublicSite {
@@ -98,6 +99,7 @@ export function PublicLayout() {
           </div>
         </nav>
       )}
+      <HeadSync />
       <main>
         <Outlet />
       </main>

@@ -27,6 +27,8 @@ COPY --from=build /app/apps/api/package.json ./apps/api/
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/drizzle ./apps/api/drizzle
 COPY --from=build /app/apps/web/dist ./apps/web/dist
+# Server rendering of the public pages (self-contained bundle).
+COPY --from=build /app/apps/web/dist-ssr ./apps/web/dist-ssr
 RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME /data

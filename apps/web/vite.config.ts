@@ -11,7 +11,8 @@ import { defineConfig, type Plugin } from "vite";
 function serviceWorker(): Plugin {
   return {
     name: "ai-grain-service-worker",
-    apply: "build",
+    // Client builds only, not the server-rendering bundle.
+    apply: (_config, env) => env.command === "build" && !env.isSsrBuild,
     enforce: "post",
     generateBundle(_options, bundle) {
       const files = Object.values(bundle)
@@ -51,11 +52,21 @@ function serviceWorker(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ isSsrBuild }) => ({
   plugins: [react(), serviceWorker()],
+  build: isSsrBuild
+    ? { copyPublicDir: false }
+    : {
+        // The server reads it to link the CSS of lazily loaded pages it renders.
+        manifest: true,
+      },
+  ssr: {
+    // The server bundle carries its dependencies: the API image has no web packages.
+    noExternal: true,
+  },
   server: {
     port: 5173,
     host: true,
     proxy: { "/api": "http://localhost:3000" },
   },
-});
+}));

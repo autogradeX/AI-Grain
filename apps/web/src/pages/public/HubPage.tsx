@@ -43,7 +43,8 @@ export interface ArticleItem {
   publishedAt: string | null;
 }
 
-const HUB_PAGE = 24;
+/** Articles per hub page; the server prefetches the same page. */
+export const HUB_PAGE = 24;
 
 export function HubPage() {
   const [params, setParams] = useSearchParams();
@@ -152,20 +153,41 @@ export function ArticlePage() {
   return (
     <div className="site-page">
       <section className="site-section narrow">
-        <Link to="/hub" className="muted small">
-          {t("back")}
-        </Link>
+        <nav aria-label={t("breadcrumb")} className="breadcrumb small">
+          <Link to="/">{t("home")}</Link>
+          <span aria-hidden>›</span>
+          <Link to="/hub">{t("hubCrumb")}</Link>
+          {a && (
+            <>
+              <span aria-hidden>›</span>
+              <span aria-current="page">{a.title}</span>
+            </>
+          )}
+        </nav>
         {article.isPending && <Spinner />}
         <ErrorNote error={article.error} />
         {a && (
           <article className="article">
             <span className="eyebrow">{kinds[a.kind]}</span>
             <h1>{a.title}</h1>
-            {a.summary && <p className="hero-lead">{a.summary}</p>}
+            {/* Short entries repeat the summary as their text: show it once. */}
+            {a.summary && !a.body.trim().startsWith(a.summary.trim()) && (
+              <p className="hero-lead">{a.summary}</p>
+            )}
             {/* Markdown without raw HTML: article text can't inject markup or scripts. */}
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{a.body}</ReactMarkdown>
             <p className="muted small">
-              {t("updated", { date: formatDate(a.updatedAt) })}
+              {a.publishedAt && (
+                <>
+                  <time dateTime={a.publishedAt}>
+                    {t("published", { date: formatDate(a.publishedAt) })}
+                  </time>
+                  {" · "}
+                </>
+              )}
+              <time dateTime={a.updatedAt}>
+                {t("updated", { date: formatDate(a.updatedAt) })}
+              </time>
             </p>
           </article>
         )}

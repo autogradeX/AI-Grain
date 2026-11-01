@@ -12,10 +12,13 @@ export const m = defineMessages({
   },
   all: { en: "All", hi: "सभी" },
   empty: { en: "Nothing here yet.", hi: "यहाँ अभी कुछ नहीं है।" },
-  back: { en: "← Knowledge hub", hi: "← ज्ञान केंद्र" },
   updated: { en: "Updated {date}", hi: "अपडेट: {date}" },
   contentNote: {
     en: "Articles are shown in the language they were written in.",
     hi: "लेख उसी भाषा में दिखाए जाते हैं जिसमें वे लिखे गए हैं।",
   },
+  breadcrumb: { en: "Breadcrumb", hi: "पथ" },
+  home: { en: "Home", hi: "होम" },
+  hubCrumb: { en: "Knowledge hub", hi: "ज्ञान केंद्र" },
+  published: { en: "Published {date}", hi: "प्रकाशित {date}" },
 });

@@ -1,4 +1,5 @@
 dist
+**/dist-ssr
 coverage
 package-lock.json
 apps/api/drizzle/meta

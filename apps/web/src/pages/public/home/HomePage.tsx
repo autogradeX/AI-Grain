@@ -22,7 +22,7 @@ import { countByKind, CUP_GROUPS, buildSample } from "./scene/layout";
 import type { GrainScene } from "./scene/GrainScene";
 import "./home.css";
 
-gsap.registerPlugin(ScrollTrigger);
+if (typeof window !== "undefined") gsap.registerPlugin(ScrollTrigger);
 
 const FEATURES = [
   ["feature1Title", "feature1Text"],
@@ -81,6 +81,8 @@ type Mode = "3d" | "still" | "flat";
 
 /** 3D with scroll animation; a still frame for reduced motion; no canvas without WebGL. */
 function detectMode(): Mode {
+  // Rendered on the server: every step as text, which crawlers can read.
+  if (typeof document === "undefined") return "flat";
   const canvas = document.createElement("canvas");
   const webgl = !!(canvas.getContext("webgl2") ?? canvas.getContext("webgl"));
   if (!webgl) return "flat";

@@ -42,6 +42,9 @@ export function locale(lang: Lang = current): string {
 }
 
 function initialLang(): Lang {
+  // Server rendering: pages are rendered in English, then the browser
+  // switches to the visitor's language.
+  if (typeof window === "undefined") return "en";
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === "en" || saved === "hi") return saved;

@@ -96,6 +96,8 @@ URL=$(gcloud run services describe ai-grain --region=$REGION --format='value(sta
 gcloud run services update ai-grain --region=$REGION --update-env-vars=APP_URL=$URL
 ```
 
+`APP_URL` is also the address search engines see: canonical URLs, `sitemap.xml`, `robots.txt` and link previews use it. When you move to your own domain, update it to that `https://` address, then submit `https://<your domain>/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
+
 Open the URL and create the first account: it becomes the admin of a new organisation. To stop strangers from signing up after that, set `ALLOW_SIGNUP=false` and add people by invite.
 
 ## Checking it

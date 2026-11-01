@@ -171,7 +171,7 @@ export class GrainScene {
   private progress = 0;
   private pointer = new THREE.Vector2();
   private pointerSmooth = new THREE.Vector2();
-  private clock = new THREE.Clock();
+  private timer = new THREE.Timer();
   private frameId = 0;
   private running = false;
   private aspect = 1;
@@ -198,7 +198,7 @@ export class GrainScene {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = quality.shadows;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.dustUniforms.uPixelRatio.value = quality.dpr;
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -475,13 +475,14 @@ export class GrainScene {
   start() {
     if (this.running) return;
     this.running = true;
-    this.clock.getDelta();
+    this.timer.reset();
     const loop = () => {
       if (!this.running) return;
       this.frameId = requestAnimationFrame(loop);
-      const dt = Math.min(this.clock.getDelta(), 0.05);
+      this.timer.update();
+      const dt = Math.min(this.timer.getDelta(), 0.05);
       this.progress += (this.target - this.progress) * (1 - Math.exp(-dt * 5));
-      this.render(this.progress, this.clock.elapsedTime);
+      this.render(this.progress, this.timer.getElapsed());
     };
     loop();
   }

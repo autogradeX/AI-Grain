@@ -1,14 +1,12 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import cookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
-import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyServerOptions } from "fastify";
 import { ZodError } from "zod";
 import type { AppContext } from "./context.js";
 import { HttpError } from "./lib/errors.js";
+import { INTERNAL_RENDER_TOKEN, registerWeb } from "./web/serve.js";
 import { analyticsRoutes } from "./modules/analytics/routes.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { batchRoutes } from "./modules/batches/routes.js";
@@ -56,10 +54,21 @@ export async function buildApp(
       fields: 20,
     },
   });
+  // Powerful browser features: the camera for board photos, nothing else.
+  app.addHook("onSend", async (_request, reply) => {
+    reply.header(
+      "permissions-policy",
+      "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
+    );
+  });
+
   await app.register(rateLimit, {
     global: true,
     max: 600,
     timeWindow: "1 minute",
+    // Reads made while server-rendering a page are part of that one request.
+    allowList: (request) =>
+      request.headers["x-internal-render"] === INTERNAL_RENDER_TOKEN,
   });
 
   app.setErrorHandler((error, request, reply) => {
@@ -117,50 +126,7 @@ export async function buildApp(
     { prefix: "/api" },
   );
 
-  // The built web app, with client-side routes falling back to index.html.
-  const webDir = ctx.config.WEB_DIST_DIR
-    ? resolve(ctx.config.WEB_DIST_DIR)
-    : null;
-  if (webDir && existsSync(webDir)) {
-    await app.register(fastifyStatic, {
-      root: webDir,
-      setHeaders: (res, path) => {
-        // @fastify/static 10 passes the Fastify reply here, though its types
-        // still describe a Node response; support both.
-        const target = res as unknown as {
-          header?: (name: string, value: string) => void;
-          setHeader?: (name: string, value: string) => void;
-        };
-        const set = (key: string, value: string) =>
-          target.header
-            ? target.header(key, value)
-            : target.setHeader?.(key, value);
-        const name = path.replace(/\\/g, "/");
-        if (name.endsWith("/sw.js") || name.endsWith("/index.html")) {
-          // Checked on every load, so a deploy reaches installed apps.
-          set("cache-control", "no-cache");
-        } else if (name.includes("/assets/")) {
-          // Hashed file names: a changed file gets a new name.
-          set("cache-control", "public, max-age=31536000, immutable");
-        }
-        if (name.endsWith(".webmanifest")) {
-          set("content-type", "application/manifest+json");
-        }
-      },
-    });
-    app.setNotFoundHandler((request, reply) => {
-      const path = request.url.split("?")[0] ?? "";
-      // App routes like /samples/123 get index.html; missing files and API paths get a real 404.
-      if (
-        request.method === "GET" &&
-        !path.startsWith("/api/") &&
-        !/\.[a-z0-9]+$/i.test(path)
-      ) {
-        return reply.header("cache-control", "no-cache").sendFile("index.html");
-      }
-      return reply.code(404).send({ error: "Not found" });
-    });
-  }
+  await registerWeb(app, ctx);
 
   return { app, ctx };
 }

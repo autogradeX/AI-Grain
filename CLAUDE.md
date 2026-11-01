@@ -18,5 +18,6 @@ Rules:
 - Public endpoints (`/api/public/...`) only expose data of the site-owner organisation that it chose to publish (demo samples, published articles, certificates).
 - User-facing text (UI, PDF, API messages, seeded content) calls the AI "Model Orchestration" and model choices Standard / Economy / Advanced (`i18n/models.ts`, `MODEL_TIERS` in `config.ts`). Never show Claude or other model names to users; code identifiers and env vars may keep them.
 - UI text goes in a sibling `<Module>.i18n.ts` (`defineMessages`, English and Hindi) read with `useT`; show class, group and crop names with `useGrainLabels()`.
+- Public pages are server-rendered by `apps/web/src/entry-server.tsx` (built to `dist-ssr`, served by `apps/api/src/web/serve.ts`). Public page components must render without browser APIs (guard `window`/`document`), and each public route needs an entry in `src/seo/meta.ts` and in the server route list.
 - The service worker (`apps/web/sw/service-worker.js`, filled in at build by `vite.config.ts`) caches only the app shell and static assets. Never cache `/api` responses: they hold org data behind sign-in.
 - Tests never call the real Claude API: use `FakeClassifier` from `apps/api/test/helpers.ts`, or inject `fetch` into `ClaudeClassifier`.

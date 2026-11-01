@@ -7,6 +7,7 @@ export default tseslint.config(
   {
     ignores: [
       "**/dist",
+      "**/dist-ssr",
       "**/coverage",
       "**/node_modules",
       "apps/api/drizzle",

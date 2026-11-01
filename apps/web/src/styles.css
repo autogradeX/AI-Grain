@@ -2569,3 +2569,19 @@ body:has(.app-view) .toast {
 .is-collapsed .sidebar button.side-link {
   justify-content: center;
 }
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+}
+
+.breadcrumb a {
+  color: var(--muted);
+}
+
+.breadcrumb [aria-current] {
+  color: var(--text);
+}
