@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { validateClasses } from "@ai-grain/core";
+import { cleanCropSuggestion } from "../src/ai/classifier.js";
 import { bearer, createTestApp, register, type TestApp } from "./helpers.js";
 
 let t: TestApp;
@@ -136,5 +138,85 @@ describe("crops and their classes", () => {
     expect(right.body.result.byGroupPct.broken_defective).toBeCloseTo(1);
     expect(right.body.result.byGroupPct.impurity).toBeCloseTo(0.5);
     expect(right.body.result.purityPct).toBeCloseTo(98.5);
+  });
+});
+
+describe("crop suggestions", () => {
+  it("suggests a crop's label and classes from its name, without saving", async () => {
+    const res = await api<{
+      key: string;
+      label: string;
+      classes: Crop["classes"];
+    }>("POST", "/api/crops/suggest", { name: "Rajma" });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      key: "rajma",
+      label: "Rajma (suggested)",
+    });
+    expect(res.body.classes.map((c) => c.id)).toEqual(["split", "stones"]);
+    const crops = await api<Crop[]>("GET", "/api/crops");
+    expect(crops.body.some((c) => c.key === "rajma")).toBe(false);
+    // The suggestion is what the admin then creates.
+    const created = await api<Crop>("POST", "/api/crops", res.body);
+    expect(created.status).toBe(201);
+    expect(created.body.classes).toHaveLength(2);
+  });
+
+  it("cleans up what the model answers", () => {
+    const s = cleanCropSuggestion(
+      {
+        label: "  ",
+        classes: [
+          {
+            label: "Split seeds",
+            group: "broken_defective",
+            description: "",
+            massFactor: 1,
+          },
+          {
+            label: "Split seeds",
+            group: "broken_defective",
+            description: "dupe",
+            massFactor: 1,
+          },
+          {
+            label: "Sound",
+            group: "broken_defective",
+            description: "",
+            massFactor: 1,
+          },
+          {
+            label: "Stones",
+            group: "impurity",
+            description: "grey",
+            massFactor: 40,
+          },
+          {
+            label: "2nd grade",
+            group: "broken_defective",
+            description: "",
+            massFactor: 1,
+          },
+        ],
+      },
+      "Moong",
+    );
+    expect(s.label).toBe("Moong");
+    expect(s.classes.map((c) => c.id)).toEqual([
+      "split_seeds",
+      "stones",
+      "c_2nd_grade",
+    ]);
+    expect(s.classes[1]!.massFactor).toBe(5);
+    expect(validateClasses(s.classes)).toEqual([]);
+  });
+
+  it("only lets admins ask", async () => {
+    const res = await t.app.inject({
+      method: "POST",
+      url: "/api/crops/suggest",
+      payload: { name: "Chana" },
+    });
+    expect(res.statusCode).toBe(401);
   });
 });

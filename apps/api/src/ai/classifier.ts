@@ -1,10 +1,18 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { kernelClassIds, type ClassDef } from "@ai-grain/core";
+import {
+  CLASS_GROUPS,
+  kernelClassIds,
+  SOUND,
+  slugifyClassId,
+  UNCLEAR,
+  type ClassDef,
+} from "@ai-grain/core";
 import { z } from "zod";
 import type { ClaudeModel } from "../config.js";
 import {
   CLASSIFY_SYSTEM,
+  CROP_SYSTEM,
   EXPERT_NOTE,
   SUMMARY_SYSTEM,
   classifyContext,
@@ -63,8 +71,18 @@ export interface SummaryRequest {
   facts: Record<string, unknown>;
 }
 
+export interface CropSuggestion {
+  label: string;
+  classes: ClassDef[];
+}
+
 export interface Classifier {
   classify(req: ClassifyRequest): Promise<ClassifyResult>;
+  /** A new crop's label and defect classes, from its name. */
+  suggestCrop(req: {
+    model: ClaudeModel;
+    name: string;
+  }): Promise<{ suggestion: CropSuggestion; usage: Usage }>;
   summarize(req: SummaryRequest): Promise<{ text: string; usage: Usage }>;
 }
 
@@ -254,6 +272,31 @@ export class ClaudeClassifier implements Classifier {
     };
   }
 
+  async suggestCrop(req: { model: ClaudeModel; name: string }) {
+    const message = await this.client.beta.messages.parse({
+      model: req.model,
+      max_tokens: 8000,
+      ...fallbackParams(req.model),
+      system: CROP_SYSTEM,
+      messages: [
+        {
+          role: "user",
+          content: `Commodity: ${req.name.trim().slice(0, 80)}`,
+        },
+      ],
+      output_config: { format: betaZodOutputFormat(cropSchema) },
+    });
+    checkStop(message);
+    if (!message.parsed_output)
+      throw new ClassifierError(
+        "The Model Orchestration answer was not valid JSON",
+      );
+    return {
+      suggestion: cleanCropSuggestion(message.parsed_output, req.name),
+      usage: usageOf(message.usage),
+    };
+  }
+
   async summarize(req: SummaryRequest) {
     const message = await this.client.beta.messages.create({
       model: req.model,
@@ -277,6 +320,51 @@ export class ClaudeClassifier implements Classifier {
   }
 }
 
+const cropSchema = z.object({
+  label: z.string(),
+  classes: z.array(
+    z.object({
+      label: z.string(),
+      group: z.enum(CLASS_GROUPS),
+      description: z.string(),
+      massFactor: z.number(),
+    }),
+  ),
+});
+
+/**
+ * Turns the model's answer into classes the crop editor accepts: ids from
+ * labels, no duplicates or reserved ids, mass factors in range. Throws when
+ * nothing usable is left.
+ */
+export function cleanCropSuggestion(
+  raw: z.infer<typeof cropSchema>,
+  name: string,
+): CropSuggestion {
+  const seen = new Set<string>([SOUND, UNCLEAR]);
+  const classes: ClassDef[] = [];
+  for (const c of raw.classes.slice(0, 30)) {
+    const label = c.label.trim().slice(0, 80);
+    if (!label) continue;
+    const id = slugifyClassId(label);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const factor = Number.isFinite(c.massFactor) ? c.massFactor : 1;
+    classes.push({
+      id,
+      label,
+      group: c.group,
+      description: c.description.trim().slice(0, 1000) || undefined,
+      massFactor: Math.round(Math.min(5, Math.max(0.05, factor)) * 100) / 100,
+    });
+  }
+  if (!classes.length)
+    throw new ClassifierError(
+      "Model Orchestration didn't suggest any usable classes",
+    );
+  return { label: raw.label.trim().slice(0, 80) || name.trim(), classes };
+}
+
 /** Used when no API key is configured: every call fails with a clear message. */
 export class UnconfiguredClassifier implements Classifier {
   classify(): Promise<never> {
@@ -288,6 +376,10 @@ export class UnconfiguredClassifier implements Classifier {
   }
 
   summarize(): Promise<never> {
+    return this.classify();
+  }
+
+  suggestCrop(): Promise<never> {
     return this.classify();
   }
 }

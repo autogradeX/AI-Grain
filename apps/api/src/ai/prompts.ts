@@ -48,6 +48,21 @@ Defect classes by group, with how this grader defines them. Use the id in quotes
 ${classLines(input.classes)}`;
 }
 
+/** System prompt for suggesting a new crop's defect classes. */
+export const CROP_SYSTEM = `You help a grain quality lab set up a new commodity (a cereal, pulse, oilseed, millet, spice seed or similar) in a photo-based screening tool.
+
+The tool photographs kernels or seeds one by one on a dark board, sorts each into "sound" or one defect class, and estimates mass percentages from each object's projected area. Classes fall into exactly four groups:
+- admixture: kernels of other cultivated grains or seeds mixed in.
+- broken_defective: damaged or substandard kernels of the commodity itself (broken, shrivelled, discoloured, insect-damaged, sprouted, immature, and so on).
+- impurity: foreign material that isn't grain: stones, soil, chaff, husks, stalks, weed seeds, dead insects.
+- harmful: toxic or diseased material that matters for food and feed safety.
+
+For the commodity named, give:
+- label: its usual English name; add a common alternative name in brackets when that helps, e.g. "Rajma (kidney beans)".
+- classes: 8 to 20 defect classes that graders of this commodity actually sort into, in the four groups. Don't include "sound" or "unclear"; the tool adds those. For each: a short label; a description of what it looks like in a top-down photo, so a vision model can recognise it (one or two sentences); and a massFactor: weight relative to a sound kernel of the same projected area (1 for most kernel defects, above 1 for stones and soil, below 1 for chaff, husks or hollow insect-damaged kernels).
+
+Use categories common in trade and national standards for this commodity, but no numeric limits: the lab sets those itself.`;
+
 export const SUMMARY_SYSTEM = `You write short grain screening reports for farm and intake staff. Use plain language and the numbers given; do not invent measurements. The method is a screening and pre-check tool, not official grading: say so once. Mention any limit the sample fails, which defects drove the result, and anything the operator should double-check. At most 180 words, no headings, no tables.`;
 
 /** The Level 1 prompt: for graders who use the Claude app directly with a whole-board photo. */

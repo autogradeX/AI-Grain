@@ -16,6 +16,41 @@ export const m = defineMessages({
     hi: "जैसे: ट्रिटिकेल, सूरजमुखी",
   },
   addCrop: { en: "Add crop", hi: "फ़सल जोड़ें" },
+  suggesting: {
+    en: "Model Orchestration is suggesting…",
+    hi: "मॉडल ऑर्केस्ट्रेशन सुझा रहा है…",
+  },
+  addCropAiHint: {
+    en: "Type the grain's name (any language, e.g. rajma, moong, sunflower). Model Orchestration suggests its name and defect classes with descriptions and mass factors; you review them next.",
+    hi: "अनाज का नाम लिखें (किसी भी भाषा में, जैसे राजमा, मूँग, सूरजमुखी)। मॉडल ऑर्केस्ट्रेशन उसका नाम और विवरण व भार-गुणक सहित दोष-वर्ग सुझाता है; आगे आप उन्हें जाँचते हैं।",
+  },
+  addPlain: {
+    en: "Add it with the general list instead",
+    hi: "इसके बजाय सामान्य सूची से जोड़ें",
+  },
+  suggestedNote: {
+    en: "Name and classes suggested by Model Orchestration. Check them, change anything that doesn't fit, and save.",
+    hi: "नाम और वर्ग मॉडल ऑर्केस्ट्रेशन ने सुझाए हैं। इन्हें जाँचें, जो ठीक न लगे उसे बदलें, और सहेजें।",
+  },
+  suggestClasses: { en: "Suggest classes", hi: "वर्ग सुझाएँ" },
+  offer: {
+    en: "Suggested for {label}: {count} classes",
+    hi: "{label} के लिए सुझाव: {count} वर्ग",
+  },
+  replaceList: { en: "Replace the list", hi: "सूची बदलें" },
+  addMissing_one: {
+    en: "Add the {count} missing class",
+    hi: "छूटा हुआ {count} वर्ग जोड़ें",
+  },
+  addMissing_other: {
+    en: "Add the {count} missing classes",
+    hi: "छूटे हुए {count} वर्ग जोड़ें",
+  },
+  discard: { en: "Discard", hi: "छोड़ें" },
+  offerHint: {
+    en: "Nothing changes until you save. Classes already used by samples or standards can't be removed.",
+    hi: "सहेजने तक कुछ नहीं बदलता। जिन वर्गों का उपयोग नमूने या मानक कर रहे हैं, उन्हें हटाया नहीं जा सकता।",
+  },
   addCropHint: {
     en: "It starts with the general cereal class list ({presets} have their own); edit it to fit.",
     hi: "यह अनाज की सामान्य वर्ग-सूची से शुरू होती है ({presets} की अपनी सूची है); ज़रूरत के हिसाब से बदलें।",

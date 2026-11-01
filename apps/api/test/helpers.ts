@@ -49,6 +49,36 @@ export class FakeClassifier implements Classifier {
     });
   }
 
+  suggestCrop(req: { name: string }) {
+    return Promise.resolve({
+      suggestion: {
+        label: `${req.name} (suggested)`,
+        classes: [
+          {
+            id: "split",
+            label: "Split",
+            group: "broken_defective" as const,
+            description: "Seed broken into its two halves.",
+            massFactor: 1,
+          },
+          {
+            id: "stones",
+            label: "Stones",
+            group: "impurity" as const,
+            description: "Mineral pieces.",
+            massFactor: 2,
+          },
+        ],
+      },
+      usage: {
+        inputTokens: 300,
+        outputTokens: 600,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+      },
+    });
+  }
+
   summarize(req: SummaryRequest) {
     this.summaries.push(req);
     return Promise.resolve({

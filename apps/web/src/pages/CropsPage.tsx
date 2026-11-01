@@ -8,10 +8,18 @@ import {
 } from "@ai-grain/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Sparkles } from "lucide-react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useCrops } from "../api/crops";
 import type { Crop } from "../api/types";
+
+/** What Model Orchestration suggests for a crop: nothing is saved until used. */
+interface CropSuggestion {
+  key: string;
+  label: string;
+  classes: ClassDef[];
+}
 import { useCan } from "../auth/AuthContext";
 import { Badge, Card, ErrorNote, Field, Spinner } from "../components/ui";
 import { useT } from "../i18n";
@@ -26,13 +34,24 @@ export function CropsPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [name, setName] = useState("");
+  const created = (crop: Crop, suggested: boolean) => {
+    void qc.invalidateQueries({ queryKey: ["crops"] });
+    void navigate(`/app/crops/${crop.key}`, { state: { suggested } });
+  };
+  // Model Orchestration fills in the name and classes; the editor opens to review them.
   const add = useMutation({
+    mutationFn: async () => {
+      const s = await api.post<CropSuggestion>("/crops/suggest", {
+        name: name.trim(),
+      });
+      return api.post<Crop>("/crops", s);
+    },
+    onSuccess: (crop) => created(crop, true),
+  });
+  const addPlain = useMutation({
     mutationFn: () =>
       api.post<Crop>("/crops", { key: name, label: name.trim() }),
-    onSuccess: (crop) => {
-      void qc.invalidateQueries({ queryKey: ["crops"] });
-      void navigate(`/app/crops/${crop.key}`);
-    },
+    onSuccess: (crop) => created(crop, false),
   });
 
   return (
@@ -82,19 +101,33 @@ export function CropsPage() {
             />
             <button
               className="primary"
-              disabled={add.isPending || !name.trim()}
+              disabled={add.isPending || addPlain.isPending || !name.trim()}
             >
-              {t("addCrop")}
+              <Sparkles size={16} aria-hidden />{" "}
+              {add.isPending ? t("suggesting") : t("addCrop")}
             </button>
           </form>
-          <p className="muted small">
-            {t("addCropHint", {
-              presets: Object.values(CROP_PRESETS)
-                .map((p) => cropLabel(p.label))
-                .join(", "),
-            })}
-          </p>
-          <ErrorNote error={add.error} />
+          <p className="muted small">{t("addCropAiHint")}</p>
+          <ErrorNote error={add.error ?? addPlain.error} />
+          {add.isError && (
+            <p className="small">
+              <button
+                type="button"
+                className="link"
+                disabled={addPlain.isPending}
+                onClick={() => addPlain.mutate()}
+              >
+                {t("addPlain")}
+              </button>{" "}
+              <span className="muted">
+                {t("addCropHint", {
+                  presets: Object.values(CROP_PRESETS)
+                    .map((p) => cropLabel(p.label))
+                    .join(", "),
+                })}
+              </span>
+            </p>
+          )}
         </Card>
       )}
     </div>
@@ -126,6 +159,24 @@ function CropForm({ crop }: { crop: Crop }) {
   const [label, setLabel] = useState(crop.label);
   const [rows, setRows] = useState<Row[]>(crop.classes);
   const [saved, setSaved] = useState(false);
+  const justSuggested =
+    (useLocation().state as { suggested?: boolean } | null)?.suggested ?? false;
+  const suggest = useMutation({
+    mutationFn: () =>
+      api.post<CropSuggestion>("/crops/suggest", { name: label || crop.key }),
+  });
+  const offer = suggest.data;
+  const missing =
+    offer?.classes.filter((c) => !rows.some((r) => r.id === c.id)) ?? [];
+  const applyOffer = (mode: "replace" | "add") => {
+    if (!offer) return;
+    setSaved(false);
+    if (mode === "replace") {
+      setLabel(offer.label);
+      setRows(offer.classes);
+    } else setRows([...rows, ...missing]);
+    suggest.reset();
+  };
 
   const classes: ClassDef[] = rows.map(({ isNew: _isNew, ...c }) => ({
     ...c,
@@ -171,7 +222,26 @@ function CropForm({ crop }: { crop: Crop }) {
         <h1>{cropLabel(crop.label)}</h1>
         <div className="muted small">{t("key", { key: crop.key })}</div>
       </div>
-      <Card title={t("crop")}>
+      {justSuggested && (
+        <p className="suggestion small">
+          <Sparkles size={16} aria-hidden /> {t("suggestedNote")}
+        </p>
+      )}
+      <Card
+        title={t("crop")}
+        actions={
+          !readOnly && (
+            <button
+              type="button"
+              disabled={suggest.isPending}
+              onClick={() => suggest.mutate()}
+            >
+              <Sparkles size={16} aria-hidden />{" "}
+              {suggest.isPending ? t("suggesting") : t("suggestClasses")}
+            </button>
+          )
+        }
+      >
         <Field label={t("name")}>
           <input
             disabled={readOnly}
@@ -179,6 +249,39 @@ function CropForm({ crop }: { crop: Crop }) {
             onChange={(e) => setLabel(e.target.value)}
           />
         </Field>
+        <ErrorNote error={suggest.error} />
+        {offer && (
+          <div className="stack-sm">
+            <p className="small">
+              {t("offer", { label: offer.label, count: offer.classes.length })}
+            </p>
+            <ul className="small offer-list">
+              {offer.classes.map((c) => (
+                <li key={c.id}>
+                  <strong>{c.label}</strong>{" "}
+                  <span className="muted">· {groupLabel(c.group)}</span>
+                  {c.description && (
+                    <div className="muted">{c.description}</div>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <div className="row wrap">
+              <button className="primary" onClick={() => applyOffer("replace")}>
+                {t("replaceList")}
+              </button>
+              {missing.length > 0 && (
+                <button onClick={() => applyOffer("add")}>
+                  {t.n("addMissing", missing.length)}
+                </button>
+              )}
+              <button className="link" onClick={() => suggest.reset()}>
+                {t("discard")}
+              </button>
+            </div>
+            <p className="muted small">{t("offerHint")}</p>
+          </div>
+        )}
       </Card>
       {CLASS_GROUPS.map((g) => (
         <Card

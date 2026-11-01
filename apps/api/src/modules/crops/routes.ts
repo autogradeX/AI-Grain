@@ -3,9 +3,11 @@ import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { AppContext } from "../../context.js";
+import { CLAUDE_MODELS, type ClaudeModel } from "../../config.js";
 import {
   crops,
   kernels,
+  organizations,
   referenceImages,
   samples,
   standards,
@@ -103,6 +105,37 @@ export function cropRoutes(ctx: AppContext) {
         .where(and(eq(crops.orgId, authOf(request).orgId), eq(crops.key, key)));
       if (!row) throw notFound("Crop");
       return row;
+    });
+
+    /**
+     * Model Orchestration suggests a crop's label and defect classes from its
+     * name. Nothing is saved: the admin reviews the suggestion first.
+     */
+    app.post("/crops/suggest", admin, async (request) => {
+      const me = authOf(request);
+      const { name } = z
+        .object({ name: z.string().trim().min(1).max(80) })
+        .parse(request.body);
+      const [org] = await ctx.db
+        .select({ model: organizations.defaultModel })
+        .from(organizations)
+        .where(eq(organizations.id, me.orgId));
+      const model = (CLAUDE_MODELS as readonly string[]).includes(
+        org?.model ?? "",
+      )
+        ? (org!.model as ClaudeModel)
+        : ctx.config.DEFAULT_MODEL;
+      try {
+        const { suggestion } = await ctx.classifier.suggestCrop({
+          model,
+          name,
+        });
+        return { key: normalizeCropKey(name), ...suggestion };
+      } catch (err) {
+        throw badRequest(
+          `Model Orchestration could not suggest classes: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     });
 
     /** Adds a crop. Without classes, it starts from its preset or the general cereal list. */

@@ -68,6 +68,44 @@ const request = {
 };
 
 describe("ClaudeClassifier", () => {
+  it("suggests a crop's classes with a schema and cleans the answer", async () => {
+    const captured: Captured[] = [];
+    const classifier = new ClaudeClassifier({
+      apiKey: "test-key",
+      fetch: fakeFetch(
+        captured,
+        message(
+          JSON.stringify({
+            label: "Rajma (kidney beans)",
+            classes: [
+              {
+                label: "Split",
+                group: "broken_defective",
+                description: "Cotyledons separated.",
+                massFactor: 1,
+              },
+              {
+                label: "Weevilled",
+                group: "broken_defective",
+                description: "Round exit holes.",
+                massFactor: 0.8,
+              },
+            ],
+          }),
+        ),
+      ),
+    });
+    const { suggestion } = await classifier.suggestCrop({
+      model: "claude-sonnet-5-5",
+      name: "rajma",
+    });
+    expect(suggestion.label).toBe("Rajma (kidney beans)");
+    expect(suggestion.classes.map((c) => c.id)).toEqual(["split", "weevilled"]);
+    const body = JSON.stringify(captured[0]!.body);
+    expect(body).toContain("Commodity: rajma");
+    expect(body).toContain("no numeric limits");
+  });
+
   it("asks for the side when it wasn't given, and passes expert notes", async () => {
     const captured: Captured[] = [];
     const classifier = new ClaudeClassifier({
