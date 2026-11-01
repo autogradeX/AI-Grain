@@ -4,12 +4,14 @@ import {
   desc,
   eq,
   inArray,
+  isNotNull,
   isNull,
   lt,
   or,
   sql,
   type SQL,
 } from "drizzle-orm";
+import { summarizeDimensions } from "@ai-grain/core";
 import type {
   ClassifierError,
   KernelVerdict,
@@ -32,6 +34,7 @@ import {
 import { straightenBoard } from "../../imaging/board.js";
 import { findGridCorners } from "../../imaging/corners.js";
 import { detectKernels } from "../../imaging/detect.js";
+import { boardGray, measureKernel } from "../../imaging/measure.js";
 import {
   boardPreview,
   buildSheet,
@@ -146,9 +149,14 @@ export async function processBatch(
         crops.get(k.number)!,
       ),
     );
+    // Length and breadth at full resolution; touching kernels aren't measured.
+    const gray = await boardGray(board);
     const rows: (typeof kernels.$inferInsert)[] = [];
     for (const k of detection.kernels) {
       const cropKey = `${prefix}/kernels/${k.number}.jpg`;
+      const size = k.isCluster
+        ? null
+        : measureKernel(gray, detection.threshold, k);
       rows.push({
         orgId: batch.orgId,
         sampleId: batch.sampleId,
@@ -161,6 +169,8 @@ export async function processBatch(
         area: k.area,
         cell: k.cell,
         isCluster: k.isCluster,
+        lengthMm: size?.lengthMm ?? null,
+        widthMm: size?.widthMm ?? null,
         cropKey,
       });
     }
@@ -461,6 +471,21 @@ export async function kernelSummary(
     ),
     ...progress!,
   };
+}
+
+/** Size of a sample's sound kernels (length, breadth, L/B), from the photos. */
+export async function dimensionsFor(ctx: AppContext, sampleId: string) {
+  const rows = await ctx.db
+    .select({ lengthMm: kernels.lengthMm, widthMm: kernels.widthMm })
+    .from(kernels)
+    .where(
+      and(
+        eq(kernels.sampleId, sampleId),
+        sql`${effectiveClass} = 'sound'`,
+        isNotNull(kernels.lengthMm),
+      ),
+    );
+  return summarizeDimensions(rows);
 }
 
 /** Batches still being processed in the background for a sample. */

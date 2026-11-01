@@ -6,6 +6,7 @@ import {
   Database,
   ExternalLink,
   Globe,
+  Plug,
   Images,
   LogOut,
   Menu,
@@ -42,6 +43,8 @@ import { useAuth, useCan } from "../auth/AuthContext";
 import { LanguageSelect, useT } from "../i18n";
 import { common } from "../i18n/common";
 import { InstallButton, OfflineBanner } from "../pwa/Pwa";
+import { OfflineQueueBanner } from "../offline/OfflineQueue";
+import { useOfflineSync } from "../offline/sync";
 import { usePhoneView } from "../pwa/pwa";
 import { m } from "./Layout.i18n";
 
@@ -84,6 +87,12 @@ const SECTIONS: { key: Key; items: Item[] }[] = [
     items: [
       { to: "/app/users", key: "users", icon: Users, show: "admin" },
       { to: "/app/website", key: "website", icon: Globe, show: "website" },
+      {
+        to: "/app/integrations",
+        key: "integrations",
+        icon: Plug,
+        show: "admin",
+      },
       { to: "/app/settings", key: "settings", icon: Settings },
     ],
   },
@@ -103,6 +112,7 @@ const ROUTES: [RegExp, Key, string?][] = [
   [/^\/app\/prompt/, "prompt"],
   [/^\/app\/users/, "users"],
   [/^\/app\/website/, "website"],
+  [/^\/app\/integrations/, "integrations"],
   [/^\/app\/settings/, "settings"],
 ];
 
@@ -314,6 +324,7 @@ function useDrawerFocus(
 export function Layout() {
   const t = useT(m);
   const { user } = useAuth();
+  useOfflineSync();
   const drawer = useIsDrawer();
   const [open, setOpen] = useState(false);
   const [collapsedPref, setCollapsed] = useState(initialCollapsed);
@@ -440,6 +451,7 @@ export function Layout() {
 
       <div className="app-main">
         <OfflineBanner />
+        <OfflineQueueBanner />
         {user && user.emailEnabled && !user.emailVerified && (
           <div className="banner">
             {t("confirmEmail", { email: user.email })}

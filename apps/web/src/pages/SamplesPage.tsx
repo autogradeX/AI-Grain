@@ -21,6 +21,8 @@ import {
 import { useT } from "../i18n";
 import { common, useGrainLabels } from "../i18n/common";
 import { m } from "./SamplesPage.i18n";
+import { enqueue, newRef } from "../offline/queue";
+import { isNetworkError } from "../offline/sync";
 import {
   StandardSuggestionNote,
   useStandardSuggestion,
@@ -202,15 +204,38 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
   const setStandardId = (id: string) => setPicked(id);
   const [source, setSource] = useState("");
   const [mass, setMass] = useState("");
+  // Without a connection the sample is saved on the device and uploaded later.
+  const saveOffline = async () => {
+    const ref = newRef();
+    await enqueue({
+      kind: "sample",
+      ref,
+      createdAt: new Date().toISOString(),
+      data: { crop, source: source || null, standardId: standardId || null },
+    });
+    return { offline: ref };
+  };
   const create = useMutation({
-    mutationFn: () =>
-      api.post<{ id: string }>("/samples", {
-        crop,
-        standardId: standardId || null,
-        source: source || null,
-        sampleMassG: mass ? Number(mass) : null,
-      }),
-    onSuccess: (s) => navigate(`/app/samples/${s.id}`),
+    mutationFn: async (): Promise<{ id: string } | { offline: string }> => {
+      if (!navigator.onLine) return saveOffline();
+      try {
+        return await api.post<{ id: string }>("/samples", {
+          crop,
+          standardId: standardId || null,
+          source: source || null,
+          sampleMassG: mass ? Number(mass) : null,
+        });
+      } catch (err) {
+        if (isNetworkError(err)) return saveOffline();
+        throw err;
+      }
+    },
+    onSuccess: (s) =>
+      navigate(
+        "offline" in s ? `/app/offline/${s.offline}` : `/app/samples/${s.id}`,
+      ),
+    // Runs offline too (TanStack Query would otherwise pause it): it saves on the device.
+    networkMode: "always",
   });
   const matching = standards.data?.filter((s) => s.crop === crop) ?? [];
 

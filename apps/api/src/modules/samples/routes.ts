@@ -1,4 +1,8 @@
-import { summarizePercentages, validateMeasurement } from "@ai-grain/core";
+import {
+  compareRuns,
+  summarizePercentages,
+  validateMeasurement,
+} from "@ai-grain/core";
 import {
   and,
   asc,
@@ -32,6 +36,7 @@ import {
 } from "../auth/guard.js";
 import {
   busyBatches,
+  dimensionsFor,
   expireStaleBatches,
   kernelSummary,
   modelFor,
@@ -39,7 +44,14 @@ import {
 import { ensureCrop, normalizeCropKey } from "../crops/service.js";
 import { withdrawCertificates } from "../certificates/service.js";
 import { getStandard } from "../standards/routes.js";
-import { estimateFor, gradeFor, loadSample, refreshResult } from "./service.js";
+import {
+  breakdownOf,
+  estimateFor,
+  gradeFor,
+  loadSample,
+  refreshResult,
+  type SampleRow,
+} from "./service.js";
 import { likePattern } from "../../lib/pagination.js";
 import {
   completeSample,
@@ -102,6 +114,38 @@ export function sampleRoutes(ctx: AppContext) {
         flaggedByReason: flagged,
         expertAsked: expert?.asked ?? 0,
         expertSettled: expert?.settled ?? 0,
+      };
+    }
+
+    /** This sample's run and the other runs of the same physical sample, with agreement. */
+    async function repeatInfo(sample: SampleRow) {
+      const firstId = sample.repeatOf ?? sample.id;
+      const runs = await ctx.db
+        .select()
+        .from(samples)
+        .where(
+          and(
+            eq(samples.orgId, sample.orgId),
+            or(eq(samples.id, firstId), eq(samples.repeatOf, firstId)),
+          ),
+        )
+        .orderBy(asc(samples.number));
+      if (runs.length < 2) return { runs: [] };
+      const mine = await breakdownOf(ctx, sample);
+      return {
+        runs: await Promise.all(
+          runs
+            .filter((r) => r.id !== sample.id)
+            .map(async (r) => {
+              const theirs = await breakdownOf(ctx, r);
+              return {
+                id: r.id,
+                number: r.number,
+                status: r.status,
+                comparison: mine && theirs ? compareRuns(mine, theirs) : null,
+              };
+            }),
+        ),
       };
     }
 
@@ -202,11 +246,52 @@ export function sampleRoutes(ctx: AppContext) {
       };
     });
 
+    /** Inserts a sample with the organisation's next number. */
+    async function insertSample(
+      orgId: string,
+      values: Omit<typeof samples.$inferInsert, "orgId" | "number">,
+    ) {
+      // Numbers are per organisation; retry if two samples are created at once.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const [row] = await ctx.db.transaction(async (tx) => {
+            const [max] = await tx
+              .select({
+                n: sql<number>`coalesce(max(${samples.number}), 0)::int`,
+              })
+              .from(samples)
+              .where(eq(samples.orgId, orgId));
+            return tx
+              .insert(samples)
+              .values({ ...values, orgId, number: (max?.n ?? 0) + 1 })
+              .returning();
+          });
+          return row!;
+        } catch (err) {
+          if (attempt >= 3) throw err;
+        }
+      }
+    }
+
     app.post("/samples", write, async (request, reply) => {
       const me = authOf(request);
       const body = SampleFields.extend({
         crop: z.string().trim().min(1).max(60).transform(normalizeCropKey),
+        // From a device that created the sample offline: sending it again returns the same sample.
+        clientRef: z.string().trim().min(8).max(64).optional(),
       }).parse(request.body);
+      if (body.clientRef) {
+        const [existing] = await ctx.db
+          .select()
+          .from(samples)
+          .where(
+            and(
+              eq(samples.orgId, me.orgId),
+              eq(samples.clientRef, body.clientRef),
+            ),
+          );
+        if (existing) return existing;
+      }
       // Creates the crop from its preset the first time it is used.
       await ensureCrop(ctx, me.orgId, body.crop);
       if (body.standardId) {
@@ -217,33 +302,35 @@ export function sampleRoutes(ctx: AppContext) {
             `That standard is for ${std.crop}, not ${body.crop}`,
           );
       }
-      // Numbers are per organisation; retry if two samples are created at once.
-      for (let attempt = 0; ; attempt++) {
-        try {
-          const [row] = await ctx.db.transaction(async (tx) => {
-            const [max] = await tx
-              .select({
-                n: sql<number>`coalesce(max(${samples.number}), 0)::int`,
-              })
-              .from(samples)
-              .where(eq(samples.orgId, me.orgId));
-            return tx
-              .insert(samples)
-              .values({
-                ...defined(body),
-                crop: body.crop,
-                orgId: me.orgId,
-                number: (max?.n ?? 0) + 1,
-                createdBy: me.id,
-              })
-              .returning();
-          });
-          reply.code(201);
-          return row;
-        } catch (err) {
-          if (attempt >= 3) throw err;
-        }
-      }
+      const row = await insertSample(me.orgId, {
+        ...defined(body),
+        crop: body.crop,
+        createdBy: me.id,
+      });
+      reply.code(201);
+      return row;
+    });
+
+    /**
+     * A second run of the same physical sample, to measure repeatability:
+     * same crop, standard, source and tier. Repeats of a repeat count against
+     * the first run.
+     */
+    app.post("/samples/:id/repeat", write, async (request, reply) => {
+      const me = authOf(request);
+      const { id } = z.object({ id: z.uuid() }).parse(request.params);
+      const original = await loadSample(ctx, me.orgId, id);
+      const row = await insertSample(me.orgId, {
+        crop: original.crop,
+        standardId: original.standardId,
+        source: original.source,
+        model: original.model,
+        notes: `Repeat run of sample #${original.number}`,
+        repeatOf: original.repeatOf ?? original.id,
+        createdBy: me.id,
+      });
+      reply.code(201);
+      return row;
     });
 
     app.get("/samples/:id", async (request) => {
@@ -309,6 +396,9 @@ export function sampleRoutes(ctx: AppContext) {
         batches: batchRows,
         kernels: summary,
         autopilot: await autopilotStatus(id, me.orgId),
+        repeat: await repeatInfo(sample),
+        // Saved at completion; live while the sample is open.
+        dimensions: sample.dimensions ?? (await dimensionsFor(ctx, id)),
         // No standard yet: the one this organisation most likely wants.
         suggestedStandard:
           !sample.standardId && sample.status === "in_progress"
@@ -422,6 +512,7 @@ export function sampleRoutes(ctx: AppContext) {
           status: "in_progress",
           completedAt: null,
           completedBy: null,
+          dimensions: null,
           // Reopened for changes: finishes again only when asked.
           autoFinish: false,
           // An estimate-based result is shown live again while the sample is open.

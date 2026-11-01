@@ -37,13 +37,21 @@ const measurement: Measurement = {
 };
 
 describe("crop presets", () => {
-  it("covers the five crops with valid class lists", () => {
+  it("covers the preset crops with valid class lists", () => {
     expect(Object.keys(CROP_PRESETS)).toEqual([
       "wheat",
       "barley",
       "oats",
       "rapeseed",
       "hemp",
+      "paddy",
+      "rice",
+      "maize",
+      "chana",
+      "tur",
+      "moong",
+      "soybean",
+      "mustard",
     ]);
     for (const preset of Object.values(CROP_PRESETS)) {
       expect(validateClasses(preset.classes)).toEqual([]);
@@ -230,5 +238,40 @@ describe("summarizeValidation", () => {
     expect(broken?.meanBiasPct).toBeCloseTo(-0.25);
     expect(broken?.meanAbsDiffPct).toBeCloseTo(0.75);
     expect(broken?.maxAbsDiffPct).toBeCloseTo(1);
+  });
+});
+
+describe("repeatability", () => {
+  it("measures how much of the mass two runs put in the same class", async () => {
+    const { compareRuns, repeatabilityBand } = await import("../src/index.js");
+    const same = compareRuns(
+      { byClass: { broken: 2, stones: 1 }, purityPct: 97 },
+      { byClass: { broken: 2, stones: 1 }, purityPct: 97 },
+    );
+    expect(same).toMatchObject({ agreementPct: 100, maxDiffPct: 0 });
+    // 1 point of mass moved from sound to broken: 99 % agreement.
+    const close = compareRuns(
+      { byClass: { broken: 2 }, purityPct: 98 },
+      { byClass: { broken: 3 }, purityPct: 97 },
+    );
+    expect(close).toMatchObject({
+      agreementPct: 99,
+      maxDiffPct: 1,
+      purityDiffPct: 1,
+    });
+    expect(repeatabilityBand(close.agreementPct)).toBe("99+");
+    expect(repeatabilityBand(96)).toBe("95-97");
+    expect(repeatabilityBand(90)).toBe("below95");
+  });
+});
+
+describe("preset names", () => {
+  it("finds a preset by its key or a local name", async () => {
+    const { presetKeyFor } = await import("../src/index.js");
+    expect(presetKeyFor("Paddy")).toBe("paddy");
+    expect(presetKeyFor("dhan")).toBe("paddy");
+    expect(presetKeyFor("धान")).toBe("paddy");
+    expect(presetKeyFor("Arhar")).toBe("tur");
+    expect(presetKeyFor("rajma")).toBeNull();
   });
 });

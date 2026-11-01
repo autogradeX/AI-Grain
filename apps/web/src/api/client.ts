@@ -188,3 +188,31 @@ export async function openFile(path: string) {
   else window.location.href = url;
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+
+/**
+ * Prints a protected PDF (a report or a thermal slip) with the browser's
+ * print dialog, through a hidden frame. Falls back to opening it in a tab.
+ */
+export async function printFile(path: string) {
+  const blob = await api.blob(path);
+  const url = URL.createObjectURL(blob);
+  const frame = document.createElement("iframe");
+  frame.style.position = "fixed";
+  frame.style.width = "0";
+  frame.style.height = "0";
+  frame.style.border = "0";
+  frame.src = url;
+  frame.onload = () => {
+    try {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+    } catch {
+      window.open(url, "_blank");
+    }
+    setTimeout(() => {
+      frame.remove();
+      URL.revokeObjectURL(url);
+    }, 60_000);
+  };
+  document.body.appendChild(frame);
+}

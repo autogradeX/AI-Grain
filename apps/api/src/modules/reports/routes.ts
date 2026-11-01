@@ -17,8 +17,11 @@ export function reportRoutes(ctx: AppContext) {
     app.get("/samples/:id/report.pdf", async (request, reply) => {
       const me = authOf(request);
       const { id } = z.object({ id: z.uuid() }).parse(request.params);
+      const { format } = z
+        .object({ format: z.enum(["a4", "slip"]).default("a4") })
+        .parse(request.query);
       const sample = await loadSample(ctx, me.orgId, id);
-      const pdf = await reportPdf(ctx, sample);
+      const pdf = await reportPdf(ctx, sample, format);
       reply
         .type("application/pdf")
         .header(
@@ -71,6 +74,9 @@ export function reportRoutes(ctx: AppContext) {
         "sample_mass_g",
         "moisture_pct",
         "test_weight_kg_hl",
+        "mean_length_mm",
+        "mean_breadth_mm",
+        "length_breadth_ratio",
         "purity_pct",
         "total_defects_pct",
         ...CLASS_GROUPS.map((g) => `${g}_pct`),
@@ -97,6 +103,9 @@ export function reportRoutes(ctx: AppContext) {
             s.sampleMassG,
             s.moisturePct,
             s.testWeightKgPerHl,
+            s.dimensions?.meanLengthMm,
+            s.dimensions?.meanBreadthMm,
+            s.dimensions?.meanLb,
             pct ? roundPct(pct.purityPct, 3) : null,
             pct ? roundPct(pct.totalDefectsPct, 3) : null,
             ...CLASS_GROUPS.map((g) =>

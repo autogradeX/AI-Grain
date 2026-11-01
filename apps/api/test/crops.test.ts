@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { validateClasses } from "@ai-grain/core";
+import { validateClasses, type ClassDef } from "@ai-grain/core";
 import { cleanCropSuggestion } from "../src/ai/classifier.js";
 import { bearer, createTestApp, register, type TestApp } from "./helpers.js";
 
@@ -35,15 +35,38 @@ interface Crop {
 }
 
 describe("crops and their classes", () => {
-  it("starts every organisation with the five preset crops", async () => {
+  it("starts every organisation with the preset crops", async () => {
     const res = await api<Crop[]>("GET", "/api/crops");
     expect(res.body.map((c) => c.key).sort()).toEqual([
       "barley",
+      "chana",
       "hemp",
+      "maize",
+      "moong",
+      "mustard",
       "oats",
+      "paddy",
       "rapeseed",
+      "rice",
+      "soybean",
+      "tur",
       "wheat",
     ]);
+    const paddy = res.body.find((c) => c.key === "paddy")!;
+    expect(paddy.classes.map((c) => c.id)).toEqual(
+      expect.arrayContaining(["lower_class", "damaged", "immature", "stones"]),
+    );
+    const rice = res.body.find((c) => c.key === "rice")!;
+    expect(rice.classes.map((c) => c.id)).toEqual(
+      expect.arrayContaining([
+        "chalky",
+        "red_grains",
+        "broken",
+        "paddy_grains",
+      ]),
+    );
+    for (const c of res.body)
+      expect(validateClasses(c.classes as ClassDef[])).toEqual([]);
     const rapeseed = res.body.find((c) => c.key === "rapeseed")!;
     expect(rapeseed.classes.map((c) => c.id)).toContain("green");
   });
@@ -160,6 +183,19 @@ describe("crop suggestions", () => {
     const created = await api<Crop>("POST", "/api/crops", res.body);
     expect(created.status).toBe(201);
     expect(created.body.classes).toHaveLength(2);
+  });
+
+  it("uses the preset for a known crop or local name, without asking the model", async () => {
+    const res = await api<{ key: string; label: string; preset: boolean }>(
+      "POST",
+      "/api/crops/suggest",
+      { name: "Dhan" },
+    );
+    expect(res.body).toMatchObject({
+      key: "paddy",
+      label: "Paddy",
+      preset: true,
+    });
   });
 
   it("cleans up what the model answers", () => {

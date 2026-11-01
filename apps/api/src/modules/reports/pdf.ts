@@ -6,14 +6,18 @@ import {
   summarizePercentages,
   type ClassDef,
   type ClassGroup,
+  type DimensionSummary,
   type GradeSpec,
   type LimitFailure,
 } from "@ai-grain/core";
 import PDFDocument from "pdfkit";
+import type { ReportSettings } from "../../db/schema.js";
 import type { SampleRow } from "../samples/service.js";
 import { modelTier } from "../../config.js";
 
 export interface ReportData {
+  /** The organisation's report layout (Settings → Report layout). */
+  layout: ReportSettings;
   orgName: string;
   sample: SampleRow;
   cropLabel: string;
@@ -49,6 +53,7 @@ export interface ReportData {
     reviewed: boolean;
   }[];
   galleryTotal: number;
+  dimensions: DimensionSummary | null;
 }
 
 const fmt = (n: number | null | undefined, digits = 2) =>
@@ -73,9 +78,13 @@ function limitText(f: LimitFailure, classes: readonly ClassDef[]): string {
 
 export function renderReport(data: ReportData): Promise<Buffer> {
   const { sample, standard } = data;
+  const layout = data.layout;
+  const show = (flag: boolean | undefined) => flag !== false;
   const doc = new PDFDocument({
     size: "A4",
     margin: 48,
+    // Pages stay open so the footer and page numbers go on at the end.
+    bufferPages: true,
     info: { Title: `Sample #${sample.number}` },
   });
   const chunks: Buffer[] = [];
@@ -135,9 +144,20 @@ export function renderReport(data: ReportData): Promise<Buffer> {
   doc
     .font("Helvetica-Bold")
     .fontSize(18)
-    .text(`Grain screening report: sample #${sample.number}`, left, top, {
-      width: headW,
-    });
+    .text(
+      `${layout.title?.trim() || "Grain screening report"}: sample #${sample.number}`,
+      left,
+      top,
+      { width: headW },
+    );
+  if (layout.header?.trim()) {
+    doc
+      .moveDown(0.2)
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor("#333")
+      .text(layout.header.trim(), { width: headW });
+  }
   doc.moveDown(0.3).font("Helvetica").fontSize(10).fillColor("#555");
   doc.text(
     `${data.orgName} · ${data.cropLabel}${sample.source ? ` · ${sample.source}` : ""} · ${
@@ -199,6 +219,13 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     `${data.kernels.total} (${data.kernels.flagged} flagged, ${data.kernels.reviewed} checked by the operator)`,
   );
   line("Model Orchestration", modelTier(data.model));
+  const dims = data.dimensions;
+  if (dims && show(layout.showDimensions)) {
+    line(
+      "Kernel size (sound kernels)",
+      `length ${fmt(dims.meanLengthMm)} mm · breadth ${fmt(dims.meanBreadthMm)} mm · L/B ${fmt(dims.meanLb)} (${dims.kernels} measured)`,
+    );
+  }
 
   doc.moveDown(1);
   const grade = sample.result?.grade.grade;
@@ -322,7 +349,7 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     }
   }
 
-  if (sample.aiSummary) {
+  if (sample.aiSummary && show(layout.showSummary)) {
     doc
       .moveDown(0.8)
       .font("Helvetica-Bold")
@@ -331,7 +358,32 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     doc.font("Helvetica").fontSize(9.5).text(sample.aiSummary, { width });
   }
 
-  if (data.boards.length) {
+  const signatures = (layout.signatures ?? []).filter((x) => x.trim());
+  if (signatures.length) {
+    doc.moveDown(2);
+    const slot = width / signatures.length;
+    let sy = doc.y + 24;
+    if (sy > doc.page.height - doc.page.margins.bottom - 40) {
+      doc.addPage();
+      sy = doc.page.margins.top + 24;
+    }
+    signatures.forEach((who, i) => {
+      const sx = left + i * slot;
+      doc
+        .moveTo(sx, sy)
+        .lineTo(sx + slot - 24, sy)
+        .strokeColor("#333")
+        .stroke();
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .fillColor("#000")
+        .text(who, sx, sy + 4, { width: slot - 24 });
+    });
+    doc.x = left;
+  }
+
+  if (data.boards.length && show(layout.showBoards)) {
     doc.addPage();
     doc
       .font("Helvetica-Bold")
@@ -357,7 +409,7 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     });
   }
 
-  if (data.gallery.length) {
+  if (data.gallery.length && show(layout.showGallery)) {
     doc.addPage();
     doc
       .font("Helvetica-Bold")
@@ -424,6 +476,177 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     });
   }
 
+  // Footer and page numbers on every page.
+  const pages = doc.bufferedPageRange();
+  for (let i = 0; i < pages.count; i++) {
+    doc.switchToPage(pages.start + i);
+    const fy = doc.page.height - doc.page.margins.bottom + 16;
+    doc.font("Helvetica").fontSize(7).fillColor("#666");
+    if (layout.footer?.trim()) {
+      doc.text(layout.footer.trim(), left, fy, {
+        width: width - 60,
+        lineBreak: false,
+      });
+    }
+    doc.text(`Page ${i + 1} of ${pages.count}`, left + width - 60, fy, {
+      width: 60,
+      align: "right",
+      lineBreak: false,
+    });
+  }
+  doc.end();
+  return done;
+}
+
+/** 80 mm thermal printers: about 72 mm printable. */
+const SLIP_WIDTH = 204;
+
+/**
+ * A short result slip for 80 mm receipt printers at the intake desk: result,
+ * groups, moisture, kernel size, certificate code and QR, signature line.
+ */
+export function renderSlip(data: ReportData): Promise<Buffer> {
+  const { sample, standard } = data;
+  const doc = new PDFDocument({
+    size: [SLIP_WIDTH + 16, 640],
+    margins: { top: 10, bottom: 10, left: 8, right: 8 },
+    info: { Title: `Sample #${sample.number} slip` },
+  });
+  const chunks: Buffer[] = [];
+  doc.on("data", (c: Buffer) => chunks.push(c));
+  const done = new Promise<Buffer>((resolve, reject) => {
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+  const w = SLIP_WIDTH;
+  const rule = () => {
+    doc.moveDown(0.3);
+    doc
+      .moveTo(8, doc.y)
+      .lineTo(8 + w, doc.y)
+      .dash(2, { space: 2 })
+      .strokeColor("#000")
+      .stroke()
+      .undash();
+    doc.moveDown(0.4);
+  };
+  const pair = (label: string, value: string) => {
+    const y = doc.y;
+    doc
+      .font("Helvetica")
+      .fontSize(8)
+      .text(label, 8, y, { width: w * 0.55 });
+    doc
+      .font("Helvetica-Bold")
+      .text(value, 8 + w * 0.55, y, { width: w * 0.45, align: "right" });
+    doc.x = 8;
+  };
+  const center = { width: w, align: "center" as const };
+  doc.font("Helvetica-Bold").fontSize(11).text(data.orgName, center);
+  if (data.layout.header?.trim())
+    doc.font("Helvetica").fontSize(7).text(data.layout.header.trim(), center);
+  doc
+    .font("Helvetica")
+    .fontSize(8)
+    .text(data.layout.title?.trim() || "Grain screening result", center);
+  rule();
+  pair("Sample", `#${sample.number}`);
+  pair("Crop", data.cropLabel);
+  if (sample.source) pair("Lot", sample.source);
+  pair(
+    "Date",
+    (sample.completedAt ?? sample.createdAt)
+      .toISOString()
+      .slice(0, 16)
+      .replace("T", " "),
+  );
+  pair("Standard", standard?.name ?? "none");
+  rule();
+  const pct = sample.result
+    ? summarizePercentages(sample.result.byClassPct, data.classes)
+    : null;
+  const grade = sample.result?.grade.grade;
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(13)
+    .text(
+      sample.result
+        ? grade
+          ? `Grade ${grade}`
+          : standard
+            ? "Below all grades"
+            : "No standard"
+        : "No result yet",
+      center,
+    );
+  if (pct) {
+    doc.moveDown(0.3);
+    pair("Purity", `${fmt(pct.purityPct)} %`);
+    pair("Total defects", `${fmt(pct.totalDefectsPct)} %`);
+    for (const g of CLASS_GROUPS)
+      if (data.classes.some((c) => c.group === g))
+        pair(GROUP_LABELS[g], `${fmt(roundPct(pct.byGroup[g]))} %`);
+    const top = Object.entries(pct.byClass)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+    if (top.length) {
+      doc.moveDown(0.2);
+      for (const [id, v] of top)
+        pair(`  ${classLabel(data.classes, id)}`, `${fmt(roundPct(v))} %`);
+    }
+    doc
+      .font("Helvetica")
+      .fontSize(6.5)
+      .text(
+        sample.result?.source === "estimate"
+          ? "Estimated from the photos, not weighed."
+          : "Weighed on the scale.",
+        center,
+      );
+  }
+  rule();
+  if (sample.moisturePct !== null)
+    pair("Moisture", `${fmt(sample.moisturePct, 1)} %`);
+  if (sample.testWeightKgPerHl !== null)
+    pair("Test weight", `${fmt(sample.testWeightKgPerHl, 1)} kg/hl`);
+  if (data.dimensions) {
+    pair("Length", `${fmt(data.dimensions.meanLengthMm)} mm`);
+    pair("Breadth", `${fmt(data.dimensions.meanBreadthMm)} mm`);
+    pair("L/B", fmt(data.dimensions.meanLb));
+  }
+  pair("Kernels", String(data.kernels.total));
+  const cert = data.certificate;
+  if (cert) {
+    rule();
+    const size = 90;
+    doc.image(cert.qr, 8 + (w - size) / 2, doc.y, { width: size });
+    doc.y += size + 4;
+    doc.font("Helvetica-Bold").fontSize(9).text(cert.code, 8, doc.y, center);
+    doc.font("Helvetica").fontSize(6).text(cert.url, center);
+  } else {
+    doc
+      .moveDown(0.4)
+      .font("Helvetica-Bold")
+      .fontSize(9)
+      .text("DRAFT: not completed", center);
+  }
+  const signatures = (data.layout.signatures ?? []).filter((x) => x.trim());
+  for (const who of signatures.length ? signatures : ["Assayer"]) {
+    doc.moveDown(1.6);
+    doc
+      .moveTo(30, doc.y)
+      .lineTo(8 + w - 22, doc.y)
+      .stroke();
+    doc
+      .font("Helvetica")
+      .fontSize(7)
+      .text(who, 8, doc.y + 2, center);
+  }
+  if (data.layout.footer?.trim()) {
+    doc.moveDown(0.8);
+    doc.font("Helvetica").fontSize(6).text(data.layout.footer.trim(), center);
+  }
   doc.end();
   return done;
 }

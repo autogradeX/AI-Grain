@@ -155,6 +155,51 @@ describe("verified reports", () => {
     expect(pdf.statusCode).toBe(200);
     expect(pdf.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
   });
+
+  it("prints a thermal slip and follows the organisation's report layout", async () => {
+    const get = (format: string) =>
+      t.app.inject({
+        method: "GET",
+        url: `/api/samples/${sampleId}/report.pdf?format=${format}`,
+        headers: bearer(token),
+      });
+    const slip = await get("slip");
+    expect(slip.statusCode).toBe(200);
+    expect(slip.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
+    // 80 mm wide: the page is about 220 points across.
+    expect(slip.rawPayload.toString("latin1")).toMatch(
+      /\/MediaBox \[0 0 220 640\]/,
+    );
+
+    const before = await get("a4");
+    const saved = await t.app.inject({
+      method: "PATCH",
+      url: "/api/org",
+      headers: bearer(token),
+      payload: {
+        report: {
+          title: "APMC Raipur assaying report",
+          header: "Krishi Upaj Mandi Samiti, Raipur",
+          signatures: ["Assayer", "Mandi Secretary"],
+          showGallery: false,
+        },
+      },
+    });
+    expect(saved.statusCode).toBe(200);
+    const org = await t.app.inject({
+      method: "GET",
+      url: "/api/org",
+      headers: bearer(token),
+    });
+    expect(org.json<{ report: object }>().report).toMatchObject({
+      title: "APMC Raipur assaying report",
+      signatures: ["Assayer", "Mandi Secretary"],
+    });
+    // A new layout gives a new report, not the stored one.
+    const after = await get("a4");
+    expect(after.statusCode).toBe(200);
+    expect(after.rawPayload.equals(before.rawPayload)).toBe(false);
+  });
 });
 
 describe("certificate helpers", () => {

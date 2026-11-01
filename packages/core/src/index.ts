@@ -11,7 +11,7 @@ export {
   validateClasses,
 } from "./classes.js";
 export type { ClassDef, ClassGroup, CropProfile } from "./classes.js";
-export { CROP_PRESETS, presetFor } from "./presets.js";
+export { CROP_PRESETS, presetFor, presetKeyFor } from "./presets.js";
 export {
   massPercentages,
   roundPct,
@@ -37,3 +37,11 @@ export { apply as applyHomography, homography } from "./homography.js";
 export type { Homography, Pt } from "./homography.js";
 export { estimateFromObjects } from "./estimate.js";
 export type { EstimateObject, MassEstimate } from "./estimate.js";
+export { summarizeDimensions, type DimensionSummary } from "./dimensions.js";
+export {
+  compareRuns,
+  repeatabilityBand,
+  type RepeatabilityBand,
+  type RunBreakdown,
+  type RunComparison,
+} from "./repeatability.js";

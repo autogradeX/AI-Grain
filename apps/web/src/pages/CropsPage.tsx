@@ -19,6 +19,8 @@ interface CropSuggestion {
   key: string;
   label: string;
   classes: ClassDef[];
+  /** A ready-made preset, not a suggestion. */
+  preset?: boolean;
 }
 import { useCan } from "../auth/AuthContext";
 import { Badge, Card, ErrorNote, Field, Spinner } from "../components/ui";
@@ -44,9 +46,18 @@ export function CropsPage() {
       const s = await api.post<CropSuggestion>("/crops/suggest", {
         name: name.trim(),
       });
-      return api.post<Crop>("/crops", s);
+      const crop = await api.post<Crop>("/crops", s);
+      return { crop, suggested: !s.preset };
     },
-    onSuccess: (crop) => created(crop, true),
+    onSuccess: ({ crop, suggested }) => created(crop, suggested),
+  });
+  // Ready-made crops this organisation doesn't have (yet, or any more).
+  const missingPresets = Object.values(CROP_PRESETS).filter(
+    (p) => crops.data && !crops.data.some((c) => c.key === p.key),
+  );
+  const addPreset = useMutation({
+    mutationFn: (key: string) => api.post<Crop>("/crops", { key }),
+    onSuccess: (crop) => created(crop, false),
   });
   const remove = useMutation({
     mutationFn: (key: string) => api.delete(`/crops/${key}`),
@@ -128,6 +139,22 @@ export function CropsPage() {
             </button>
           </form>
           <p className="muted small">{t("addCropAiHint")}</p>
+          {missingPresets.length > 0 && (
+            <div className="row wrap small">
+              <span className="muted">{t("readyMade")}</span>
+              {missingPresets.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  disabled={addPreset.isPending}
+                  onClick={() => addPreset.mutate(p.key)}
+                >
+                  + {cropLabel(p.label)}
+                </button>
+              ))}
+            </div>
+          )}
+          <ErrorNote error={addPreset.error} />
           <ErrorNote error={add.error ?? addPlain.error} />
           {add.isError && (
             <p className="small">

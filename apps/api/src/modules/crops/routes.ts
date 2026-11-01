@@ -1,4 +1,10 @@
-import { CLASS_GROUPS, validateClasses, type ClassDef } from "@ai-grain/core";
+import {
+  CLASS_GROUPS,
+  presetFor,
+  presetKeyFor,
+  validateClasses,
+  type ClassDef,
+} from "@ai-grain/core";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -116,6 +122,17 @@ export function cropRoutes(ctx: AppContext) {
       const { name } = z
         .object({ name: z.string().trim().min(1).max(80) })
         .parse(request.body);
+      // A crop with a preset (by name or local name, e.g. "dhan"): use it.
+      const presetKey = presetKeyFor(name);
+      if (presetKey) {
+        const preset = presetFor(presetKey);
+        return {
+          key: preset.key,
+          label: preset.label,
+          classes: preset.classes,
+          preset: true,
+        };
+      }
       const [org] = await ctx.db
         .select({ model: organizations.defaultModel })
         .from(organizations)

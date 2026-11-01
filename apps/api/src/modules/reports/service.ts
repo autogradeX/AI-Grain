@@ -3,7 +3,13 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import QRCode from "qrcode";
 import sharp from "sharp";
 import type { AppContext } from "../../context.js";
-import { batches, kernels, organizations, users } from "../../db/schema.js";
+import {
+  batches,
+  kernels,
+  organizations,
+  users,
+  type ReportSettings,
+} from "../../db/schema.js";
 import { BOARD_WIDTH } from "../../imaging/board.js";
 import { annotateBoard, cropKernels } from "../../imaging/sheets.js";
 import { mapLimit } from "../../lib/jobs.js";
@@ -11,6 +17,7 @@ import {
   aiVerdict,
   aiVerdictConfidence,
   batchPrefix,
+  dimensionsFor,
   effectiveClass,
   kernelSummary,
   modelFor,
@@ -19,7 +26,7 @@ import { currentCertificate } from "../certificates/service.js";
 import { ensureCrop } from "../crops/service.js";
 import { loadSample, type SampleRow } from "../samples/service.js";
 import { getStandard } from "../standards/routes.js";
-import { renderReport } from "./pdf.js";
+import { renderReport, renderSlip } from "./pdf.js";
 
 /** Gallery pages show at most this many kernels. */
 const GALLERY_MAX = 240;
@@ -35,6 +42,8 @@ const samplePrefix = (s: { orgId: string; id: string }) =>
 function cacheKey(
   sample: SampleRow,
   cert: { code: string; version: number },
+  format: ReportFormat,
+  layout: ReportSettings,
 ): string {
   const hash = createHash("sha256")
     .update(
@@ -44,12 +53,16 @@ function cacheKey(
         sample.aiSummary,
         sample.updatedAt.toISOString(),
         sample.completedAt?.toISOString() ?? null,
+        layout,
       ]),
     )
     .digest("hex")
     .slice(0, 16);
-  return `${samplePrefix(sample)}/reports/${hash}.pdf`;
+  return `${samplePrefix(sample)}/reports/${format}-${hash}.pdf`;
 }
+
+/** "a4": the full report. "slip": an 80 mm receipt for thermal printers. */
+export type ReportFormat = "a4" | "slip";
 
 /**
  * The sample's PDF report. A completed sample's report is built once and
@@ -59,20 +72,27 @@ function cacheKey(
 export async function reportPdf(
   ctx: AppContext,
   sample: SampleRow,
+  format: ReportFormat = "a4",
 ): Promise<Buffer> {
+  const [org] = await ctx.db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, sample.orgId));
+  const layout = org?.report ?? {};
   const cert =
     sample.status === "completed"
       ? await currentCertificate(ctx, sample.id)
       : null;
-  if (!cert) return buildReport(ctx, sample, null);
-  const key = cacheKey(sample, cert);
+  if (!cert) return buildReport(ctx, sample, null, format, org);
+  const key = cacheKey(sample, cert, format, layout);
   try {
     return await ctx.storage.get(key);
   } catch {
     // Not built yet.
   }
-  const pdf = await buildReport(ctx, sample, cert);
-  // Older versions of this sample's report are of no further use.
+  const pdf = await buildReport(ctx, sample, cert, format, org);
+  // Older reports of this sample are of no further use (the other format is
+  // rebuilt the next time it is asked for).
   await ctx.storage.remove(`${samplePrefix(sample)}/reports`);
   await ctx.storage.put(key, pdf);
   return pdf;
@@ -92,12 +112,10 @@ async function buildReport(
   ctx: AppContext,
   sample: SampleRow,
   cert: Awaited<ReturnType<typeof currentCertificate>> | null,
+  format: ReportFormat,
+  org: typeof organizations.$inferSelect | undefined,
 ): Promise<Buffer> {
   const id = sample.id;
-  const [org] = await ctx.db
-    .select()
-    .from(organizations)
-    .where(eq(organizations.id, sample.orgId));
   const standard = sample.standardId
     ? await getStandard(ctx, sample.orgId, sample.standardId)
     : null;
@@ -113,32 +131,39 @@ async function buildReport(
   const nameOf = (uid: string | null) =>
     names.find((n) => n.id === uid)?.name ?? null;
 
-  const batchRows = await ctx.db
-    .select()
-    .from(batches)
-    .where(eq(batches.sampleId, id))
-    .orderBy(asc(batches.createdAt));
+  // The slip has no pictures.
+  const batchRows =
+    format === "slip"
+      ? []
+      : await ctx.db
+          .select()
+          .from(batches)
+          .where(eq(batches.sampleId, id))
+          .orderBy(asc(batches.createdAt));
   const batchIndex = new Map(batchRows.map((b, i) => [b.id, i + 1]));
 
   // Every kernel not judged sound: rings on the board pictures, and the gallery.
   const notSound = sql`coalesce(${effectiveClass}, '') <> 'sound'`;
-  const flaggedRows = await ctx.db
-    .select({
-      batchId: kernels.batchId,
-      number: kernels.number,
-      cell: kernels.cell,
-      x: kernels.x,
-      y: kernels.y,
-      w: kernels.w,
-      h: kernels.h,
-      cls: effectiveClass,
-      aiClass: aiVerdict,
-      aiConfidence: aiVerdictConfidence,
-      finalClass: kernels.finalClass,
-      reviewStatus: kernels.reviewStatus,
-    })
-    .from(kernels)
-    .where(and(eq(kernels.sampleId, id), notSound));
+  const flaggedRows =
+    format === "slip"
+      ? []
+      : await ctx.db
+          .select({
+            batchId: kernels.batchId,
+            number: kernels.number,
+            cell: kernels.cell,
+            x: kernels.x,
+            y: kernels.y,
+            w: kernels.w,
+            h: kernels.h,
+            cls: effectiveClass,
+            aiClass: aiVerdict,
+            aiConfidence: aiVerdictConfidence,
+            finalClass: kernels.finalClass,
+            reviewStatus: kernels.reviewStatus,
+          })
+          .from(kernels)
+          .where(and(eq(kernels.sampleId, id), notSound));
   const ordered = flaggedRows.sort(
     (a, b) =>
       (batchIndex.get(a.batchId) ?? 0) - (batchIndex.get(b.batchId) ?? 0) ||
@@ -207,7 +232,10 @@ async function buildReport(
 
   const crop = await ensureCrop(ctx, sample.orgId, sample.crop);
   const verifyUrl = cert ? `${ctx.config.APP_URL}/verify/${cert.code}` : null;
-  return renderReport({
+  const render = format === "slip" ? renderSlip : renderReport;
+  return render({
+    layout: org?.report ?? {},
+    dimensions: sample.dimensions ?? (await dimensionsFor(ctx, id)),
     orgName: org?.name ?? "",
     sample,
     standard: standard

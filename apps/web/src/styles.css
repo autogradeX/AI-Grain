@@ -2793,3 +2793,37 @@ body:has(.app-view) .toast {
 .icon-button.danger:hover:not(:disabled) {
   background: var(--bad-bg);
 }
+
+/* A weight field with the "read the scale" button beside it. */
+.input-with-button {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.input-with-button > input {
+  flex: 1;
+  min-width: 0;
+}
+
+.scale-button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+}
+
+.scale-button.is-error {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+.kernel-size {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.queue-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}

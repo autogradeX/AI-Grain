@@ -10,6 +10,7 @@ import { Badge, Card, ErrorNote, Field, Spinner } from "../components/ui";
 import { useT } from "../i18n";
 import { useGrainLabels } from "../i18n/common";
 import { m } from "./ValidationPage.i18n";
+import { RepeatabilityCard } from "./Repeatability";
 
 const f = (v: number) => v.toFixed(2);
 
@@ -45,6 +46,7 @@ export function ValidationPage() {
           }}
         />
       </Field>
+      <RepeatabilityCard crop={crop} />
       {report.isPending && <Spinner />}
       <ErrorNote error={report.error} />
       {r && (

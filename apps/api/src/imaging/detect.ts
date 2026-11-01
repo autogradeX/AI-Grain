@@ -168,11 +168,21 @@ export function otsu(gray: Uint8Array | Buffer): number {
 }
 
 /** Square min-filter, done as a horizontal then a vertical pass. */
-function erode(m: Uint8Array, w: number, h: number, r: number): Uint8Array {
+export function erode(
+  m: Uint8Array,
+  w: number,
+  h: number,
+  r: number,
+): Uint8Array {
   return filter(filter(m, w, h, r, true, 1), w, h, r, false, 1);
 }
 
-function dilate(m: Uint8Array, w: number, h: number, r: number): Uint8Array {
+export function dilate(
+  m: Uint8Array,
+  w: number,
+  h: number,
+  r: number,
+): Uint8Array {
   return filter(filter(m, w, h, r, true, 0), w, h, r, false, 0);
 }
 

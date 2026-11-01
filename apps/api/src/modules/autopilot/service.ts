@@ -22,6 +22,7 @@ import {
   busyBatches,
   classifyBatch,
   classifyKernels,
+  dimensionsFor,
   kernelSummary,
   markClassified,
   mix,
@@ -29,6 +30,7 @@ import {
   processBatch,
 } from "../batches/service.js";
 import { issueCertificate } from "../certificates/service.js";
+import { notifyCompleted } from "../integration/service.js";
 import { prepareReport } from "../reports/service.js";
 import { ensureCrop } from "../crops/service.js";
 import {
@@ -320,6 +322,7 @@ export async function completeSample(
     .set({
       status: "completed",
       result,
+      dimensions: await dimensionsFor(ctx, sample.id),
       completedAt: new Date(),
       completedBy: by,
     })
@@ -338,6 +341,8 @@ export async function completeSample(
       certificate: certificate.code,
     },
   });
+  // Connected systems (APMC, eNAM bridge, ERP) get the result pushed.
+  ctx.jobs.run(`notify ${sample.id}`, () => notifyCompleted(ctx, sample.id));
   return { row: row!, certificate };
 }
 

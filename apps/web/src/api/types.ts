@@ -19,6 +19,7 @@ export interface Org {
   /** This organisation runs the public website (demo, hub, enquiries). */
   isSiteOwner: boolean;
   autopilot: AutopilotPolicy;
+  report: ReportSettings;
 }
 
 export interface Standard {
@@ -193,6 +194,47 @@ export interface Sample {
   };
   /** Set while the sample has no standard. */
   suggestedStandard: StandardSuggestion | null;
+  /** Size of the sound kernels; null until kernels are measured. */
+  dimensions: DimensionSummary | null;
+  /** The first run, when this sample is a repeat run. */
+  repeatOf: string | null;
+  /** The other runs of the same physical sample, compared with this one. */
+  repeat: {
+    runs: {
+      id: string;
+      number: number;
+      status: "in_progress" | "completed";
+      comparison: {
+        agreementPct: number;
+        maxDiffPct: number;
+        maxDiffClass: string | null;
+        purityDiffPct: number;
+      } | null;
+    }[];
+  };
+}
+
+export interface DimensionSummary {
+  kernels: number;
+  meanLengthMm: number;
+  meanBreadthMm: number;
+  meanLb: number;
+  sdLengthMm: number;
+  sdBreadthMm: number;
+  minLengthMm: number;
+  maxLengthMm: number;
+}
+
+/** The PDF report's layout (Settings → Report layout). */
+export interface ReportSettings {
+  title?: string;
+  header?: string;
+  footer?: string;
+  signatures?: string[];
+  showBoards?: boolean;
+  showGallery?: boolean;
+  showDimensions?: boolean;
+  showSummary?: boolean;
 }
 
 export interface Kernel {
@@ -204,6 +246,8 @@ export interface Kernel {
   h: number;
   cell: string;
   isCluster: boolean;
+  lengthMm: number | null;
+  widthMm: number | null;
   aiClass: string | null;
   aiConfidence: "high" | "medium" | "low" | null;
   aiReason: string | null;

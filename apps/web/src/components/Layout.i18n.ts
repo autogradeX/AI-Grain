@@ -16,6 +16,7 @@ export const m = defineMessages({
   dataset: { en: "Training dataset", hi: "प्रशिक्षण डेटासेट" },
   users: { en: "Users and invites", hi: "उपयोगकर्ता और आमंत्रण" },
   website: { en: "Website", hi: "वेबसाइट" },
+  integrations: { en: "Integrations", hi: "एकीकरण" },
   settings: { en: "Settings", hi: "सेटिंग्स" },
   publicSite: { en: "Public site", hi: "सार्वजनिक साइट" },
   signOut: { en: "Sign out", hi: "साइन आउट" },

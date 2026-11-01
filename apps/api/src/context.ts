@@ -13,4 +13,6 @@ export interface AppContext {
   mailer: Mailer;
   classifier: Classifier;
   jobs: JobRunner;
+  /** For outgoing webhooks; tests pass a fake. Defaults to the global fetch. */
+  fetch?: typeof fetch;
 }

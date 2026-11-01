@@ -6,6 +6,7 @@ import {
   straightenBoard,
 } from "../src/imaging/board.js";
 import { detectKernels } from "../src/imaging/detect.js";
+import { boardGray, measureKernel } from "../src/imaging/measure.js";
 import { applyHomography as apply, homography } from "@ai-grain/core";
 import {
   buildSheet,
@@ -154,5 +155,46 @@ describe("kernel detection", () => {
     // Each part is about one kernel.
     const areas = detection.kernels.map((k) => k.area);
     expect(Math.max(...areas) / Math.min(...areas)).toBeLessThan(1.8);
+  });
+
+  it("measures each kernel's length and breadth", async () => {
+    // Kernels in the synthetic board are ellipses 0.7 cm × 0.36 cm.
+    const photo = await syntheticBoard(20);
+    const board = await straightenBoard(photo.jpeg, photo.corners as Corners);
+    const detection = await detectKernels(board);
+    const gray = await boardGray(board);
+    const sizes = detection.kernels.map((k) =>
+      measureKernel(gray, detection.threshold, k),
+    );
+    expect(sizes.every((s) => s !== null)).toBe(true);
+    for (const s of sizes) {
+      expect(s!.lengthMm).toBeGreaterThan(6.6);
+      expect(s!.lengthMm).toBeLessThan(7.5);
+      expect(s!.widthMm).toBeGreaterThan(3.2);
+      expect(s!.widthMm).toBeLessThan(4.0);
+    }
+  });
+
+  it("measures a rotated kernel along its own axis", async () => {
+    const photo = await syntheticBoard(1);
+    const overlay = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${photo.width}" height="${photo.height}">
+        <ellipse cx="0" cy="0" rx="30" ry="9" fill="#d8b46a" transform="translate(800 1200) rotate(35)"/>
+      </svg>`,
+    );
+    const jpeg = await sharp(photo.jpeg)
+      .composite([{ input: overlay }])
+      .jpeg()
+      .toBuffer();
+    const board = await straightenBoard(jpeg, photo.corners as Corners);
+    const detection = await detectKernels(board);
+    const gray = await boardGray(board);
+    const rotated = detection.kernels.find((k) => k.w > 60 && k.h > 60)!;
+    const size = measureKernel(gray, detection.threshold, rotated)!;
+    // 60 px × 18 px at 60 px/cm: 10 mm × 3 mm.
+    expect(size.lengthMm).toBeGreaterThan(9.4);
+    expect(size.lengthMm).toBeLessThan(10.6);
+    expect(size.widthMm).toBeGreaterThan(2.6);
+    expect(size.widthMm).toBeLessThan(3.5);
   });
 });

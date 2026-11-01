@@ -62,6 +62,20 @@ export const m = defineMessages({
     en: "Mark the corners myself",
     hi: "कोने मैं ख़ुद चिह्नित करूँगा",
   },
+  savedOnDevice_one: {
+    en: "Photo saved on this device",
+    hi: "फ़ोटो इस डिवाइस पर सहेजी गई",
+  },
+  savedOnDevice_other: {
+    en: "{count} photos saved on this device",
+    hi: "{count} फ़ोटो इस डिवाइस पर सहेजी गईं",
+  },
+  savedOnDeviceHint: {
+    en: "There's no connection. The upload starts by itself when you're back online, and Autopilot carries on from there.",
+    hi: "कनेक्शन नहीं है। ऑनलाइन होते ही अपलोड अपने आप शुरू होगा, और फिर ऑटोपायलट आगे बढ़ेगा।",
+  },
+  anotherPhoto: { en: "Take another photo", hi: "एक और फ़ोटो लें" },
+  toSamples: { en: "Back to samples", hi: "नमूनों पर वापस" },
   sideAuto: {
     en: "Detect it from the photo",
     hi: "फ़ोटो से पहचानें",

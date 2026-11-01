@@ -12,6 +12,8 @@ import { Card, ErrorNote, Field } from "../components/ui";
 import { useT } from "../i18n";
 import { useSample } from "./SamplePage";
 import { m } from "./CapturePage.i18n";
+import { enqueue, newRef } from "../offline/queue";
+import { isNetworkError } from "../offline/sync";
 
 type Side = "auto" | "front" | "crease";
 
@@ -54,7 +56,8 @@ export function CapturePage() {
   const [manualCorners, setManualCorners] = useState(false);
   const [lastPhoto, setLastPhoto] = useState(false);
   const sample = useSample(id);
-  const autopilot = sample.data?.autopilot.enabled ?? false;
+  // Offline the sample can't load: Autopilot is on by default, so offer finishing.
+  const autopilot = sample.data?.autopilot.enabled ?? sample.isError;
   const [loadError, setLoadError] = useState<unknown>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
@@ -87,26 +90,68 @@ export function CapturePage() {
     }
   };
 
+  // Photos that couldn't be sent: kept on the device and uploaded later
+  // (the grid corners are then found by the server).
+  const [queued, setQueued] = useState(0);
+  const queuePhotos = async (list: { blob: Blob; finish: boolean }[]) => {
+    for (const p of list) {
+      await enqueue({
+        kind: "photo",
+        ref: newRef(),
+        createdAt: new Date().toISOString(),
+        sampleId: id,
+        photo: p.blob,
+        side,
+        finish: p.finish,
+      });
+    }
+    setQueued(list.length);
+  };
+
   const uploadMany = useMutation({
     mutationFn: async () => {
       // One at a time, in the order chosen; corners and side found by the server.
       for (const [i, p] of many.entries()) {
+        const finish = autopilot && lastPhoto && i === many.length - 1;
+        if (!navigator.onLine) {
+          await queuePhotos(
+            many.slice(i).map((q, j) => ({
+              blob: q.blob,
+              finish: autopilot && lastPhoto && i + j === many.length - 1,
+            })),
+          );
+          return "queued";
+        }
         setProgress(i + 1);
         const form = new FormData();
         form.set("side", side);
-        if (autopilot && lastPhoto && i === many.length - 1)
-          form.set("finish", "true");
+        if (finish) form.set("finish", "true");
         form.set("photo", p.blob, `board-${i + 1}.jpg`);
-        await api.upload<{ id: string }>(`/samples/${id}/batches`, form);
+        try {
+          await api.upload<{ id: string }>(`/samples/${id}/batches`, form);
+        } catch (err) {
+          if (!isNetworkError(err)) throw err;
+          await queuePhotos(
+            many.slice(i).map((q, j) => ({
+              blob: q.blob,
+              finish: autopilot && lastPhoto && i + j === many.length - 1,
+            })),
+          );
+          return "queued";
+        }
       }
+      return "sent";
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      if (result === "queued") return;
       await qc.invalidateQueries({ queryKey: ["sample", id] });
       void qc.invalidateQueries({ queryKey: ["samples"] });
       void navigate(`/app/samples/${id}`, { replace: true });
     },
     // Photos already sent stay in the sample: show it, with the error.
     onError: () => void qc.invalidateQueries({ queryKey: ["sample", id] }),
+    // Runs offline too: the photos are saved on the device.
+    networkMode: "always",
   });
 
   const accept = async (blob: Blob, preset?: Corners) => {
@@ -122,7 +167,12 @@ export function CapturePage() {
   };
 
   const upload = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      const finish = autopilot && lastPhoto;
+      if (!navigator.onLine) {
+        await queuePhotos([{ blob: photo!.blob, finish }]);
+        return null;
+      }
       const form = new FormData();
       form.set("side", side);
       if (manualCorners) {
@@ -132,10 +182,17 @@ export function CapturePage() {
       }
       if (autopilot && lastPhoto) form.set("finish", "true");
       form.set("photo", photo!.blob, "board.jpg");
-      return api.upload<{ id: string }>(`/samples/${id}/batches`, form);
+      try {
+        return await api.upload<{ id: string }>(`/samples/${id}/batches`, form);
+      } catch (err) {
+        if (!isNetworkError(err)) throw err;
+        await queuePhotos([{ blob: photo!.blob, finish }]);
+        return null;
+      }
     },
     // With Autopilot the sample page shows the progress; otherwise the photo.
     onSuccess: async (batch) => {
+      if (!batch) return;
       await qc.invalidateQueries({ queryKey: ["sample", id] });
       void qc.invalidateQueries({ queryKey: ["samples"] });
       void navigate(
@@ -145,7 +202,35 @@ export function CapturePage() {
         },
       );
     },
+    networkMode: "always",
   });
+
+  if (queued > 0) {
+    return (
+      <div className="stack">
+        <h1>{t("title")}</h1>
+        <Card title={t.n("savedOnDevice", queued)}>
+          <p>{t("savedOnDeviceHint")}</p>
+          <div className="row wrap">
+            <button
+              className="primary"
+              onClick={() => {
+                setQueued(0);
+                setPhoto(null);
+                setCorners(null);
+                setMany([]);
+              }}
+            >
+              {t("anotherPhoto")}
+            </button>
+            <Link to="/app" className="button">
+              {t("toSamples")}
+            </Link>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="stack">

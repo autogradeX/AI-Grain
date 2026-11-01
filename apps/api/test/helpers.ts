@@ -124,11 +124,36 @@ export async function createTestApp(env: Record<string, string> = {}) {
   const mailer = new MemoryMailer();
   const storage = new MemoryStorage();
   const classifier = new FakeClassifier();
+  // Outgoing webhooks: recorded, answered with `webhooks.status`.
+  const webhooks = {
+    status: 200,
+    sent: [] as {
+      url: string;
+      headers: Record<string, string>;
+      body: string;
+    }[],
+  };
+  const fakeFetch = ((url: string, init: RequestInit) => {
+    webhooks.sent.push({
+      url,
+      headers: init.headers as Record<string, string>,
+      body: init.body as string,
+    });
+    return Promise.resolve(new Response("", { status: webhooks.status }));
+  }) as unknown as typeof fetch;
   let jobs!: JobRunner;
   const { app, ctx } = await buildApp(
     (log) => {
       jobs = new JobRunner(log);
-      return { config, db: handle.db, storage, mailer, classifier, jobs };
+      return {
+        config,
+        db: handle.db,
+        storage,
+        mailer,
+        classifier,
+        jobs,
+        fetch: fakeFetch,
+      };
     },
     { logger: false },
   );
@@ -140,6 +165,7 @@ export async function createTestApp(env: Record<string, string> = {}) {
     storage,
     classifier,
     jobs,
+    webhooks,
     close: async () => {
       await jobs.idle();
       await app.close();

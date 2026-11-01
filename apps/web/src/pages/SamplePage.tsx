@@ -26,6 +26,8 @@ import { common, useGrainLabels } from "../i18n/common";
 import { MODEL_TIERS, useModelLabel } from "../i18n/models";
 import { StandardSuggestionNote } from "../components/StandardSuggestion";
 import { AutopilotCard } from "./AutopilotCard";
+import { KernelSizeCard, OutputButtons, RepeatCard } from "./SampleExtras";
+import { ScaleButton } from "../components/ScaleButton";
 import { m } from "./SamplePage.i18n";
 
 type T = Translate<keyof typeof m>;
@@ -103,6 +105,7 @@ export function SamplePage() {
           <AutopilotCard sample={s} />
           <PhotosCard sample={s} editable={editable} />
           <EstimateCard sample={s} />
+          <KernelSizeCard sample={s} />
           <details
             className="card weigh-verify"
             open={weighingRequired || hasWeights}
@@ -131,6 +134,7 @@ export function SamplePage() {
           <PhotosCard sample={s} editable={editable} />
           <ReviewCard sample={s} />
           <EstimateCard sample={s} />
+          <KernelSizeCard sample={s} />
           {/* Keyed by the saved weights, so the form resets when they change on the server. */}
           <CupsCard
             key={JSON.stringify(s.cupMassG)}
@@ -140,6 +144,7 @@ export function SamplePage() {
         </>
       )}
       <ResultCard sample={s} />
+      <RepeatCard sample={s} />
       <ReferenceCard sample={s} />
     </div>
   );
@@ -335,15 +340,23 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
         }}
       >
         <Field label={t("sampleMass")}>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            min="0"
-            disabled={!editable}
-            value={form.sampleMassG}
-            onChange={(e) => setForm({ ...form, sampleMassG: e.target.value })}
-          />
+          <span className="input-with-button">
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              disabled={!editable}
+              value={form.sampleMassG}
+              onChange={(e) =>
+                setForm({ ...form, sampleMassG: e.target.value })
+              }
+            />
+            <ScaleButton
+              disabled={!editable}
+              onWeight={(g) => setForm({ ...form, sampleMassG: String(g) })}
+            />
+          </span>
         </Field>
         <Field label={t("moisture")} hint={t("moistureHint")}>
           <input
@@ -599,21 +612,29 @@ function CupsCard({ sample, editable }: { sample: Sample; editable: boolean }) {
                             {sample.kernels.byClass[c.id] ?? 0}
                           </td>
                           <td>
-                            <input
-                              className="input-sm"
-                              type="number"
-                              inputMode="decimal"
-                              step="0.01"
-                              min="0"
-                              aria-label={t("cupAria", {
-                                class: classLabel(classes, c.id),
-                              })}
-                              disabled={!editable}
-                              value={cups[c.id] ?? ""}
-                              onChange={(e) =>
-                                setCups({ ...cups, [c.id]: e.target.value })
-                              }
-                            />
+                            <span className="input-with-button">
+                              <input
+                                className="input-sm"
+                                type="number"
+                                inputMode="decimal"
+                                step="0.01"
+                                min="0"
+                                aria-label={t("cupAria", {
+                                  class: classLabel(classes, c.id),
+                                })}
+                                disabled={!editable}
+                                value={cups[c.id] ?? ""}
+                                onChange={(e) =>
+                                  setCups({ ...cups, [c.id]: e.target.value })
+                                }
+                              />
+                              <ScaleButton
+                                disabled={!editable}
+                                onWeight={(g) =>
+                                  setCups({ ...cups, [c.id]: String(g) })
+                                }
+                              />
+                            </span>
                           </td>
                           <td className="num">
                             {live ? pct(live.byClass[c.id]) : "—"}
@@ -867,6 +888,7 @@ function ResultCard({ sample }: { sample: Sample }) {
         <button disabled={report.isPending} onClick={() => report.mutate()}>
           {t("pdfReport")}
         </button>
+        <OutputButtons sample={sample} />
         {can.write && r && (
           <button disabled={summary.isPending} onClick={() => summary.mutate()}>
             {summary.isPending

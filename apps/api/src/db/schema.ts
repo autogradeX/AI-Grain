@@ -1,11 +1,13 @@
 import type {
   ClassDef,
   ClassGroup,
+  DimensionSummary,
   GradeResult,
   GradeSpec,
 } from "@ai-grain/core";
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   doublePrecision,
   index,
@@ -55,6 +57,29 @@ export interface AutopilotSettings {
   expertReview?: boolean;
 }
 
+/** The PDF report's layout, set per organisation. */
+export interface ReportSettings {
+  /** Replaces "Grain screening report" as the title. */
+  title?: string;
+  /** Lines under the title: address, licence number, lab name. */
+  header?: string;
+  /** Printed at the bottom of every page. */
+  footer?: string;
+  /** Signature lines at the end, e.g. "Assayer", "Mandi Secretary". */
+  signatures?: string[];
+  showBoards?: boolean;
+  showGallery?: boolean;
+  showDimensions?: boolean;
+  showSummary?: boolean;
+}
+
+/** Where completed results are pushed (APMC, eNAM bridge, ERP). */
+export interface IntegrationSettings {
+  webhookUrl?: string;
+  /** Signs each delivery (HMAC-SHA256), so the receiver can check it came from here. */
+  webhookSecret?: string;
+}
+
 export const organizations = pgTable("organizations", {
   id: id(),
   name: text("name").notNull(),
@@ -64,8 +89,38 @@ export const organizations = pgTable("organizations", {
     .$type<AutopilotSettings>()
     .notNull()
     .default({}),
+  report: jsonb("report").$type<ReportSettings>().notNull().default({}),
+  integration: jsonb("integration")
+    .$type<IntegrationSettings>()
+    .notNull()
+    .default({}),
   createdAt: createdAt(),
 });
+
+/**
+ * Keys for systems that read results (APMC, eNAM bridge, ERP). Only a hash
+ * is stored; the key is shown once when created.
+ */
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** First characters of the key, to tell keys apart in the list. */
+    prefix: text("prefix").notNull(),
+    keyHash: text("key_hash").notNull(),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("api_keys_hash_idx").on(t.keyHash)],
+);
 
 export const users = pgTable(
   "users",
@@ -262,6 +317,14 @@ export const samples = pgTable(
     result: jsonb("result").$type<SampleResult>(),
     reference: jsonb("reference").$type<ReferenceResult>(),
     aiSummary: text("ai_summary"),
+    /** Size of the sound kernels, saved when the sample completes. */
+    dimensions: jsonb("dimensions").$type<DimensionSummary>(),
+    /** A second run of the same physical sample, to measure repeatability. */
+    repeatOf: uuid("repeat_of").references((): AnyPgColumn => samples.id, {
+      onDelete: "set null",
+    }),
+    /** Set by a device that created the sample offline, so a retried upload doesn't create it twice. */
+    clientRef: text("client_ref"),
     /** Shown on the public website's interactive demo. Only the site owner's completed samples. */
     publicDemo: boolean("public_demo").notNull().default(false),
     demoTitle: text("demo_title"),
@@ -280,6 +343,7 @@ export const samples = pgTable(
   (t) => [
     uniqueIndex("samples_org_number_idx").on(t.orgId, t.number),
     index("samples_org_created_idx").on(t.orgId, t.createdAt),
+    uniqueIndex("samples_org_client_ref_idx").on(t.orgId, t.clientRef),
   ],
 );
 
@@ -322,6 +386,8 @@ export const batches = pgTable("batches", {
   kernelCount: integer("kernel_count"),
   /** Side of the square crop window, shared by every kernel crop in the batch. */
   cropWindowCm: doublePrecision("crop_window_cm"),
+  /** Set by a device that queued the photo offline, so a retried upload isn't stored twice. */
+  clientRef: text("client_ref").unique(),
   error: text("error"),
   createdBy: uuid("created_by").references(() => users.id, {
     onDelete: "set null",
@@ -373,6 +439,9 @@ export const kernels = pgTable(
     cell: text("cell").notNull(),
     /** Unusually large blob: probably kernels touching. The operator should separate them. */
     isCluster: boolean("is_cluster").notNull().default(false),
+    /** Longest dimension and the breadth across it, measured in the photo. Null when it couldn't be measured. */
+    lengthMm: doublePrecision("length_mm"),
+    widthMm: doublePrecision("width_mm"),
     cropKey: text("crop_key").notNull(),
     aiClass: text("ai_class"),
     aiConfidence: text("ai_confidence").$type<"high" | "medium" | "low">(),

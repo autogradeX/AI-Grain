@@ -66,6 +66,14 @@ const ValidationPage = page(
   "ValidationPage",
 );
 const WebsitePage = page(() => import("./pages/WebsitePage"), "WebsitePage");
+const IntegrationsPage = page(
+  () => import("./pages/IntegrationsPage"),
+  "IntegrationsPage",
+);
+const OfflineSamplePage = page(
+  () => import("./pages/OfflineSamplePage"),
+  "OfflineSamplePage",
+);
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -131,6 +139,8 @@ export function App() {
             <Route path="users" element={<UsersPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="website" element={<WebsitePage />} />
+            <Route path="integrations" element={<IntegrationsPage />} />
+            <Route path="offline/:ref" element={<OfflineSamplePage />} />
             {/* The phone "More" page became the drawer. */}
             <Route path="more" element={<Navigate to="/app" replace />} />
             <Route path="*" element={<Navigate to="/app" replace />} />

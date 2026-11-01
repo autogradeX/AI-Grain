@@ -23,6 +23,10 @@ import { sampleRoutes } from "./modules/samples/routes.js";
 import { publicSiteRoutes, siteAdminRoutes } from "./modules/site/routes.js";
 import { standardRoutes } from "./modules/standards/routes.js";
 import { userRoutes } from "./modules/users/routes.js";
+import {
+  integrationRoutes,
+  machineRoutes,
+} from "./modules/integration/routes.js";
 import { validationRoutes } from "./modules/validation/routes.js";
 
 export async function buildApp(
@@ -122,6 +126,8 @@ export async function buildApp(
       await api.register(publicVerifyRoutes(ctx), { prefix: "/public" });
       await api.register(publicSiteRoutes(ctx), { prefix: "/public" });
       await api.register(siteAdminRoutes(ctx));
+      await api.register(integrationRoutes(ctx));
+      await api.register(machineRoutes(ctx), { prefix: "/v1" });
     },
     { prefix: "/api" },
   );

@@ -8,6 +8,7 @@ import {
   type MassEstimate,
   type MassPercentages,
   type Measurement,
+  type RunBreakdown,
 } from "@ai-grain/core";
 import { and, eq } from "drizzle-orm";
 import type { AppContext } from "../../context.js";
@@ -107,6 +108,27 @@ export async function estimateFor(
     .from(kernels)
     .where(eq(kernels.sampleId, sampleId));
   return estimateFromObjects(rows, classes);
+}
+
+/**
+ * A sample's mass % breakdown for comparing runs: its result when it has
+ * one, else the live photo estimate; null when there is neither yet.
+ */
+export async function breakdownOf(
+  ctx: AppContext,
+  sample: SampleRow,
+): Promise<RunBreakdown | null> {
+  if (sample.result) {
+    return {
+      byClass: sample.result.byClassPct,
+      purityPct: sample.result.purityPct ?? 100 - sample.result.totalDefectsPct,
+    };
+  }
+  const crop = await ensureCrop(ctx, sample.orgId, sample.crop);
+  const estimate = await estimateFor(ctx, sample.id, crop.classes);
+  return estimate.counted > 0
+    ? { byClass: estimate.byClass, purityPct: estimate.purityPct }
+    : null;
 }
 
 /** The estimate as a result, graded, for completing a sample that wasn't weighed. */

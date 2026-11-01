@@ -3,8 +3,8 @@ import { defineMessages } from "../i18n";
 export const m = defineMessages({
   title: { en: "Crops and classes", hi: "फ़सलें और वर्ग" },
   intro: {
-    en: "Each crop has its own defect classes in four groups: grain admixtures, broken & defective, impurities & foreign material, and harmful & disease. Model Orchestration sorts every kernel into one of them, and standards set limits per class and per group. Wheat, barley, oats, rapeseed and hemp start from presets you can change.",
-    hi: "हर फ़सल के अपने दोष-वर्ग होते हैं, चार समूहों में: अन्य अनाज की मिलावट, टूटे व दोषपूर्ण दाने, अशुद्धियाँ व बाहरी पदार्थ, और हानिकारक व रोगग्रस्त। मॉडल ऑर्केस्ट्रेशन हर दाने को इनमें से किसी एक वर्ग में रखता है, और मानक हर वर्ग व हर समूह की सीमा तय करते हैं। गेहूँ, जौ, जई, सरसों और भांग पहले से बनी सूचियों से शुरू होते हैं, जिन्हें आप बदल सकते हैं।",
+    en: "Each crop has its own defect classes in four groups: grain admixtures, broken & defective, impurities & foreign material, and harmful & disease. Model Orchestration sorts every kernel into one of them, and standards set limits per class and per group. Wheat, paddy, rice, maize, pulses and oilseeds start from ready-made lists you can change.",
+    hi: "हर फ़सल के अपने दोष-वर्ग होते हैं, चार समूहों में: अन्य अनाज की मिलावट, टूटे व दोषपूर्ण दाने, अशुद्धियाँ व बाहरी पदार्थ, और हानिकारक व रोगग्रस्त। मॉडल ऑर्केस्ट्रेशन हर दाने को इनमें से किसी एक वर्ग में रखता है, और मानक हर वर्ग व हर समूह की सीमा तय करते हैं। गेहूँ, धान, चावल, मक्का, दालें और तिलहन पहले से बनी सूचियों से शुरू होते हैं, जिन्हें आप बदल सकते हैं।",
   },
   archived: { en: "Archived", hi: "संग्रहित" },
   groupCount: { en: "{count} {group}", hi: "{count} {group}" },
@@ -16,6 +16,7 @@ export const m = defineMessages({
     hi: "जैसे: ट्रिटिकेल, सूरजमुखी",
   },
   addCrop: { en: "Add crop", hi: "फ़सल जोड़ें" },
+  readyMade: { en: "Ready-made:", hi: "तैयार सूचियाँ:" },
   suggesting: {
     en: "Model Orchestration is suggesting…",
     hi: "मॉडल ऑर्केस्ट्रेशन सुझा रहा है…",

@@ -93,8 +93,25 @@ export function batchRoutes(ctx: AppContext) {
           imageWidth: z.coerce.number().positive().optional(),
           imageHeight: z.coerce.number().positive().optional(),
           finish: z.enum(["true", "false"]).optional(),
+          // From a device that queued the photo offline: a retry returns the same batch.
+          clientRef: z.string().trim().min(8).max(64).optional(),
         })
         .parse(upload.fields);
+      if (fields.clientRef) {
+        const [existing] = await ctx.db
+          .select()
+          .from(batches)
+          .where(
+            and(
+              eq(batches.clientRef, fields.clientRef),
+              eq(batches.orgId, me.orgId),
+            ),
+          );
+        if (existing) {
+          reply.code(200);
+          return existing;
+        }
+      }
       const clientCorners =
         fields.corners && fields.imageWidth && fields.imageHeight
           ? CornersSchema.parse(JSON.parse(fields.corners))
@@ -120,6 +137,7 @@ export function batchRoutes(ctx: AppContext) {
           sampleId: sample.id,
           side: fields.side === "crease" ? "crease" : "front",
           sideDetected: fields.side === "auto",
+          clientRef: fields.clientRef ?? null,
           originalKey: "",
           originalWidth: normalized.width,
           originalHeight: normalized.height,
@@ -161,6 +179,8 @@ export function batchRoutes(ctx: AppContext) {
           h: kernels.h,
           cell: kernels.cell,
           isCluster: kernels.isCluster,
+          lengthMm: kernels.lengthMm,
+          widthMm: kernels.widthMm,
           aiClass: aiVerdict,
           aiConfidence: aiVerdictConfidence,
           aiReason: sql<

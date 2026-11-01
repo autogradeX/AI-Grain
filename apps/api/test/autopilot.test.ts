@@ -250,6 +250,17 @@ describe("Autopilot from photo to report", () => {
     expect(done.body.result?.source).toBe("estimate");
     expect(done.body.completedBy).toBeNull();
     expect(done.body.aiSummary).toBe("Screening summary.");
+    // Kernel size of the sound kernels (0.7 cm × 0.36 cm ellipses), saved at completion.
+    const dims = (
+      done.body as unknown as {
+        dimensions: { kernels: number; meanLengthMm: number; meanLb: number };
+      }
+    ).dimensions;
+    expect(dims.kernels).toBeGreaterThan(20);
+    expect(dims.meanLengthMm).toBeGreaterThan(6.6);
+    expect(dims.meanLengthMm).toBeLessThan(7.5);
+    expect(dims.meanLb).toBeGreaterThan(1.7);
+    expect(dims.meanLb).toBeLessThan(2.3);
     const certificates = await api<{ code: string; status: string }[]>(
       "GET",
       `/api/samples/${sampleId}/certificates`,
@@ -482,6 +493,95 @@ describe("Autopilot from photo to report", () => {
       standard: { id: older.body.id },
       reason: { kind: "usage", used: 2, of: 2 },
     });
+  });
+
+  it("measures repeatability between two runs of the same sample", async () => {
+    const photo = await syntheticBoard(30);
+    const finish = async (sampleId: string) => {
+      const pending = await api<{ id: string; aiClass: string }[]>(
+        "GET",
+        `/api/samples/${sampleId}/review`,
+      );
+      if (pending.body.length)
+        await api("POST", "/api/kernels/review", {
+          decisions: pending.body.map((k) => ({
+            kernelId: k.id,
+            finalClass: k.aiClass === "unclear" ? "sound" : k.aiClass,
+          })),
+        });
+      await t.jobs.idle();
+    };
+    const first = await photographed(photo.jpeg);
+    await finish(first.sampleId);
+
+    const repeat = await api<{ id: string; repeatOf: string; crop: string }>(
+      "POST",
+      `/api/samples/${first.sampleId}/repeat`,
+    );
+    expect(repeat.status).toBe(201);
+    expect(repeat.body).toMatchObject({
+      repeatOf: first.sampleId,
+      crop: "wheat",
+    });
+    const form = multipart(
+      { finish: "true" },
+      { name: "photo", data: photo.jpeg },
+    );
+    await t.app.inject({
+      method: "POST",
+      url: `/api/samples/${repeat.body.id}/batches`,
+      headers: { ...bearer(token), ...form.headers },
+      payload: form.payload,
+    });
+    await t.jobs.idle();
+    await finish(repeat.body.id);
+
+    const view = await api<{
+      status: string;
+      repeat: { runs: { id: string; comparison: { agreementPct: number } }[] };
+    }>("GET", `/api/samples/${repeat.body.id}`);
+    expect(view.body.status).toBe("completed");
+    expect(view.body.repeat.runs).toMatchObject([
+      { id: first.sampleId, comparison: { agreementPct: 100 } },
+    ]);
+    const report = await api<{
+      summary: { count: number; bands: Record<string, number> };
+    }>("GET", "/api/validation/repeatability");
+    expect(report.body.summary.count).toBe(1);
+    expect(report.body.summary.bands["99+"]).toBe(1);
+  });
+
+  it("returns the same sample when an offline device sends it again", async () => {
+    const payload = { crop: "paddy", clientRef: "device-1:3b7f0c2e" };
+    const first = await api<{ id: string; number: number }>(
+      "POST",
+      "/api/samples",
+      payload,
+    );
+    expect(first.status).toBe(201);
+    const again = await api<{ id: string }>("POST", "/api/samples", payload);
+    expect(again.status).toBe(200);
+    expect(again.body.id).toBe(first.body.id);
+    // A photo sent twice with the same reference is stored once.
+    const photo = await syntheticBoard(10);
+    const send = () => {
+      const form = multipart(
+        { clientRef: "device-1:photo-1" },
+        { name: "photo", data: photo.jpeg },
+      );
+      return t.app.inject({
+        method: "POST",
+        url: `/api/samples/${first.body.id}/batches`,
+        headers: { ...bearer(token), ...form.headers },
+        payload: form.payload,
+      });
+    };
+    const one = await send();
+    const two = await send();
+    expect(one.statusCode).toBe(202);
+    expect(two.statusCode).toBe(200);
+    expect(two.json<{ id: string }>().id).toBe(one.json<{ id: string }>().id);
+    await t.jobs.idle();
   });
 
   it("asks for the corners when it can't find the board", async () => {

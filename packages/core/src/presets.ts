@@ -213,6 +213,167 @@ const oilseed = (crop: string, otherSeeds: string): ClassDef[] => [
   },
 ];
 
+/*
+ * Foreign matter as eNAM / DMI assaying splits it: organic (husk, chaff,
+ * straw, weed seeds) and inorganic (stones, soil, dust).
+ */
+const foreignMatter = (husk: string): ClassDef[] => [
+  {
+    id: "organic_foreign",
+    label: "Foreign matter (organic)",
+    group: "impurity",
+    description: `${husk}, straw, stems, leaves, weed seeds and other plant material that is not the commodity.`,
+    massFactor: 0.4,
+  },
+  {
+    id: "stones",
+    label: "Stones",
+    group: "impurity",
+    description: "Stones, gravel and soil clods.",
+    massFactor: 2.5,
+  },
+  {
+    id: "inorganic_foreign",
+    label: "Foreign matter (inorganic)",
+    group: "impurity",
+    description:
+      "Dust balls, sand, glass, metal, plastic and other mineral or man-made material.",
+    massFactor: 1.5,
+  },
+];
+
+const mouldy: ClassDef = {
+  id: "mouldy",
+  label: "Mouldy / decayed",
+  group: "harmful",
+  description:
+    "Kernels with visible mould growth (white, green, black) or rot.",
+};
+
+/** Paddy (unhusked rice), as assayed in mandi procurement. */
+const paddy: ClassDef[] = [
+  {
+    id: "lower_class",
+    label: "Admixture of lower class",
+    group: "admixture",
+    description:
+      "Paddy grains of a different, lower variety: clearly shorter, bolder or a different husk colour from the lot.",
+  },
+  {
+    id: "damaged",
+    label: "Damaged / discoloured / sprouted / weevilled",
+    group: "broken_defective",
+    description:
+      "Grains with a darkened, spotted or discoloured husk, a sprout or rootlet, or holes from insects.",
+  },
+  {
+    id: "immature",
+    label: "Immature / shrunken / shrivelled",
+    group: "broken_defective",
+    description:
+      "Thin, chaffy, greenish or partly filled grains, clearly lighter than sound grains; empty husks count here only when a grain is inside.",
+  },
+  ...foreignMatter("Empty husks, chaff"),
+  mouldy,
+];
+
+/** Milled rice (raw or parboiled). */
+const rice: ClassDef[] = [
+  {
+    id: "lower_class",
+    label: "Admixture of lower class",
+    group: "admixture",
+    description:
+      "Rice grains of a different, lower variety: clearly shorter or bolder than the lot.",
+  },
+  {
+    id: "paddy_grains",
+    label: "Paddy grains",
+    group: "admixture",
+    description: "Unhusked paddy grains in the rice, with the husk still on.",
+  },
+  {
+    id: "broken",
+    label: "Brokens",
+    group: "broken_defective",
+    description:
+      "Pieces smaller than three quarters of a whole grain (tips and small brokens included).",
+  },
+  {
+    id: "chalky",
+    label: "Chalky grains",
+    group: "broken_defective",
+    description:
+      "Grains with an opaque, white, chalk-like area covering half or more of the grain.",
+  },
+  {
+    id: "red_grains",
+    label: "Red grains",
+    group: "broken_defective",
+    description: "Grains with red or reddish-brown bran streaks or patches.",
+  },
+  {
+    id: "damaged",
+    label: "Damaged / slightly damaged",
+    group: "broken_defective",
+    description:
+      "Grains with spots, pinpoint damage, insect holes or internal damage visible at the surface.",
+  },
+  {
+    id: "discoloured",
+    label: "Discoloured grains",
+    group: "broken_defective",
+    description:
+      "Grains with a yellow, brown or grey colour throughout, unlike the lot.",
+  },
+  ...foreignMatter("Husk pieces, bran balls"),
+  mouldy,
+];
+
+/** Pulses (chana, tur, moong and similar). */
+const pulse = (crop: string, others: string): ClassDef[] => [
+  {
+    id: "other_grain",
+    label: "Other edible grains",
+    group: "admixture",
+    description: others,
+  },
+  {
+    id: "damaged",
+    label: "Damaged",
+    group: "broken_defective",
+    description: `${crop} seeds with internal damage, sprouting, deep discolouration, fungal damage or heat damage.`,
+  },
+  {
+    id: "slightly_damaged",
+    label: "Slightly damaged / touched",
+    group: "broken_defective",
+    description: `${crop} seeds with only surface damage: small spots, light discolouration or a touched seed coat.`,
+  },
+  {
+    id: "immature",
+    label: "Immature / shrivelled",
+    group: "broken_defective",
+    description: `Small, wrinkled, greenish or underdeveloped ${crop} seeds.`,
+  },
+  {
+    id: "weevilled",
+    label: "Weevilled",
+    group: "broken_defective",
+    description:
+      "Seeds with round exit holes or tunnels from weevils or bruchids.",
+    massFactor: 0.8,
+  },
+  {
+    id: "split_broken",
+    label: "Split / broken",
+    group: "broken_defective",
+    description: `${crop} seeds split into halves or broken into pieces.`,
+  },
+  ...foreignMatter("Pod walls, husk"),
+  mouldy,
+];
+
 export const CROP_PRESETS: Record<string, CropProfile> = {
   wheat: {
     key: "wheat",
@@ -251,7 +412,140 @@ export const CROP_PRESETS: Record<string, CropProfile> = {
       "Seeds of other crops in hemp, for example cereals or other oilseeds.",
     ),
   },
+  paddy: { key: "paddy", label: "Paddy", classes: paddy },
+  rice: { key: "rice", label: "Rice", classes: rice },
+  maize: {
+    key: "maize",
+    label: "Maize",
+    classes: [
+      {
+        id: "other_grain",
+        label: "Other edible grains",
+        group: "admixture",
+        description: "Kernels of other cereals or pulses in maize.",
+      },
+      {
+        id: "damaged",
+        label: "Damaged",
+        group: "broken_defective",
+        description:
+          "Kernels with internal damage, sprouting, deep discolouration, fungal or heat damage.",
+      },
+      {
+        id: "slightly_damaged",
+        label: "Slightly damaged / discoloured",
+        group: "broken_defective",
+        description:
+          "Kernels with only surface spots or light discolouration of the pericarp.",
+      },
+      {
+        id: "immature",
+        label: "Shrivelled / immature",
+        group: "broken_defective",
+        description: "Small, wrinkled, thin or underdeveloped kernels.",
+      },
+      {
+        id: "weevilled",
+        label: "Weevilled",
+        group: "broken_defective",
+        description: "Kernels with holes or tunnels from weevils.",
+        massFactor: 0.8,
+      },
+      {
+        id: "broken",
+        label: "Broken",
+        group: "broken_defective",
+        description: "Pieces smaller than three quarters of a whole kernel.",
+      },
+      ...foreignMatter("Cob pieces, husk, silk"),
+      mouldy,
+    ],
+  },
+  chana: {
+    key: "chana",
+    label: "Chana (gram)",
+    classes: pulse(
+      "Chana",
+      "Seeds of other pulses or cereals in chana: peas, lentils, wheat.",
+    ),
+  },
+  tur: {
+    key: "tur",
+    label: "Tur (arhar)",
+    classes: pulse(
+      "Tur",
+      "Seeds of other pulses or cereals in tur: chana, moong, urad, cereals.",
+    ),
+  },
+  moong: {
+    key: "moong",
+    label: "Moong",
+    classes: pulse(
+      "Moong",
+      "Seeds of other pulses or cereals in moong: urad, masoor, cereals.",
+    ),
+  },
+  soybean: {
+    key: "soybean",
+    label: "Soybean",
+    classes: [
+      ...oilseed(
+        "soybean",
+        "Seeds of other crops in soybean: other oilseeds, pulses or cereals.",
+      ).filter((c) => c.id !== "green"),
+    ],
+  },
+  mustard: {
+    key: "mustard",
+    label: "Mustard",
+    classes: oilseed(
+      "mustard",
+      "Seeds of other crops in mustard: other brassicas, linseed, cereals.",
+    ),
+  },
 };
+
+/** Local names that mean a preset crop, e.g. "dhan" is paddy. */
+const PRESET_ALIASES: Record<string, string> = {
+  dhan: "paddy",
+  dhaan: "paddy",
+  धान: "paddy",
+  chawal: "rice",
+  चावल: "rice",
+  makka: "maize",
+  makki: "maize",
+  corn: "maize",
+  मक्का: "maize",
+  gram: "chana",
+  chickpea: "chana",
+  chickpeas: "chana",
+  चना: "chana",
+  arhar: "tur",
+  toor: "tur",
+  tuar: "tur",
+  pigeon_pea: "tur",
+  अरहर: "tur",
+  mung: "moong",
+  green_gram: "moong",
+  मूँग: "moong",
+  मूंग: "moong",
+  soya: "soybean",
+  soyabean: "soybean",
+  सोयाबीन: "soybean",
+  sarson: "mustard",
+  सरसों: "mustard",
+  gehun: "wheat",
+  gehu: "wheat",
+  गेहूँ: "wheat",
+  गेहूं: "wheat",
+};
+
+/** The preset crop a typed name refers to (by key or local name), or null. */
+export function presetKeyFor(name: string): string | null {
+  const key = name.trim().toLowerCase().replace(/\s+/g, "_");
+  if (CROP_PRESETS[key]) return key;
+  return PRESET_ALIASES[key] ?? null;
+}
 
 /** A crop's starting profile: its preset when there is one, otherwise the general cereal list. */
 export function presetFor(key: string, label?: string): CropProfile {

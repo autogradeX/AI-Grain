@@ -222,8 +222,11 @@ export function userRoutes(ctx: AppContext) {
         .from(organizations)
         .where(eq(organizations.id, me.orgId));
       if (!org) throw notFound("Organisation");
+      const { integration, ...rest } = org;
       return {
-        ...org,
+        ...rest,
+        // The webhook secret is only shown to admins, on the integration page.
+        integration: { webhookUrl: integration.webhookUrl ?? null },
         // With defaults filled in, as the pipeline applies them.
         autopilot: autopilotOf(org.autopilot),
         effectiveModel: org.defaultModel ?? ctx.config.DEFAULT_MODEL,
@@ -248,6 +251,22 @@ export function userRoutes(ctx: AppContext) {
               expertReview: z.boolean().optional(),
             })
             .optional(),
+          // The report layout, replaced as a whole.
+          report: z
+            .object({
+              title: z.string().trim().max(120).optional(),
+              header: z.string().trim().max(600).optional(),
+              footer: z.string().trim().max(300).optional(),
+              signatures: z
+                .array(z.string().trim().min(1).max(60))
+                .max(4)
+                .optional(),
+              showBoards: z.boolean().optional(),
+              showGallery: z.boolean().optional(),
+              showDimensions: z.boolean().optional(),
+              showSummary: z.boolean().optional(),
+            })
+            .optional(),
         })
         .parse(request.body);
       const [current] = await ctx.db
@@ -260,6 +279,11 @@ export function userRoutes(ctx: AppContext) {
           ...(body.name !== undefined && { name: body.name }),
           ...(body.defaultModel !== undefined && {
             defaultModel: body.defaultModel,
+          }),
+          ...(body.report && {
+            report: Object.fromEntries(
+              Object.entries(body.report).filter(([, v]) => v !== undefined),
+            ),
           }),
           ...(body.autopilot && {
             autopilot: {
