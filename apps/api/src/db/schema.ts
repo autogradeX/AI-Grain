@@ -40,11 +40,28 @@ export interface SiteSettings {
   address?: string;
 }
 
+/**
+ * Autopilot: how much of a sample the AI handles on its own. Stored as set by
+ * an admin; missing keys take the defaults in `autopilotOf`.
+ */
+export interface AutopilotSettings {
+  /** Find corners, classify, get a second opinion and finish without buttons. */
+  enabled?: boolean;
+  /** Share of AI-accepted kernels sent to a person anyway, to keep measuring accuracy. */
+  spotCheckPct?: number;
+  /** Write the plain-language summary when a sample finishes. */
+  autoSummary?: boolean;
+}
+
 export const organizations = pgTable("organizations", {
   id: id(),
   name: text("name").notNull(),
   defaultModel: text("default_model"),
   site: jsonb("site").$type<SiteSettings>().notNull().default({}),
+  autopilot: jsonb("autopilot")
+    .$type<AutopilotSettings>()
+    .notNull()
+    .default({}),
   createdAt: createdAt(),
 });
 
@@ -230,6 +247,8 @@ export const samples = pgTable(
     source: text("source"),
     notes: text("notes"),
     status: sampleStatusEnum("status").notNull().default("in_progress"),
+    /** All photos are taken: Autopilot finishes the sample once nothing waits on a person. */
+    autoFinish: boolean("auto_finish").notNull().default(false),
     model: text("model"),
     sampleMassG: doublePrecision("sample_mass_g"),
     moisturePct: doublePrecision("moisture_pct"),
@@ -317,6 +336,16 @@ export const reviewStatusEnum = pgEnum("review_status", [
   "corrected",
 ]);
 
+export type FlagReason =
+  | "cluster"
+  | "unclear"
+  | "low_confidence"
+  | "medium_confidence"
+  | "defect"
+  | "harmful"
+  | "disagreement"
+  | "spot_check";
+
 export const kernels = pgTable(
   "kernels",
   {
@@ -344,6 +373,14 @@ export const kernels = pgTable(
     aiClass: text("ai_class"),
     aiConfidence: text("ai_confidence").$type<"high" | "medium" | "low">(),
     aiReason: text("ai_reason"),
+    /** Second, independent verdict (Autopilot), on a sheet with different neighbours. */
+    aiClass2: text("ai_class2"),
+    aiConfidence2: text("ai_confidence2").$type<"high" | "medium" | "low">(),
+    /**
+     * Why a person must look at this kernel; null when the AI's verdict stands.
+     * Set by triage after classification.
+     */
+    flagReason: text("flag_reason").$type<FlagReason>(),
     finalClass: text("final_class"),
     reviewStatus: reviewStatusEnum("review_status")
       .notNull()
@@ -370,7 +407,9 @@ export const analysisRuns = pgTable("analysis_runs", {
   batchId: uuid("batch_id").references(() => batches.id, {
     onDelete: "cascade",
   }),
-  kind: text("kind").$type<"classify" | "summary">().notNull(),
+  kind: text("kind")
+    .$type<"classify" | "second_opinion" | "summary">()
+    .notNull(),
   model: text("model").notNull(),
   requests: integer("requests").notNull().default(0),
   inputTokens: integer("input_tokens").notNull().default(0),

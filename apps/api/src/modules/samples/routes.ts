@@ -1,19 +1,23 @@
+import { summarizePercentages, validateMeasurement } from "@ai-grain/core";
 import {
-  CLASS_GROUPS,
-  GROUP_LABELS,
-  classLabel,
-  roundPct,
-  summarizePercentages,
-  validateMeasurement,
-} from "@ai-grain/core";
-import { and, asc, count, desc, eq, ilike, or, sql } from "drizzle-orm";
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { CLAUDE_MODELS } from "../../config.js";
 import type { AppContext } from "../../context.js";
 import {
-  analysisRuns,
   batches,
+  kernels,
   samples,
   standards,
   users,
@@ -33,20 +37,17 @@ import {
   modelFor,
 } from "../batches/service.js";
 import { ensureCrop, normalizeCropKey } from "../crops/service.js";
-import {
-  issueCertificate,
-  withdrawCertificates,
-} from "../certificates/service.js";
+import { withdrawCertificates } from "../certificates/service.js";
 import { getStandard } from "../standards/routes.js";
-import {
-  estimateFor,
-  estimateResult,
-  gradeFor,
-  loadSample,
-  measurementOf,
-  refreshResult,
-} from "./service.js";
+import { estimateFor, gradeFor, loadSample, refreshResult } from "./service.js";
 import { likePattern } from "../../lib/pagination.js";
+import {
+  completeSample,
+  completionProblems,
+  finishIfReady,
+  policyForOrg,
+  writeSummary,
+} from "../autopilot/service.js";
 
 const Mass = z.number().positive().max(100_000);
 const Pct = z.number().min(0).max(100);
@@ -71,6 +72,23 @@ export function sampleRoutes(ctx: AppContext) {
   return (app: FastifyInstance) => {
     app.addHook("preHandler", authenticate(ctx));
     const write = { preHandler: requireRole(...WRITE_ROLES) };
+
+    /** What the AI did on a sample and why kernels went to a person. */
+    async function autopilotStatus(sampleId: string, orgId: string) {
+      const policy = await policyForOrg(ctx, orgId);
+      const byReason = await ctx.db
+        .select({ reason: kernels.flagReason, count: count() })
+        .from(kernels)
+        .where(eq(kernels.sampleId, sampleId))
+        .groupBy(kernels.flagReason);
+      const flagged: Partial<Record<string, number>> = {};
+      let accepted = 0;
+      for (const r of byReason) {
+        if (r.reason) flagged[r.reason] = r.count;
+        else accepted += r.count;
+      }
+      return { ...policy, acceptedByAi: accepted, flaggedByReason: flagged };
+    }
 
     async function editable(orgId: string, id: string) {
       const sample = await loadSample(ctx, orgId, id);
@@ -131,7 +149,42 @@ export function sampleRoutes(ctx: AppContext) {
           .offset(q.offset),
         ctx.db.select({ total: count() }).from(samples).where(where),
       ]);
-      return { items, total: totals?.total ?? 0 };
+      // Where people are needed: kernels waiting for review, photos in progress.
+      const ids = items.map((i) => i.id);
+      const [queues, busy] = ids.length
+        ? await Promise.all([
+            ctx.db
+              .select({ sampleId: kernels.sampleId, count: count() })
+              .from(kernels)
+              .where(
+                and(
+                  inArray(kernels.sampleId, ids),
+                  isNotNull(kernels.flagReason),
+                  eq(kernels.reviewStatus, "pending"),
+                ),
+              )
+              .groupBy(kernels.sampleId),
+            ctx.db
+              .selectDistinct({ sampleId: batches.sampleId })
+              .from(batches)
+              .where(
+                and(
+                  inArray(batches.sampleId, ids),
+                  inArray(batches.status, ["detecting", "classifying"]),
+                ),
+              ),
+          ])
+        : [[], []];
+      const queue = new Map(queues.map((q) => [q.sampleId, q.count]));
+      const processing = new Set(busy.map((b) => b.sampleId));
+      return {
+        items: items.map((i) => ({
+          ...i,
+          pendingReview: queue.get(i.id) ?? 0,
+          processing: processing.has(i.id),
+        })),
+        total: totals?.total ?? 0,
+      };
     });
 
     app.post("/samples", write, async (request, reply) => {
@@ -239,6 +292,7 @@ export function sampleRoutes(ctx: AppContext) {
         effectiveModel: model,
         batches: batchRows,
         kernels: summary,
+        autopilot: await autopilotStatus(id, me.orgId),
       };
     });
 
@@ -285,88 +339,54 @@ export function sampleRoutes(ctx: AppContext) {
         .update(samples)
         .set({ sampleMassG, cupMassG: body.cupMassG })
         .where(eq(samples.id, id));
-      return refreshResult(ctx, id);
+      const refreshed = await refreshResult(ctx, id);
+      // Weighed now: that may be all Autopilot was waiting for.
+      ctx.jobs.run(`finish ${id}`, async () => {
+        await finishIfReady(ctx, id);
+      });
+      return refreshed;
     });
 
     /**
      * Completes a sample. The result comes from the scale when the sample was
-     * weighed. Without a sample mass, it can come from the photo estimate if
-     * the sample's standard allows that. Flagged kernels must be reviewed either way.
+     * weighed; otherwise from the photo estimate, if the sample's standard
+     * allows that (or, with Autopilot, when there is no standard). Flagged
+     * kernels must be reviewed either way.
      */
     app.post("/samples/:id/complete", write, async (request) => {
       const me = authOf(request);
       const { id } = z.object({ id: z.uuid() }).parse(request.params);
       const sample = await editable(me.orgId, id);
-      const standard = sample.standardId
-        ? await getStandard(ctx, me.orgId, sample.standardId)
-        : null;
-      const summary = await kernelSummary(ctx, { sampleId: id });
-      const weighed = measurementOf(sample) !== null;
-      const onEstimate = !weighed && standard?.allowEstimate === true;
-      const problems: string[] = [];
-      if (!weighed && !onEstimate) {
-        problems.push(
-          standard
-            ? "enter the sample mass (this standard doesn't allow completing on the photo estimate)"
-            : "enter the sample mass",
-        );
-      }
-      if (
-        onEstimate &&
-        (summary.total === 0 || summary.classified < summary.total)
-      ) {
-        problems.push(
-          "photograph the sample and classify every kernel, for the photo estimate",
-        );
-      }
-      if ((await busyBatches(ctx, id)).length)
-        problems.push("wait for photos to finish processing");
-      if (summary.pendingReview > 0) {
-        problems.push(
-          `check the ${summary.pendingReview} flagged kernel(s) still waiting for review`,
-        );
-      }
+      const problems = await completionProblems(ctx, sample);
       if (problems.length)
         throw badRequest(`Before completing: ${problems.join(", ")}.`);
-
-      let result;
-      if (weighed) {
-        result = (await refreshResult(ctx, id)).result;
-      } else {
-        const crop = await ensureCrop(ctx, me.orgId, sample.crop);
-        result = estimateResult(
-          await estimateFor(ctx, id, crop.classes),
-          sample,
-          standard?.grades ?? null,
-        );
-      }
-      const [row] = await ctx.db
-        .update(samples)
-        .set({
-          status: "completed",
-          result,
-          completedAt: new Date(),
-          completedBy: me.id,
-        })
-        .where(eq(samples.id, id))
-        .returning();
-      const certificate = await issueCertificate(ctx, id, me.id);
-      await audit(ctx.db, {
-        orgId: me.orgId,
-        userId: me.id,
-        action: "samples.completed",
-        detail: {
-          id,
-          number: sample.number,
-          grade: result?.grade.grade ?? null,
-          source: result?.source ?? "weighed",
-          certificate: certificate.code,
-        },
-      });
+      const { row, certificate } = await completeSample(ctx, sample, me.id);
       return {
         ...row,
         certificate: { code: certificate.code, version: certificate.version },
       };
+    });
+
+    /**
+     * All photos are in: Autopilot completes the sample as soon as nothing
+     * waits on a person (now, or after the last review). Returns what is
+     * still outstanding.
+     */
+    app.post("/samples/:id/finish", write, async (request) => {
+      const me = authOf(request);
+      const { id } = z.object({ id: z.uuid() }).parse(request.params);
+      const sample = await editable(me.orgId, id);
+      await ctx.db
+        .update(samples)
+        .set({ autoFinish: true })
+        .where(eq(samples.id, id));
+      const waitingFor = await completionProblems(ctx, sample);
+      if (!waitingFor.length) {
+        ctx.jobs.run(`finish ${id}`, async () => {
+          await finishIfReady(ctx, id);
+        });
+      }
+      return { autoFinish: true, waitingFor };
     });
 
     app.post("/samples/:id/reopen", write, async (request) => {
@@ -379,6 +399,8 @@ export function sampleRoutes(ctx: AppContext) {
           status: "in_progress",
           completedAt: null,
           completedBy: null,
+          // Reopened for changes: finishes again only when asked.
+          autoFinish: false,
           // An estimate-based result is shown live again while the sample is open.
           ...(sample.result?.source === "estimate" && { result: null }),
         })
@@ -442,69 +464,15 @@ export function sampleRoutes(ctx: AppContext) {
       return row;
     });
 
-    /** Asks Claude for a short plain-language report of the computed results. */
+    /** Asks Model Orchestration for a short plain-language report of the results. */
     app.post("/samples/:id/summary", write, async (request) => {
       const me = authOf(request);
       const { id } = z.object({ id: z.uuid() }).parse(request.params);
       const sample = await loadSample(ctx, me.orgId, id);
       if (!sample.result)
         throw badRequest("Enter the weights before asking for a summary");
-      const standard = sample.standardId
-        ? await getStandard(ctx, me.orgId, sample.standardId)
-        : null;
-      const kernels = await kernelSummary(ctx, { sampleId: id });
-      const model = await modelFor(ctx, id);
-      const crop = await ensureCrop(ctx, me.orgId, sample.crop);
-      const pct = summarizePercentages(sample.result.byClassPct, crop.classes);
-      const started = Date.now();
-      const facts = {
-        sample: `#${sample.number}`,
-        crop: crop.label,
-        source: sample.source,
-        standard: standard?.name ?? null,
-        sampleMassG: sample.sampleMassG,
-        moisturePct: sample.moisturePct,
-        testWeightKgPerHl: sample.testWeightKgPerHl,
-        massPctByClass: Object.fromEntries(
-          crop.classes.map((c) => [c.label, roundPct(pct.byClass[c.id] ?? 0)]),
-        ),
-        massPctByGroup: Object.fromEntries(
-          CLASS_GROUPS.map((g) => [GROUP_LABELS[g], roundPct(pct.byGroup[g])]),
-        ),
-        totalDefectsPct: roundPct(pct.totalDefectsPct),
-        purityPct: roundPct(pct.purityPct),
-        grade: sample.result.grade.grade,
-        failedLimitsPerGrade: sample.result.grade.failures,
-        gradeLimits: standard?.grades ?? null,
-        kernelsPhotographed: kernels.total,
-        kernelsFlaggedByClaude: kernels.flagged,
-        kernelCountsByClass: Object.fromEntries(
-          Object.entries(kernels.byClass).map(([id, n]) => [
-            classLabel(crop.classes, id),
-            n,
-          ]),
-        ),
-      };
       try {
-        const { text, usage } = await ctx.classifier.summarize({
-          model,
-          facts,
-        });
-        await ctx.db.insert(analysisRuns).values({
-          orgId: me.orgId,
-          sampleId: id,
-          kind: "summary",
-          model,
-          requests: 1,
-          ...usage,
-          durationMs: Date.now() - started,
-        });
-        const [row] = await ctx.db
-          .update(samples)
-          .set({ aiSummary: text, updatedAt: new Date() })
-          .where(eq(samples.id, id))
-          .returning();
-        return row;
+        return await writeSummary(ctx, id);
       } catch (err) {
         throw badRequest(
           `Model Orchestration could not write the summary: ${err instanceof Error ? err.message : String(err)}`,

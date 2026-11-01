@@ -2585,3 +2585,137 @@ body:has(.app-view) .toast {
 .breadcrumb [aria-current] {
   color: var(--text);
 }
+
+/* Autopilot card on the sample page */
+.autopilot {
+  border-color: color-mix(in srgb, var(--primary), transparent 70%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--primary-soft), var(--surface) 55%),
+    var(--surface) 60%
+  );
+}
+
+.autopilot-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.autopilot-title svg {
+  color: var(--primary);
+}
+
+.pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.pipeline-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.pipeline-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.pipeline-step.is-done .pipeline-icon {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
+}
+
+.pipeline-step.is-active .pipeline-icon {
+  border-color: var(--info);
+  color: var(--info);
+}
+
+.pipeline-step.is-active .pipeline-icon svg {
+  animation: spin 1s linear infinite;
+}
+
+.pipeline-step.is-attention .pipeline-icon {
+  background: var(--warn-bg);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.pipeline-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.pipeline-text strong {
+  font-size: 0.88rem;
+}
+
+.pipeline-text span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.ai-share {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ai-share-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border), var(--bg) 30%);
+  overflow: hidden;
+}
+
+.ai-share-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 0.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pipeline-step.is-active .pipeline-icon svg {
+    animation: none;
+  }
+}
+
+.weigh-verify > summary {
+  list-style-position: inside;
+  padding: 0.1rem 0;
+}
+
+.weigh-verify[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
+.weigh-verify .card {
+  box-shadow: none;
+}
+
+.capture-preview {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: #000;
+}

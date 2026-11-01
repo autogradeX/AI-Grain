@@ -37,4 +37,7 @@ export const m = defineMessages({
     hi: "0.01 g वाले तराज़ू पर 20–25 g तौलें (गेहूँ के लगभग 500–600 दाने)।",
   },
   createSample: { en: "Create sample", hi: "नमूना बनाएँ" },
+  needsReview_one: { en: "{count} to review", hi: "{count} जाँचना है" },
+  needsReview_other: { en: "{count} to review", hi: "{count} जाँचने हैं" },
+  aiWorking: { en: "AI working…", hi: "AI काम कर रहा है…" },
 });

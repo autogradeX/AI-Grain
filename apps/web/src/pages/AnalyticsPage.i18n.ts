@@ -138,4 +138,17 @@ export const m = defineMessages({
     en: "Estimated from token counts at list prices; your invoice is the reference.",
     hi: "टोकन संख्या और सूची मूल्य से अनुमानित; असली खर्च आपके बिल में देखें।",
   },
+  aiHandled: { en: "Kernels settled by AI", hi: "AI द्वारा तय दाने" },
+  aiHandledNote: {
+    en: "no person needed · {count} samples finished by Autopilot",
+    hi: "किसी व्यक्ति की ज़रूरत नहीं · {count} नमूने ऑटोपायलट ने पूरे किए",
+  },
+  spotAgreement: {
+    en: "Spot checks agreeing with AI",
+    hi: "AI से सहमत यादृच्छिक जाँचें",
+  },
+  spotAgreementNote: {
+    en: "of {count} random checks of AI-settled kernels",
+    hi: "AI-तय दानों की {count} यादृच्छिक जाँचों में",
+  },
 });

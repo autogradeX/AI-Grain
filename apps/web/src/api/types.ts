@@ -18,6 +18,7 @@ export interface Org {
   claudeConfigured: boolean;
   /** This organisation runs the public website (demo, hub, enquiries). */
   isSiteOwner: boolean;
+  autopilot: AutopilotPolicy;
 }
 
 export interface Standard {
@@ -59,6 +60,24 @@ export interface CropProfile {
   classes: ClassDef[];
 }
 
+/** How much of a sample the AI handles on its own (organisation setting). */
+export interface AutopilotPolicy {
+  enabled: boolean;
+  spotCheckPct: number;
+  autoSummary: boolean;
+}
+
+/** Why a kernel went to a person; null when the AI's verdict stands. */
+export type FlagReason =
+  | "cluster"
+  | "unclear"
+  | "low_confidence"
+  | "medium_confidence"
+  | "defect"
+  | "harmful"
+  | "disagreement"
+  | "spot_check";
+
 export interface SampleListItem {
   id: string;
   number: number;
@@ -71,6 +90,10 @@ export interface SampleListItem {
   createdByName: string | null;
   createdAt: string;
   completedAt: string | null;
+  /** Kernels waiting for a person. */
+  pendingReview: number;
+  /** Photos still being processed. */
+  processing: boolean;
 }
 
 export interface SampleResult {
@@ -125,6 +148,8 @@ export interface Sample {
   result: SampleResult | null;
   reference: ReferenceResult | null;
   aiSummary: string | null;
+  /** Null when Autopilot completed the sample. */
+  completedBy: string | null;
   /** Shown on the public website's demo page. */
   publicDemo: boolean;
   demoTitle: string | null;
@@ -143,6 +168,13 @@ export interface Sample {
     createdAt: string;
   }[];
   kernels: KernelSummary;
+  /** All photos are in: Autopilot finishes once nothing waits on a person. */
+  autoFinish: boolean;
+  autopilot: AutopilotPolicy & {
+    /** Kernels whose AI verdict stands without a person. */
+    acceptedByAi: number;
+    flaggedByReason: Partial<Record<FlagReason, number>>;
+  };
 }
 
 export interface Kernel {
@@ -159,6 +191,9 @@ export interface Kernel {
   aiReason: string | null;
   finalClass: string | null;
   reviewStatus: "pending" | "confirmed" | "corrected";
+  aiClass2: string | null;
+  aiConfidence2: "high" | "medium" | "low" | null;
+  flagReason: FlagReason | null;
   needsReview: boolean;
 }
 
@@ -190,6 +225,8 @@ export interface ReviewKernel {
   aiReason: string | null;
   finalClass: string | null;
   reviewStatus: "pending" | "confirmed" | "corrected";
+  aiClass2: string | null;
+  flagReason: FlagReason | null;
 }
 
 export interface UserRow {

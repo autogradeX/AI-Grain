@@ -151,6 +151,12 @@ export function SamplesPage() {
                   <Badge tone={s.grade ? "good" : "warn"}>
                     {s.grade ? t("grade", { grade: s.grade }) : t("noGrade")}
                   </Badge>
+                ) : s.pendingReview > 0 ? (
+                  <Badge tone="warn">
+                    {t.n("needsReview", s.pendingReview)}
+                  </Badge>
+                ) : s.processing ? (
+                  <Badge tone="info">{t("aiWorking")}</Badge>
                 ) : (
                   <Badge tone="info">{t("inProgress")}</Badge>
                 )}

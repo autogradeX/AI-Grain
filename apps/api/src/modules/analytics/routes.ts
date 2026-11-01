@@ -331,6 +331,21 @@ export function analyticsRoutes(ctx: AppContext) {
         0,
       );
 
+      // Autopilot: how much the AI settled alone, and how often people agreed
+      // with it when they checked a random sample of those verdicts.
+      const ids = rows.map((r) => r.id);
+      const [ai] = ids.length
+        ? await ctx.db
+            .select({
+              classified: sql<number>`count(${kernels.aiClass})::int`,
+              acceptedByAi: sql<number>`count(*) filter (where ${kernels.aiClass} is not null and ${kernels.flagReason} is null)::int`,
+              spotChecked: sql<number>`count(*) filter (where ${kernels.flagReason} = 'spot_check' and ${kernels.reviewStatus} <> 'pending')::int`,
+              spotAgreed: sql<number>`count(*) filter (where ${kernels.flagReason} = 'spot_check' and ${kernels.reviewStatus} = 'confirmed')::int`,
+            })
+            .from(kernels)
+            .where(inArray(kernels.sampleId, ids))
+        : [];
+
       const turnaround = completed.map(
         (r) => (r.completedAt!.getTime() - r.createdAt.getTime()) / 60000,
       );
@@ -350,6 +365,14 @@ export function analyticsRoutes(ctx: AppContext) {
           costPerCompletedSampleUsd: completed.length
             ? costTotal / completed.length
             : null,
+          aiHandledRate: ai?.classified
+            ? ai.acceptedByAi / ai.classified
+            : null,
+          spotChecked: ai?.spotChecked ?? 0,
+          spotCheckAgreement: ai?.spotChecked
+            ? ai.spotAgreed / ai.spotChecked
+            : null,
+          completedByAutopilot: completed.filter((r) => !r.completedBy).length,
         },
         perDay: [...perDay.entries()].map(([date, v]) => ({ date, ...v })),
         groupTrend,

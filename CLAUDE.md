@@ -14,7 +14,8 @@ Rules:
 - After changing `apps/api/src/db/schema.ts`, run `npm run db:generate -- --name <change>` and commit the migration. Never edit a migration that has been released; add a new one.
 - The API must keep working on Cloud Run (see `deploy/cloud-run.md`): no state on local disk (use `ctx.storage`), no state in memory that other instances need, and background jobs must survive being cut off.
 - Grade limits are configuration supplied by the user. Don't hard-code official grade standards.
-- Kernel counting stays in classic image processing (`apps/api/src/imaging`); Claude only classifies crops. Final percentages come from the scale.
+- Kernel counting and corner finding stay in classic image processing (`apps/api/src/imaging`); Claude only classifies crops.
+- Autopilot (`apps/api/src/modules/autopilot`, on by default per organisation) runs the pipeline: corners, classification, a second opinion on defects, triage, finishing. `flagFor` in `triage.ts` is the single rule for which kernels a person reviews; harmful classes, disagreements, low confidence, clusters and spot checks always go to a person. Results come from the photo estimate unless the sample was weighed; a standard with `allowEstimate: false` still requires the scale. Reports say which source a result has.
 - Public endpoints (`/api/public/...`) only expose data of the site-owner organisation that it chose to publish (demo samples, published articles, certificates).
 - User-facing text (UI, PDF, API messages, seeded content) calls the AI "Model Orchestration" and model choices Standard / Economy / Advanced (`i18n/models.ts`, `MODEL_TIERS` in `config.ts`). Never show Claude or other model names to users; code identifiers and env vars may keep them.
 - UI text goes in a sibling `<Module>.i18n.ts` (`defineMessages`, English and Hindi) read with `useT`; show class, group and crop names with `useGrainLabels()`.

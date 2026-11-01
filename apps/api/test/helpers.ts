@@ -136,10 +136,15 @@ export function refreshCookie(res: {
   return c.value;
 }
 
+/**
+ * Signs up a new organisation. Autopilot is switched off unless asked for,
+ * so tests can walk through each manual step; autopilot.test.ts covers it.
+ */
 export async function register(
   t: TestApp,
   email = "admin@farm.test",
   orgName = "Farm",
+  options: { autopilot?: boolean } = {},
 ) {
   const res = await t.app.inject({
     method: "POST",
@@ -153,6 +158,14 @@ export async function register(
   });
   if (res.statusCode !== 201) throw new Error(res.body);
   const body = res.json<{ accessToken: string; user: { id: string } }>();
+  if (!options.autopilot) {
+    await t.app.inject({
+      method: "PATCH",
+      url: "/api/org",
+      headers: { authorization: `Bearer ${body.accessToken}` },
+      payload: { autopilot: { enabled: false } },
+    });
+  }
   return {
     token: body.accessToken,
     userId: body.user.id,

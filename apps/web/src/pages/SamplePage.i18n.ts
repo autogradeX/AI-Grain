@@ -187,6 +187,10 @@ export const m = defineMessages({
     en: "Enter the cup weights to see the result, or complete the sample on the photo estimate (this standard allows it).",
     hi: "परिणाम देखने के लिए कपों का वज़न भरें, या फ़ोटो के अनुमान पर नमूना पूरा करें (यह मानक इसकी अनुमति देता है)।",
   },
+  autopilotReport: {
+    en: "Autopilot completes the sample and issues the report on the photo estimate once nothing waits on you. Weighing the cups is optional.",
+    hi: "जब आपके लिए कुछ बाकी नहीं रहता, ऑटोपायलट फ़ोटो के अनुमान पर नमूना पूरा करके रिपोर्ट जारी करता है। कपों का वज़न करना वैकल्पिक है।",
+  },
   noStandardShort: { en: "No standard", hi: "कोई मानक नहीं" },
   purityLine: {
     en: "Purity {purity} · total defects {defects} by mass",
@@ -274,4 +278,13 @@ export const m = defineMessages({
   grader: { en: "Grader", hi: "ग्रेडर" },
   date: { en: "Date", hi: "तारीख़" },
   classPct: { en: "{class} (%)", hi: "{class} (%)" },
+  verifyByWeighing: { en: "Verify by weighing", hi: "तौलकर पुष्टि करें" },
+  weighingOptional: {
+    en: "Optional: the scale confirms the AI's photo estimate.",
+    hi: "वैकल्पिक: स्केल AI के फ़ोटो अनुमान की पुष्टि करता है।",
+  },
+  weighingRequired: {
+    en: "Required by this sample's standard.",
+    hi: "इस नमूने के मानक के अनुसार ज़रूरी।",
+  },
 });

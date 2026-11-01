@@ -20,6 +20,7 @@ import { LanguageSelect, useT } from "../i18n";
 import { common } from "../i18n/common";
 import { useModelLabel } from "../i18n/models";
 import { AppSettingsCard } from "../pwa/Pwa";
+import { AutopilotSettingsCard } from "./AutopilotSettings";
 import { m } from "./SettingsPage.i18n";
 
 const ROLE_NAME = {
@@ -43,6 +44,7 @@ export function SettingsPage() {
       <ProfileCard />
       <PasswordCard />
       <SessionsCard />
+      <AutopilotSettingsCard />
       <OrgCard />
       {can.admin && <AuditCard />}
     </div>

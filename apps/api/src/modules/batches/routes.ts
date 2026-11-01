@@ -27,12 +27,15 @@ import { ensureCrop } from "../crops/service.js";
 import { loadSample } from "../samples/service.js";
 import {
   batchPrefix,
-  classifyBatch,
   expireStaleBatches,
   kernelSummary,
   needsReview,
-  processBatch,
 } from "./service.js";
+import {
+  classifyAndTriage,
+  finishIfReady,
+  runBatch,
+} from "../autopilot/service.js";
 import { readUpload } from "./upload.js";
 
 const Point = z.object({ x: z.number().finite(), y: z.number().finite() });
@@ -69,7 +72,9 @@ export function batchRoutes(ctx: AppContext) {
     /**
      * Uploads one board photo. `corners` are the grid's outer corners in the
      * photo (TL, TR, BR, BL) measured on an image `imageWidth` × `imageHeight`
-     * pixels; the server rescales them to its stored copy.
+     * pixels; the server rescales them to its stored copy. Without corners the
+     * server finds the grid itself. `finish` says this is the sample's last
+     * photo: Autopilot completes the sample once nothing waits on a person.
      */
     app.post("/samples/:sampleId/batches", write, async (request, reply) => {
       const me = authOf(request);
@@ -81,12 +86,16 @@ export function batchRoutes(ctx: AppContext) {
       const fields = z
         .object({
           side: z.enum(["front", "crease"]).default("front"),
-          corners: z.string(),
-          imageWidth: z.coerce.number().positive(),
-          imageHeight: z.coerce.number().positive(),
+          corners: z.string().optional(),
+          imageWidth: z.coerce.number().positive().optional(),
+          imageHeight: z.coerce.number().positive().optional(),
+          finish: z.enum(["true", "false"]).optional(),
         })
         .parse(upload.fields);
-      const clientCorners = CornersSchema.parse(JSON.parse(fields.corners));
+      const clientCorners =
+        fields.corners && fields.imageWidth && fields.imageHeight
+          ? CornersSchema.parse(JSON.parse(fields.corners))
+          : null;
 
       let normalized;
       try {
@@ -94,12 +103,12 @@ export function batchRoutes(ctx: AppContext) {
       } catch {
         throw badRequest("The file is not a readable image");
       }
-      const sx = normalized.width / fields.imageWidth;
-      const sy = normalized.height / fields.imageHeight;
-      const corners = clientCorners.map((p) => ({
-        x: p.x * sx,
-        y: p.y * sy,
-      })) as Corners;
+      const corners = clientCorners
+        ? (clientCorners.map((p) => ({
+            x: (p.x * normalized.width) / fields.imageWidth!,
+            y: (p.y * normalized.height) / fields.imageHeight!,
+          })) as Corners)
+        : null;
 
       const [batch] = await ctx.db
         .insert(batches)
@@ -122,10 +131,13 @@ export function batchRoutes(ctx: AppContext) {
         .where(eq(batches.id, batch!.id));
       await ctx.db
         .update(samples)
-        .set({ updatedAt: new Date() })
+        .set({
+          updatedAt: new Date(),
+          ...(fields.finish === "true" && { autoFinish: true }),
+        })
         .where(eq(samples.id, sample.id));
-      ctx.jobs.run(`detect ${batch!.id}`, () =>
-        processBatch(ctx, batch!.id, corners),
+      ctx.jobs.run(`batch ${batch!.id}`, () =>
+        runBatch(ctx, batch!.id, corners),
       );
       reply.code(202);
       return { ...batch!, originalKey, status: "detecting" };
@@ -150,6 +162,9 @@ export function batchRoutes(ctx: AppContext) {
           aiReason: kernels.aiReason,
           finalClass: kernels.finalClass,
           reviewStatus: kernels.reviewStatus,
+          aiClass2: kernels.aiClass2,
+          aiConfidence2: kernels.aiConfidence2,
+          flagReason: kernels.flagReason,
           needsReview,
         })
         .from(kernels)
@@ -199,7 +214,7 @@ export function batchRoutes(ctx: AppContext) {
         .update(batches)
         .set({ status: "detecting" })
         .where(eq(batches.id, id));
-      ctx.jobs.run(`detect ${id}`, () => processBatch(ctx, id, body.corners));
+      ctx.jobs.run(`batch ${id}`, () => runBatch(ctx, id, body.corners));
       reply.code(202);
       return { ok: true };
     });
@@ -227,7 +242,7 @@ export function batchRoutes(ctx: AppContext) {
         .update(batches)
         .set({ status: "classifying", error: null })
         .where(eq(batches.id, id));
-      ctx.jobs.run(`classify ${id}`, () => classifyBatch(ctx, id));
+      ctx.jobs.run(`classify ${id}`, () => classifyAndTriage(ctx, id));
       reply.code(202);
       return { ok: true };
     });
@@ -285,6 +300,8 @@ export function batchRoutes(ctx: AppContext) {
           aiReason: kernels.aiReason,
           finalClass: kernels.finalClass,
           reviewStatus: kernels.reviewStatus,
+          aiClass2: kernels.aiClass2,
+          flagReason: kernels.flagReason,
         })
         .from(kernels)
         .innerJoin(batches, eq(batches.id, kernels.batchId))
@@ -366,6 +383,12 @@ export function batchRoutes(ctx: AppContext) {
             .where(eq(kernels.id, d.kernelId));
         }
       });
+      // The last decision may be all that kept a sample from finishing.
+      for (const sampleId of new Set(found.map((k) => k.sampleId))) {
+        ctx.jobs.run(`finish ${sampleId}`, async () => {
+          await finishIfReady(ctx, sampleId);
+        });
+      }
       return { ok: true, updated: body.decisions.length };
     });
 

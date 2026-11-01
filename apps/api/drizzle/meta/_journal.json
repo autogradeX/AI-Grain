@@ -50,6 +50,13 @@
       "when": 1793333052677,
       "tag": "0006_model_orchestration_wording",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793527641880,
+      "tag": "0007_autopilot",
+      "breakpoints": true
     }
   ]
 }

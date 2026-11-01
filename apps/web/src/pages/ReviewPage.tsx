@@ -18,6 +18,7 @@ import {
 } from "../components/ui";
 import { useT } from "../i18n";
 import { useGrainLabels } from "../i18n/common";
+import { FlagReasonBadge } from "../components/FlagReason";
 import { m } from "./ReviewPage.i18n";
 import { useSample } from "./SamplePage";
 
@@ -142,7 +143,11 @@ function ReviewCard({
           <span className="muted small">
             {t(kernel.side === "crease" ? "creaseSide" : "topSide")}
           </span>
-          {kernel.isCluster && <Badge tone="info">{t("touching")}</Badge>}
+          {kernel.flagReason && kernel.flagReason !== "cluster" ? (
+            <FlagReasonBadge reason={kernel.flagReason} />
+          ) : (
+            kernel.isCluster && <Badge tone="info">{t("touching")}</Badge>
+          )}
           <div>
             <ClassBadge cls={kernel.aiClass} classes={classes} />{" "}
             {kernel.aiConfidence && (
@@ -153,6 +158,13 @@ function ReviewCard({
           </div>
           {kernel.aiReason && (
             <span className="muted small">“{kernel.aiReason}”</span>
+          )}
+          {kernel.flagReason === "disagreement" && kernel.aiClass2 && (
+            <span className="small">
+              {t.rich("secondOpinion", {
+                class: <ClassBadge cls={kernel.aiClass2} classes={classes} />,
+              })}
+            </span>
           )}
           {kernel.finalClass && (
             <span className="small">

@@ -52,4 +52,18 @@ export const m = defineMessages({
   retake: { en: "Retake", hi: "दोबारा लें" },
   uploading: { en: "Uploading…", hi: "अपलोड हो रहा है…" },
   findKernels: { en: "Find kernels", hi: "दाने खोजें" },
+  checkPhoto: { en: "Check the photo", hi: "फ़ोटो जाँचें" },
+  photoPreview: { en: "The board photo", hi: "बोर्ड की फ़ोटो" },
+  autoCornersHint: {
+    en: "The grid's corners are found automatically. The whole board must be in the photo, on a lighter surface.",
+    hi: "ग्रिड के कोने अपने आप ढूँढे जाते हैं। पूरा बोर्ड फ़ोटो में हो, हल्के रंग की सतह पर।",
+  },
+  markMyself: {
+    en: "Mark the corners myself",
+    hi: "कोने मैं ख़ुद चिह्नित करूँगा",
+  },
+  lastPhoto: {
+    en: "This is the last photo of the sample: finish automatically",
+    hi: "यह नमूने की आख़िरी फ़ोटो है: अपने आप पूरा करें",
+  },
 });

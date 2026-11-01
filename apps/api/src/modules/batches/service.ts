@@ -30,6 +30,7 @@ import {
   type Corners,
 } from "../../db/schema.js";
 import { straightenBoard } from "../../imaging/board.js";
+import { findGridCorners } from "../../imaging/corners.js";
 import { detectKernels } from "../../imaging/detect.js";
 import {
   boardPreview,
@@ -42,12 +43,8 @@ import { mapLimit } from "../../lib/jobs.js";
 import { classesWithDefinitions, ensureCrop } from "../crops/service.js";
 import { MAX_REFERENCES_PER_REQUEST } from "../references/routes.js";
 
-/** A kernel the operator must look at: anything not confidently sound, and every cluster. */
-export const needsReview: SQL<boolean> = sql<boolean>`(
-  ${kernels.isCluster}
-  or (${kernels.aiClass} is not null and ${kernels.aiClass} <> 'sound')
-  or ${kernels.aiConfidence} = 'low'
-)`;
+/** A kernel a person must look at: triage gave it a reason (see autopilot/triage.ts). */
+export const needsReview: SQL<boolean> = sql<boolean>`(${kernels.flagReason} is not null)`;
 
 /** The class that counts: the operator's decision, else Claude's. */
 export const effectiveClass = sql<
@@ -101,17 +98,28 @@ async function setBatch(
 export async function processBatch(
   ctx: AppContext,
   batchId: string,
-  corners: Corners,
+  given: Corners | null,
 ): Promise<void> {
   const [batch] = await ctx.db
     .select()
     .from(batches)
     .where(eq(batches.id, batchId));
   if (!batch) return;
-  await setBatch(ctx, batchId, { status: "detecting", corners, error: null });
+  await setBatch(ctx, batchId, { status: "detecting", error: null });
   try {
     const prefix = batchPrefix(batch);
     const original = await ctx.storage.get(batch.originalKey);
+    // No corners from the operator: find the grid in the photo.
+    const corners = given ?? (await findGridCorners(original));
+    if (!corners) {
+      await setBatch(ctx, batchId, {
+        status: "failed",
+        error:
+          "The grid board wasn't found in this photo. Mark its four corners, or retake the photo with the whole board on a lighter surface.",
+      });
+      return;
+    }
+    await setBatch(ctx, batchId, { corners });
     const board = await straightenBoard(original, corners);
     const detection = await detectKernels(board);
     const windowCm = cropWindowCm(detection.kernels);
@@ -222,22 +230,30 @@ export async function loadReferences(
   );
 }
 
+type KernelRow = typeof kernels.$inferSelect;
+
 /**
- * Sends the batch's unclassified kernels to Claude, 30 per sheet. Kernels
- * already classified keep their verdicts, so a retry after a failure only
- * re-sends what is missing.
+ * Sends kernels to the classifier, 30 per sheet, and records the usage.
+ * Returns the first error, or null. `shuffle` puts kernels next to different
+ * neighbours (for an independent second opinion).
  */
-export async function classifyBatch(
+export async function classifyKernels(
   ctx: AppContext,
   batchId: string,
-): Promise<void> {
+  todo: KernelRow[],
+  options: {
+    kind: "classify" | "second_opinion";
+    shuffle?: boolean;
+    save: (verdicts: KernelVerdict[]) => Promise<void>;
+  },
+): Promise<string | null> {
   const [row] = await ctx.db
     .select({ batch: batches, sample: samples, standard: standards })
     .from(batches)
     .innerJoin(samples, eq(samples.id, batches.sampleId))
     .leftJoin(standards, eq(standards.id, samples.standardId))
     .where(eq(batches.id, batchId));
-  if (!row) return;
+  if (!row) return "batch not found";
   const { batch, sample, standard } = row;
   const model = await modelFor(ctx, sample.id);
   const started = Date.now();
@@ -249,22 +265,17 @@ export async function classifyBatch(
   };
   let requests = 0;
   let failure: string | null;
-
-  await setBatch(ctx, batchId, { status: "classifying", error: null });
   try {
-    const todo = await ctx.db
-      .select()
-      .from(kernels)
-      .where(and(eq(kernels.batchId, batchId), isNull(kernels.aiClass)))
-      .orderBy(asc(kernels.number));
     const crop = await ensureCrop(ctx, sample.orgId, sample.crop);
     const classes = classesWithDefinitions(crop.classes, standard?.definitions);
     const references = await loadReferences(ctx, sample.orgId, sample.crop);
-    const chunks: (typeof todo)[] = [];
-    for (let i = 0; i < todo.length; i += KERNELS_PER_SHEET) {
-      chunks.push(todo.slice(i, i + KERNELS_PER_SHEET));
+    const ordered = options.shuffle
+      ? [...todo].sort((a, b) => mix(a.id) - mix(b.id))
+      : todo;
+    const chunks: KernelRow[][] = [];
+    for (let i = 0; i < ordered.length; i += KERNELS_PER_SHEET) {
+      chunks.push(ordered.slice(i, i + KERNELS_PER_SHEET));
     }
-
     const results = await mapLimit(
       chunks,
       ctx.config.CLASSIFY_CONCURRENCY,
@@ -292,9 +303,9 @@ export async function classifyBatch(
           total.outputTokens += usage.outputTokens;
           total.cacheReadTokens += usage.cacheReadTokens;
           total.cacheWriteTokens += usage.cacheWriteTokens;
-          await saveVerdicts(ctx, batchId, verdicts);
+          await options.save(verdicts);
           // Heartbeat: shows the job is still alive.
-          await setBatch(ctx, batchId, { status: "classifying" });
+          await setBatch(ctx, batchId, { updatedAt: new Date() });
           return null;
         } catch (err) {
           return (err as ClassifierError).message || String(err);
@@ -305,24 +316,64 @@ export async function classifyBatch(
   } catch (err) {
     failure = err instanceof Error ? err.message : String(err);
   }
-
   await ctx.db.insert(analysisRuns).values({
     orgId: sample.orgId,
     sampleId: sample.id,
     batchId,
-    kind: "classify",
+    kind: options.kind,
     model,
     requests,
     ...total,
     durationMs: Date.now() - started,
     error: failure,
   });
-  await setBatch(ctx, batchId, {
-    status: failure ? "failed" : "classified",
-    error: failure
-      ? `Classification incomplete: ${failure}. Retry to classify the remaining kernels.`
-      : null,
+  return failure;
+}
+
+/** A stable pseudo-random number for an id, for shuffling and spot checks. */
+export function mix(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967296;
+}
+
+/**
+ * Sends the batch's unclassified kernels to the classifier. Kernels already
+ * classified keep their verdicts, so a retry after a failure only re-sends
+ * what is missing.
+ */
+export async function classifyBatch(
+  ctx: AppContext,
+  batchId: string,
+  /** False when more steps follow (second opinion, triage): the batch stays busy. */
+  done = true,
+): Promise<boolean> {
+  await setBatch(ctx, batchId, { status: "classifying", error: null });
+  const todo = await ctx.db
+    .select()
+    .from(kernels)
+    .where(and(eq(kernels.batchId, batchId), isNull(kernels.aiClass)))
+    .orderBy(asc(kernels.number));
+  const failure = await classifyKernels(ctx, batchId, todo, {
+    kind: "classify",
+    save: (verdicts) => saveVerdicts(ctx, batchId, verdicts),
   });
+  if (failure) {
+    await setBatch(ctx, batchId, {
+      status: "failed",
+      error: `Classification incomplete: ${failure}. Retry to classify the remaining kernels.`,
+    });
+    return false;
+  }
+  if (done) await setBatch(ctx, batchId, { status: "classified", error: null });
+  return true;
+}
+
+export async function markClassified(ctx: AppContext, batchId: string) {
+  await setBatch(ctx, batchId, { status: "classified", error: null });
 }
 
 async function saveVerdicts(

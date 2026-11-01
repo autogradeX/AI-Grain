@@ -24,6 +24,7 @@ import {
 import { useT, type Translate } from "../i18n";
 import { common, useGrainLabels } from "../i18n/common";
 import { MODEL_TIERS, useModelLabel } from "../i18n/models";
+import { AutopilotCard } from "./AutopilotCard";
 import { m } from "./SamplePage.i18n";
 
 type T = Translate<keyof typeof m>;
@@ -34,8 +35,18 @@ export function useSample(id: string) {
   return useQuery({
     queryKey: ["sample", id],
     queryFn: () => api.get<Sample>(`/samples/${id}`),
-    refetchInterval: (q) =>
-      q.state.data?.batches.some((b) => BUSY.has(b.status)) ? 2000 : false,
+    refetchInterval: (q) => {
+      const d = q.state.data;
+      if (!d) return false;
+      if (d.batches.some((b) => BUSY.has(b.status))) return 2000;
+      // Autopilot is finishing it: result, report and summary arrive shortly.
+      return d.autoFinish &&
+        d.status === "in_progress" &&
+        d.kernels.pendingReview === 0 &&
+        d.kernels.total > 0
+        ? 2000
+        : false;
+    },
   });
 }
 
@@ -54,6 +65,10 @@ export function SamplePage() {
   if (sample.error) return <ErrorNote error={sample.error} />;
   const s = sample.data;
   const editable = can.write && s.status === "in_progress";
+  const autopilot = s.autopilot.enabled;
+  // A standard that doesn't accept the photo estimate needs the scale.
+  const weighingRequired = !!s.standard && !s.standard.allowEstimate;
+  const hasWeights = Object.keys(s.cupMassG).length > 0;
 
   return (
     <div className="stack">
@@ -81,16 +96,48 @@ export function SamplePage() {
       </div>
 
       <DetailsCard sample={s} editable={editable} />
-      <MassCard sample={s} editable={editable} />
-      <PhotosCard sample={s} editable={editable} />
-      <ReviewCard sample={s} />
-      <EstimateCard sample={s} />
-      {/* Keyed by the saved weights, so the form resets when they change on the server. */}
-      <CupsCard
-        key={JSON.stringify(s.cupMassG)}
-        sample={s}
-        editable={editable}
-      />
+      {autopilot ? (
+        <>
+          {/* The AI does the steps; people review the few uncertain kernels. */}
+          <AutopilotCard sample={s} />
+          <PhotosCard sample={s} editable={editable} />
+          <EstimateCard sample={s} />
+          <details
+            className="card weigh-verify"
+            open={weighingRequired || hasWeights}
+          >
+            <summary>
+              <strong>{t("verifyByWeighing")}</strong>{" "}
+              <span className="muted small">
+                {weighingRequired
+                  ? t("weighingRequired")
+                  : t("weighingOptional")}
+              </span>
+            </summary>
+            <div className="stack">
+              <MassCard sample={s} editable={editable} />
+              <CupsCard
+                key={JSON.stringify(s.cupMassG)}
+                sample={s}
+                editable={editable}
+              />
+            </div>
+          </details>
+        </>
+      ) : (
+        <>
+          <MassCard sample={s} editable={editable} />
+          <PhotosCard sample={s} editable={editable} />
+          <ReviewCard sample={s} />
+          <EstimateCard sample={s} />
+          {/* Keyed by the saved weights, so the form resets when they change on the server. */}
+          <CupsCard
+            key={JSON.stringify(s.cupMassG)}
+            sample={s}
+            editable={editable}
+          />
+        </>
+      )}
       <ResultCard sample={s} />
       <ReferenceCard sample={s} />
     </div>
@@ -718,9 +765,12 @@ function ResultCard({ sample }: { sample: Sample }) {
       {!r ? (
         <p className="muted">
           {t(
-            sample.standard?.allowEstimate
-              ? "enterCupsOrEstimate"
-              : "enterCups",
+            sample.autopilot.enabled &&
+              (sample.standard ? sample.standard.allowEstimate : true)
+              ? "autopilotReport"
+              : sample.standard?.allowEstimate
+                ? "enterCupsOrEstimate"
+                : "enterCups",
           )}
         </p>
       ) : (

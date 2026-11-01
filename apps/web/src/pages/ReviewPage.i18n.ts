@@ -14,7 +14,7 @@ export const m = defineMessages({
     hi: "सभी चिह्नित दाने जाँच लिए गए हैं।",
   },
   noFlagged: { en: "No flagged kernels.", hi: "कोई दाना चिह्नित नहीं है।" },
-  backToWeighing: { en: "Back to weighing", hi: "तौल पर वापस जाएँ" },
+  backToWeighing: { en: "Back to the sample", hi: "नमूने पर वापस जाएँ" },
   kernelAlt: { en: "Kernel {number}", hi: "दाना {number}" },
   cell: { en: "Cell {cell} · #{number}", hi: "खाना {cell} · #{number}" },
   creaseSide: { en: "Crease-side photo", hi: "खाँचे वाली तरफ़ की फ़ोटो" },
@@ -34,5 +34,9 @@ export const m = defineMessages({
   useAsReference: {
     en: "Use as a reference example for Model Orchestration",
     hi: "मॉडल ऑर्केस्ट्रेशन के लिए संदर्भ उदाहरण बनाएँ",
+  },
+  secondOpinion: {
+    en: "Second look said: {class}",
+    hi: "दूसरी जाँच का कहना: {class}",
   },
 });

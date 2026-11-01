@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { autopilotOf } from "../autopilot/triage.js";
 import { CLAUDE_MODELS } from "../../config.js";
 import type { AppContext } from "../../context.js";
 import {
@@ -20,6 +21,7 @@ import {
   organizations,
   roleEnum,
   users,
+  type AutopilotSettings,
 } from "../../db/schema.js";
 import { audit } from "../../lib/audit.js";
 import { badRequest, conflict, notFound } from "../../lib/errors.js";
@@ -222,6 +224,8 @@ export function userRoutes(ctx: AppContext) {
       if (!org) throw notFound("Organisation");
       return {
         ...org,
+        // With defaults filled in, as the pipeline applies them.
+        autopilot: autopilotOf(org.autopilot),
         effectiveModel: org.defaultModel ?? ctx.config.DEFAULT_MODEL,
         models: CLAUDE_MODELS,
         claudeConfigured: Boolean(ctx.config.ANTHROPIC_API_KEY),
@@ -236,14 +240,35 @@ export function userRoutes(ctx: AppContext) {
         .object({
           name: z.string().trim().min(1).max(120).optional(),
           defaultModel: z.enum(CLAUDE_MODELS).nullable().optional(),
+          autopilot: z
+            .object({
+              enabled: z.boolean().optional(),
+              spotCheckPct: z.number().min(0).max(20).optional(),
+              autoSummary: z.boolean().optional(),
+            })
+            .optional(),
         })
         .parse(request.body);
+      const [current] = await ctx.db
+        .select({ autopilot: organizations.autopilot })
+        .from(organizations)
+        .where(eq(organizations.id, me.orgId));
       await ctx.db
         .update(organizations)
         .set({
           ...(body.name !== undefined && { name: body.name }),
           ...(body.defaultModel !== undefined && {
             defaultModel: body.defaultModel,
+          }),
+          ...(body.autopilot && {
+            autopilot: {
+              ...current?.autopilot,
+              ...(Object.fromEntries(
+                Object.entries(body.autopilot).filter(
+                  ([, v]) => v !== undefined,
+                ),
+              ) as AutopilotSettings),
+            },
           }),
         })
         .where(eq(organizations.id, me.orgId));

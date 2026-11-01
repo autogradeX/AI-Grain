@@ -22,6 +22,10 @@ interface Analytics {
     claudeConfirmedRate: number | null;
     estimatedClaudeCostUsd: number;
     costPerCompletedSampleUsd: number | null;
+    aiHandledRate: number | null;
+    spotChecked: number;
+    spotCheckAgreement: number | null;
+    completedByAutopilot: number;
   };
   perDay: { date: string; created: number; completed: number }[];
   groupTrend: {
@@ -169,6 +173,26 @@ export function AnalyticsPage() {
       {a && (
         <div className={`stack ${q.isPlaceholderData ? "refetching" : ""}`}>
           <div className="kpis">
+            <Kpi
+              label={t("aiHandled")}
+              value={
+                a.totals.aiHandledRate === null
+                  ? "—"
+                  : `${Math.round(a.totals.aiHandledRate * 100)} %`
+              }
+              note={t("aiHandledNote", {
+                count: a.totals.completedByAutopilot,
+              })}
+            />
+            <Kpi
+              label={t("spotAgreement")}
+              value={
+                a.totals.spotCheckAgreement === null
+                  ? "—"
+                  : `${Math.round(a.totals.spotCheckAgreement * 100)} %`
+              }
+              note={t("spotAgreementNote", { count: a.totals.spotChecked })}
+            />
             <Kpi
               label={t("completedSamples")}
               value={String(a.totals.completed)}

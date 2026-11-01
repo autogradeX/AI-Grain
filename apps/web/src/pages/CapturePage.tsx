@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -10,6 +10,7 @@ import {
 import { LiveCamera } from "../components/LiveCamera";
 import { Card, ErrorNote, Field } from "../components/ui";
 import { useT } from "../i18n";
+import { useSample } from "./SamplePage";
 import { m } from "./CapturePage.i18n";
 
 interface Photo {
@@ -43,6 +44,11 @@ export function CapturePage() {
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [corners, setCorners] = useState<Corners | null>(null);
   const [side, setSide] = useState<"front" | "crease">("front");
+  // Corners: found by the server unless the operator marks them.
+  const [manualCorners, setManualCorners] = useState(false);
+  const [lastPhoto, setLastPhoto] = useState(false);
+  const sample = useSample(id);
+  const autopilot = sample.data?.autopilot.enabled ?? false;
   const [loadError, setLoadError] = useState<unknown>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
@@ -66,18 +72,31 @@ export function CapturePage() {
     }
   };
 
+  const qc = useQueryClient();
   const upload = useMutation({
     mutationFn: () => {
       const form = new FormData();
       form.set("side", side);
-      form.set("corners", JSON.stringify(corners));
-      form.set("imageWidth", String(photo!.width));
-      form.set("imageHeight", String(photo!.height));
+      if (manualCorners) {
+        form.set("corners", JSON.stringify(corners));
+        form.set("imageWidth", String(photo!.width));
+        form.set("imageHeight", String(photo!.height));
+      }
+      if (autopilot && lastPhoto) form.set("finish", "true");
       form.set("photo", photo!.blob, "board.jpg");
       return api.upload<{ id: string }>(`/samples/${id}/batches`, form);
     },
-    onSuccess: (batch) =>
-      navigate(`/app/batches/${batch.id}`, { replace: true }),
+    // With Autopilot the sample page shows the progress; otherwise the photo.
+    onSuccess: async (batch) => {
+      await qc.invalidateQueries({ queryKey: ["sample", id] });
+      void qc.invalidateQueries({ queryKey: ["samples"] });
+      void navigate(
+        autopilot ? `/app/samples/${id}` : `/app/batches/${batch.id}`,
+        {
+          replace: true,
+        },
+      );
+    },
   });
 
   return (
@@ -140,15 +159,36 @@ export function CapturePage() {
       )}
 
       {mode === "choose" && photo && corners && (
-        <Card title={t("markCorners")}>
-          <p className="muted small">{t("markCornersHint")}</p>
-          <CornerEditor
-            src={photo.url}
-            width={photo.width}
-            height={photo.height}
-            corners={corners}
-            onChange={setCorners}
-          />
+        <Card title={manualCorners ? t("markCorners") : t("checkPhoto")}>
+          {manualCorners ? (
+            <>
+              <p className="muted small">{t("markCornersHint")}</p>
+              <CornerEditor
+                src={photo.url}
+                width={photo.width}
+                height={photo.height}
+                corners={corners}
+                onChange={setCorners}
+              />
+            </>
+          ) : (
+            <>
+              <img
+                src={photo.url}
+                alt={t("photoPreview")}
+                className="capture-preview"
+              />
+              <p className="muted small">{t("autoCornersHint")}</p>
+            </>
+          )}
+          <label className="row small">
+            <input
+              type="checkbox"
+              checked={manualCorners}
+              onChange={(e) => setManualCorners(e.target.checked)}
+            />
+            {t("markMyself")}
+          </label>
           <Field label={t("whichSide")}>
             <select
               value={side}
@@ -158,6 +198,16 @@ export function CapturePage() {
               <option value="crease">{t("sideCrease")}</option>
             </select>
           </Field>
+          {autopilot && (
+            <label className="row small">
+              <input
+                type="checkbox"
+                checked={lastPhoto}
+                onChange={(e) => setLastPhoto(e.target.checked)}
+              />
+              {t("lastPhoto")}
+            </label>
+          )}
           <ErrorNote error={upload.error} />
           <div className="row">
             <button

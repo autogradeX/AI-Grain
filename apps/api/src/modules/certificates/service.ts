@@ -48,7 +48,7 @@ export function hashPayload(payload: CertificatePayload): string {
 export async function issueCertificate(
   ctx: AppContext,
   sampleId: string,
-  issuedBy: string,
+  issuedBy: string | null,
 ) {
   const [row] = await ctx.db
     .select({
