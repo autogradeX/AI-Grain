@@ -214,6 +214,50 @@ export function cropRoutes(ctx: AppContext) {
       return updated;
     });
 
+    /**
+     * Deletes a crop nothing uses yet. Once samples, standards or reference
+     * images use it, it can only be archived, so their records stay readable.
+     */
+    app.delete("/crops/:key", admin, async (request) => {
+      const me = authOf(request);
+      const { key } = z.object({ key: CropKey }).parse(request.params);
+      const [row] = await ctx.db
+        .select({ id: crops.id })
+        .from(crops)
+        .where(and(eq(crops.orgId, me.orgId), eq(crops.key, key)));
+      if (!row) throw notFound("Crop");
+      const count = async (
+        table: typeof samples | typeof standards | typeof referenceImages,
+      ) => {
+        const [r] = await ctx.db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(table)
+          .where(and(eq(table.orgId, me.orgId), eq(table.crop, key)));
+        return r?.n ?? 0;
+      };
+      const used: [number, string, string][] = [
+        [await count(samples), "sample", "samples"],
+        [await count(standards), "standard", "standards"],
+        [await count(referenceImages), "reference image", "reference images"],
+      ];
+      const uses = used
+        .filter(([n]) => n > 0)
+        .map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
+      if (uses.length) {
+        throw conflict(
+          `This crop is used by ${uses.join(", ")}, so it can't be deleted. Archive it instead to hide it.`,
+        );
+      }
+      await ctx.db.delete(crops).where(eq(crops.id, row.id));
+      await audit(ctx.db, {
+        orgId: me.orgId,
+        userId: me.id,
+        action: "crops.deleted",
+        detail: { key },
+      });
+      return { ok: true };
+    });
+
     app.post("/crops/:key/archive", admin, async (request) => {
       const me = authOf(request);
       const { key } = z.object({ key: CropKey }).parse(request.params);

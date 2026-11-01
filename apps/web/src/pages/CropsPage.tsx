@@ -8,7 +8,7 @@ import {
 } from "@ai-grain/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Trash2 } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useCrops } from "../api/crops";
@@ -48,6 +48,10 @@ export function CropsPage() {
     },
     onSuccess: (crop) => created(crop, true),
   });
+  const remove = useMutation({
+    mutationFn: (key: string) => api.delete(`/crops/${key}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["crops"] }),
+  });
   const addPlain = useMutation({
     mutationFn: () =>
       api.post<Crop>("/crops", { key: name, label: name.trim() }),
@@ -60,9 +64,10 @@ export function CropsPage() {
       <p className="muted small">{t("intro")}</p>
       {crops.isPending && <Spinner />}
       <ErrorNote error={crops.error} />
+      <ErrorNote error={remove.error} />
       <ul className="list">
         {crops.data?.map((c) => (
-          <li key={c.key}>
+          <li key={c.key} className="crop-row">
             <Link to={`/app/crops/${c.key}`} className="list-item">
               <div>
                 <strong>{cropLabel(c.label)}</strong>{" "}
@@ -80,6 +85,21 @@ export function CropsPage() {
                 {t.n("classes", c.classes.length)}
               </span>
             </Link>
+            {can.admin && (
+              <button
+                type="button"
+                className="icon-button danger"
+                aria-label={t("deleteCrop", { name: cropLabel(c.label) })}
+                title={t("deleteCrop", { name: cropLabel(c.label) })}
+                disabled={remove.isPending}
+                onClick={() =>
+                  confirm(t("confirmDelete", { name: cropLabel(c.label) })) &&
+                  remove.mutate(c.key)
+                }
+              >
+                <Trash2 size={18} aria-hidden />
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -195,6 +215,14 @@ function CropForm({ crop }: { crop: Crop }) {
     mutationFn: () =>
       api.post(`/crops/${crop.key}/archive`, { archived: !crop.archived }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["crops"] }),
+  });
+  const navigate = useNavigate();
+  const remove = useMutation({
+    mutationFn: () => api.delete(`/crops/${crop.key}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["crops"] });
+      void navigate("/app/crops", { replace: true });
+    },
   });
 
   const update = (i: number, patch: Partial<Row>) => {
@@ -396,10 +424,21 @@ function CropForm({ crop }: { crop: Crop }) {
         </Card>
       ))}
       {problems.length > 0 && <p className="error">{problems.join("; ")}</p>}
-      <ErrorNote error={save.error ?? archive.error} />
+      <ErrorNote error={save.error ?? archive.error ?? remove.error} />
       {saved && <p className="good">{t("saved")}</p>}
       {!readOnly && (
         <div className="row">
+          <button
+            type="button"
+            className="danger"
+            disabled={remove.isPending}
+            onClick={() =>
+              confirm(t("confirmDelete", { name: cropLabel(crop.label) })) &&
+              remove.mutate()
+            }
+          >
+            <Trash2 size={16} aria-hidden /> {t("delete")}
+          </button>
           <button type="button" onClick={() => archive.mutate()}>
             {crop.archived ? t("restore") : t("archive")}
           </button>

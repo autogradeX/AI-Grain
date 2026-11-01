@@ -47,6 +47,12 @@ export const m = defineMessages({
     hi: "छूटे हुए {count} वर्ग जोड़ें",
   },
   discard: { en: "Discard", hi: "छोड़ें" },
+  delete: { en: "Delete crop", hi: "फ़सल हटाएँ" },
+  deleteCrop: { en: "Delete {name}", hi: "{name} हटाएँ" },
+  confirmDelete: {
+    en: "Delete {name} and its classes? This can't be undone. A crop already used by samples, standards or reference images can only be archived.",
+    hi: "{name} और उसके वर्ग हटाएँ? यह वापस नहीं होगा। जिस फ़सल का उपयोग नमूने, मानक या संदर्भ चित्र कर रहे हैं, उसे केवल संग्रहित किया जा सकता है।",
+  },
   offerHint: {
     en: "Nothing changes until you save. Classes already used by samples or standards can't be removed.",
     hi: "सहेजने तक कुछ नहीं बदलता। जिन वर्गों का उपयोग नमूने या मानक कर रहे हैं, उन्हें हटाया नहीं जा सकता।",

@@ -15,7 +15,7 @@ afterAll(async () => {
 });
 
 const api = <T = Record<string, unknown>>(
-  method: "GET" | "POST" | "PUT",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   url: string,
   payload?: object,
 ) =>
@@ -218,5 +218,25 @@ describe("crop suggestions", () => {
       payload: { name: "Chana" },
     });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe("deleting a crop", () => {
+  it("deletes a crop nothing uses, and refuses one in use", async () => {
+    await api("POST", "/api/crops", { key: "moong", label: "Moong" });
+    const gone = await api("DELETE", "/api/crops/moong");
+    expect(gone.status).toBe(200);
+    const list = await api<Crop[]>("GET", "/api/crops?includeArchived=true");
+    expect(list.body.some((c) => c.key === "moong")).toBe(false);
+
+    await api("POST", "/api/crops", { key: "chana", label: "Chana" });
+    await api("POST", "/api/samples", { crop: "chana" });
+    const refused = await api<{ error: string }>("DELETE", "/api/crops/chana");
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toMatch(
+      /used by 1 sample\b.*Archive it instead/,
+    );
+
+    expect((await api("DELETE", "/api/crops/nothing_here")).status).toBe(404);
   });
 });

@@ -2773,3 +2773,23 @@ body:has(.app-view) .toast {
   max-height: 22rem;
   overflow-y: auto;
 }
+
+/* A crop in the list, with its delete button beside the link. */
+.crop-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.crop-row > .list-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.icon-button.danger {
+  color: var(--bad);
+}
+
+.icon-button.danger:hover:not(:disabled) {
+  background: var(--bad-bg);
+}
