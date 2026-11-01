@@ -245,6 +245,7 @@ export function userRoutes(ctx: AppContext) {
               enabled: z.boolean().optional(),
               spotCheckPct: z.number().min(0).max(20).optional(),
               autoSummary: z.boolean().optional(),
+              expertReview: z.boolean().optional(),
             })
             .optional(),
         })

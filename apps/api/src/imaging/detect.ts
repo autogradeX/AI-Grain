@@ -73,12 +73,24 @@ export async function detectKernels(
   const cm2 = DETECT_PX_PER_CM * DETECT_PX_PER_CM;
   const minArea = minAreaCm2 * cm2;
   const maxArea = (options.maxAreaCm2 ?? 4) * cm2;
-  const all = label(mask, width, height);
-  const blobs = all.filter((b) => b.area >= minArea && b.area <= maxArea);
+  const labels = new Int32Array(width * height);
+  const all = label(mask, width, height, labels);
+  const found = all.filter((b) => b.area >= minArea && b.area <= maxArea);
   const ignoredLargeRegions = all.filter((b) => b.area > maxArea).length;
 
-  const areas = blobs.map((b) => b.area).sort((a, b) => a - b);
+  const areas = found.map((b) => b.area).sort((a, b) => a - b);
   const medianArea = areas.length ? areas[Math.floor(areas.length / 2)]! : 0;
+  const enough = areas.length >= 5;
+  const isLarge = (b: Blob) => enough && b.area > medianArea * 2.2;
+
+  // Touching kernels: separate them where they meet, so each is counted,
+  // classified and weighed on its own. Two touching kernels are only about
+  // twice a kernel's area, so anything clearly larger than one is tried.
+  const blobs = found.flatMap((b) =>
+    enough && b.area > medianArea * 1.5
+      ? (splitTouching(labels, width, b, medianArea, minArea) ?? [b])
+      : [b],
+  );
 
   const kernels = blobs
     .map((b) => {
@@ -101,7 +113,7 @@ export async function detectKernels(
         cell: cellAt(x + w / 2, y + h / 2),
         row: Math.floor((y + h / 2) / BOARD_PX_PER_CM),
         cx: x + w / 2,
-        isCluster: areas.length >= 5 && b.area > medianArea * 2.2,
+        isCluster: isLarge(b),
       };
     })
     .sort((a, b) => a.row - b.row || a.cx - b.cx)
@@ -197,6 +209,8 @@ function filter(
 }
 
 interface Blob {
+  /** Label in the label map. */
+  id: number;
   area: number;
   minX: number;
   minY: number;
@@ -204,8 +218,16 @@ interface Blob {
   maxY: number;
 }
 
-/** 8-connected component labelling with an explicit stack. */
-function label(mask: Uint8Array, w: number, h: number): Blob[] {
+/**
+ * 8-connected component labelling with an explicit stack. Writes each
+ * pixel's blob id (from 1) into `labels` when given.
+ */
+function label(
+  mask: Uint8Array,
+  w: number,
+  h: number,
+  labels?: Int32Array,
+): Blob[] {
   const seen = new Uint8Array(mask.length);
   const stack = new Int32Array(mask.length);
   const blobs: Blob[] = [];
@@ -214,9 +236,17 @@ function label(mask: Uint8Array, w: number, h: number): Blob[] {
     let top = 0;
     stack[top++] = start;
     seen[start] = 1;
-    const blob: Blob = { area: 0, minX: w, minY: h, maxX: 0, maxY: 0 };
+    const blob: Blob = {
+      id: blobs.length + 1,
+      area: 0,
+      minX: w,
+      minY: h,
+      maxX: 0,
+      maxY: 0,
+    };
     while (top > 0) {
       const i = stack[--top]!;
+      if (labels) labels[i] = blob.id;
       const x = i % w;
       const y = (i - x) / w;
       blob.area++;
@@ -240,4 +270,144 @@ function label(mask: Uint8Array, w: number, h: number): Blob[] {
     blobs.push(blob);
   }
   return blobs;
+}
+
+/**
+ * Distance from each set pixel to the nearest unset pixel (or the edge), by
+ * a two-pass 3-4 chamfer transform: close to Euclidean, in pixels.
+ */
+function distanceMap(m: Uint8Array, w: number, h: number): Float32Array {
+  const big = 1e9;
+  const d = new Float32Array(m.length);
+  for (let i = 0; i < m.length; i++) d[i] = m[i] ? big : 0;
+  const at = (x: number, y: number) =>
+    x < 0 || y < 0 || x >= w || y >= h ? 0 : d[y * w + x]!;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!d[i]) continue;
+      d[i] = Math.min(
+        d[i],
+        at(x - 1, y) + 3,
+        at(x, y - 1) + 3,
+        at(x - 1, y - 1) + 4,
+        at(x + 1, y - 1) + 4,
+      );
+    }
+  }
+  for (let y = h - 1; y >= 0; y--) {
+    for (let x = w - 1; x >= 0; x--) {
+      const i = y * w + x;
+      if (!d[i]) continue;
+      d[i] = Math.min(
+        d[i],
+        at(x + 1, y) + 3,
+        at(x, y + 1) + 3,
+        at(x + 1, y + 1) + 4,
+        at(x - 1, y + 1) + 4,
+      );
+    }
+  }
+  for (let i = 0; i < d.length; i++) d[i] = d[i]! / 3;
+  return d;
+}
+
+/**
+ * Separates touching kernels in one large blob: finds the level of its
+ * distance map at which it falls apart into kernel-sized cores (the narrow
+ * necks where kernels touch go first), then grows each core back over the
+ * blob's pixels (nearest core wins). Returns null when it doesn't come apart
+ * cleanly; the blob then stays one object.
+ */
+export function splitTouching(
+  labels: Int32Array,
+  width: number,
+  blob: Blob,
+  medianArea: number,
+  minArea: number,
+): Blob[] | null {
+  const bw = blob.maxX - blob.minX + 1;
+  const bh = blob.maxY - blob.minY + 1;
+  const sub = new Uint8Array(bw * bh);
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      if (labels[(blob.minY + y) * width + blob.minX + x] === blob.id)
+        sub[y * bw + x] = 1;
+    }
+  }
+  const dist = distanceMap(sub, bw, bh);
+  let peak = 0;
+  for (const v of dist) if (v > peak) peak = v;
+  // The level that gives the most cores (ties: the lowest level).
+  let best: { seeds: Int32Array; count: number } | null = null;
+  const core = new Uint8Array(bw * bh);
+  for (let level = 1; level < peak - 0.5; level += 0.5) {
+    for (let i = 0; i < core.length; i++) core[i] = dist[i]! > level ? 1 : 0;
+    const seeds = new Int32Array(bw * bh);
+    const cores = label(core, bw, bh, seeds).filter(
+      (c) => c.area >= Math.max(3, medianArea * 0.03),
+    );
+    if (cores.length < 2) continue;
+    if (best && cores.length <= best.count) continue;
+    // Keep only the cores that passed the size filter, renumbered 1..n.
+    const keep = new Map(cores.map((c, i) => [c.id, i + 1]));
+    for (let i = 0; i < seeds.length; i++) seeds[i] = keep.get(seeds[i]!) ?? 0;
+    best = { seeds, count: cores.length };
+  }
+  if (!best) return null;
+
+  // Grow the cores back over the blob, breadth first (4-connected).
+  const owner = best.seeds;
+  let frontier: number[] = [];
+  for (let i = 0; i < owner.length; i++) if (owner[i]) frontier.push(i);
+  while (frontier.length) {
+    const next: number[] = [];
+    for (const i of frontier) {
+      const x = i % bw;
+      for (const j of [
+        x > 0 ? i - 1 : -1,
+        x < bw - 1 ? i + 1 : -1,
+        i - bw,
+        i + bw,
+      ]) {
+        if (j >= 0 && j < owner.length && sub[j] && !owner[j]) {
+          owner[j] = owner[i]!;
+          next.push(j);
+        }
+      }
+    }
+    frontier = next;
+  }
+  const parts = Array.from({ length: best.count }, (_, i) => ({
+    id: blob.id,
+    area: 0,
+    minX: bw,
+    minY: bh,
+    maxX: 0,
+    maxY: 0,
+    n: i + 1,
+  }));
+  for (let i = 0; i < owner.length; i++) {
+    const n = owner[i]!;
+    if (!n) continue;
+    const p = parts[n - 1]!;
+    const x = i % bw;
+    const y = (i - x) / bw;
+    p.area++;
+    if (x < p.minX) p.minX = x;
+    if (x > p.maxX) p.maxX = x;
+    if (y < p.minY) p.minY = y;
+    if (y > p.maxY) p.maxY = y;
+  }
+  // Every part must look like (part of) a kernel, not a sliver.
+  if (parts.some((p) => p.area < Math.max(minArea, medianArea * 0.3)))
+    return null;
+  return parts.map((p) => ({
+    id: blob.id,
+    area: p.area,
+    minX: blob.minX + p.minX,
+    minY: blob.minY + p.minY,
+    maxX: blob.minX + p.maxX,
+    maxY: blob.minY + p.maxY,
+  }));
 }

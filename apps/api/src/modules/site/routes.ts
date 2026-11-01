@@ -20,7 +20,12 @@ import {
 import { audit } from "../../lib/audit.js";
 import { badRequest, conflict, notFound } from "../../lib/errors.js";
 import { authenticate, requireRole } from "../auth/guard.js";
-import { batchPrefix, effectiveClass } from "../batches/service.js";
+import {
+  aiVerdict,
+  aiVerdictConfidence,
+  batchPrefix,
+  effectiveClass,
+} from "../batches/service.js";
 import { currentCertificate } from "../certificates/service.js";
 import { ensureCrop } from "../crops/service.js";
 import { estimateFor } from "../samples/service.js";
@@ -156,9 +161,11 @@ export function publicSiteRoutes(ctx: AppContext) {
           h: kernels.h,
           cell: kernels.cell,
           cls: effectiveClass,
-          aiClass: kernels.aiClass,
-          aiConfidence: kernels.aiConfidence,
-          aiReason: kernels.aiReason,
+          aiClass: aiVerdict,
+          aiConfidence: aiVerdictConfidence,
+          aiReason: sql<
+            string | null
+          >`coalesce(${kernels.expertReason}, ${kernels.aiReason})`,
           reviewed: sql<boolean>`${kernels.reviewStatus} <> 'pending'`,
         })
         .from(kernels)

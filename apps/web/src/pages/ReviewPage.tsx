@@ -166,6 +166,20 @@ function ReviewCard({
               })}
             </span>
           )}
+          {kernel.expertClass &&
+            kernel.firstClass &&
+            kernel.firstClass !== kernel.expertClass && (
+              <span className="small">
+                {t.rich("firstLook", {
+                  class: (
+                    <ClassBadge cls={kernel.firstClass} classes={classes} />
+                  ),
+                })}
+              </span>
+            )}
+          {kernel.expertClass && (
+            <span className="muted small">{t("expertChecked")}</span>
+          )}
           {kernel.finalClass && (
             <span className="small">
               {t.rich("decided", {

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  BrainCircuit,
   Camera,
   Check,
   FileCheck,
@@ -123,6 +124,21 @@ export function AutopilotCard({ sample }: { sample: Sample }) {
           title={t("stepCheck")}
           detail={t("checkDetail")}
         />
+        {sample.autopilot.expertReview && (
+          <Step
+            icon={BrainCircuit}
+            state={classified ? "done" : busy ? "active" : "todo"}
+            title={t("stepExpert")}
+            detail={
+              sample.autopilot.expertAsked
+                ? t("expertDetail", {
+                    settled: sample.autopilot.expertSettled,
+                    asked: sample.autopilot.expertAsked,
+                  })
+                : t("expertNone")
+            }
+          />
+        )}
         <Step
           icon={UserCheck}
           state={!classified ? "todo" : pending > 0 ? "attention" : "done"}

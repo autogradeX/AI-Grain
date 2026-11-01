@@ -3,7 +3,12 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { kernelClassIds, type ClassDef } from "@ai-grain/core";
 import { z } from "zod";
 import type { ClaudeModel } from "../config.js";
-import { CLASSIFY_SYSTEM, SUMMARY_SYSTEM, classifyContext } from "./prompts.js";
+import {
+  CLASSIFY_SYSTEM,
+  EXPERT_NOTE,
+  SUMMARY_SYSTEM,
+  classifyContext,
+} from "./prompts.js";
 
 export type Confidence = "high" | "medium" | "low";
 
@@ -23,7 +28,20 @@ export interface ClassifyRequest {
   sheet: Buffer;
   numbers: readonly number[];
   windowCm: number;
-  side: "front" | "crease";
+  /** "auto": the side wasn't given; the answer says which side is up. */
+  side: "front" | "crease" | "auto";
+  /**
+   * Expert pass: the kernels earlier looks couldn't settle, with what those
+   * looks said (by kernel number).
+   */
+  expert?: { notes: Record<number, string> };
+}
+
+export interface ClassifyResult {
+  verdicts: KernelVerdict[];
+  usage: Usage;
+  /** Only when the request's side was "auto". */
+  side?: "front" | "crease";
 }
 
 export interface KernelVerdict {
@@ -46,9 +64,7 @@ export interface SummaryRequest {
 }
 
 export interface Classifier {
-  classify(
-    req: ClassifyRequest,
-  ): Promise<{ verdicts: KernelVerdict[]; usage: Usage }>;
+  classify(req: ClassifyRequest): Promise<ClassifyResult>;
   summarize(req: SummaryRequest): Promise<{ text: string; usage: Usage }>;
 }
 
@@ -59,8 +75,15 @@ export class ClassifierError extends Error {}
  * than enforced: an unknown id becomes "unclear" below, so one bad verdict
  * can't fail a whole sheet of 30 kernels.
  */
-function verdictSheet(classes: readonly ClassDef[]) {
+function verdictSheet(classes: readonly ClassDef[], withSide: boolean) {
   return z.object({
+    ...(withSide && {
+      side: z
+        .enum(["top", "crease"])
+        .describe(
+          "Which side of most kernels faces the camera: top (rounded back, germ visible) or crease (the groove)",
+        ),
+    }),
     kernels: z.array(
       z.object({
         number: z.number().int(),
@@ -125,7 +148,7 @@ export class ClaudeClassifier implements Classifier {
     });
   }
 
-  async classify(req: ClassifyRequest) {
+  async classify(req: ClassifyRequest): Promise<ClassifyResult> {
     // Stable per standard and organisation: definitions and reference images go
     // first, marked for caching, so each sheet after the first reads them from cache.
     const prefix: (
@@ -163,12 +186,26 @@ export class ClaudeClassifier implements Classifier {
             jpegBlock(req.sheet),
             {
               type: "text",
-              text: `This sheet shows the ${req.side === "crease" ? "crease side" : "top side"} of ${req.numbers.length} kernels. Each tile covers ${req.windowCm} cm × ${req.windowCm} cm. Numbers on this sheet: ${req.numbers.join(", ")}.`,
+              text: [
+                `This sheet shows ${req.side === "auto" ? "one side (say which)" : `the ${req.side === "crease" ? "crease side" : "top side"}`} of ${req.numbers.length} kernels. Each tile covers ${req.windowCm} cm × ${req.windowCm} cm. Numbers on this sheet: ${req.numbers.join(", ")}.`,
+                ...(req.expert
+                  ? [
+                      EXPERT_NOTE,
+                      ...req.numbers.map(
+                        (n) => `#${n}: ${req.expert!.notes[n] ?? "no notes"}`,
+                      ),
+                    ]
+                  : []),
+              ].join("\n"),
             },
           ],
         },
       ],
-      output_config: { format: betaZodOutputFormat(verdictSheet(req.classes)) },
+      output_config: {
+        format: betaZodOutputFormat(
+          verdictSheet(req.classes, req.side === "auto"),
+        ),
+      },
     });
 
     checkStop(message);
@@ -208,7 +245,13 @@ export class ClaudeClassifier implements Classifier {
         reason: "Model Orchestration returned no verdict for this kernel",
       });
     }
-    return { verdicts, usage: usageOf(message.usage) };
+    const side = (parsed as { side?: "top" | "crease" }).side;
+    return {
+      verdicts,
+      usage: usageOf(message.usage),
+      ...(req.side === "auto" &&
+        side && { side: side === "crease" ? "crease" : "front" }),
+    };
   }
 
   async summarize(req: SummaryRequest) {

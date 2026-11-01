@@ -5,6 +5,7 @@ import { CROP_PRESETS } from "@ai-grain/core";
 import {
   autopilotOf,
   flagFor,
+  wantsExpert,
   type TriageKernel,
 } from "../src/modules/autopilot/triage.js";
 import {
@@ -54,6 +55,63 @@ describe("triage: which kernels a person sees", () => {
     );
     // No second opinion (it failed): the defect isn't taken on one verdict.
     expect(flagFor(k({ aiClass: "broken" }), wheat, on)).toBe("defect");
+  });
+
+  it("accepts a confident expert verdict, but not a harmful or unsure one", () => {
+    const low = { aiClass: "sound", aiConfidence: "low" as const };
+    expect(wantsExpert(k(low), wheat, on)).toBe(true);
+    expect(
+      flagFor(
+        k({ ...low, expertClass: "sound", expertConfidence: "high" }),
+        wheat,
+        on,
+      ),
+    ).toBeNull();
+    // Medium is enough when it agrees with an earlier look...
+    expect(
+      flagFor(
+        k({ ...low, expertClass: "sound", expertConfidence: "medium" }),
+        wheat,
+        on,
+      ),
+    ).toBeNull();
+    // ...but not on touching kernels, and not when it says something new.
+    expect(
+      flagFor(
+        k({
+          ...low,
+          isCluster: true,
+          expertClass: "sound",
+          expertConfidence: "medium",
+        }),
+        wheat,
+        on,
+      ),
+    ).toBe("cluster");
+    expect(
+      flagFor(
+        k({ ...low, expertClass: "broken", expertConfidence: "medium" }),
+        wheat,
+        on,
+      ),
+    ).toBe("low_confidence");
+    expect(
+      flagFor(
+        k({ ...low, expertClass: "ergot", expertConfidence: "high" }),
+        wheat,
+        on,
+      ),
+    ).toBe("harmful");
+    expect(
+      flagFor(
+        k({ ...low, expertClass: "unclear", expertConfidence: "high" }),
+        wheat,
+        on,
+      ),
+    ).toBe("low_confidence");
+    // Harmful first looks never go to the expert: a person checks them.
+    expect(wantsExpert(k({ aiClass: "ergot" }), wheat, on)).toBe(false);
+    expect(wantsExpert(k({}), wheat, on)).toBe(false);
   });
 
   it("spot-checks a share of accepted kernels", () => {
@@ -152,13 +210,19 @@ describe("Autopilot from photo to report", () => {
 
     // A first pass over all 40 kernels, then a second opinion on the 8 broken ones.
     const requests = t.classifier.requests.slice(before);
-    expect(requests.length).toBeGreaterThan(2);
-    const secondPass = requests.slice(2).flatMap((r) => r.numbers);
+    const looks = requests.filter((r) => !r.expert);
+    expect(looks.length).toBeGreaterThan(2);
+    const secondPass = looks.slice(2).flatMap((r) => r.numbers);
     expect(secondPass.sort((a, b) => a - b)).toEqual([
       5, 10, 15, 20, 25, 30, 35, 40,
     ]);
+    // The 4 low-confidence kernels go to the expert pass, on the Advanced tier.
+    const expert = requests.filter((r) => r.expert);
+    expect(expert.flatMap((r) => r.numbers)).toEqual([7, 14, 21, 28]);
+    expect(expert.every((r) => r.model === "claude-opus-5-5")).toBe(true);
+    expect(expert[0]!.expert!.notes[7]).toMatch(/first look: "sound" \(low/);
 
-    // Only the 4 low-confidence kernels need a person: 10% of the sample.
+    // The expert wasn't sure either, so only those 4 need a person: 10% of the sample.
     const view = await api<SampleView>("GET", `/api/samples/${sampleId}`);
     expect(view.body.status).toBe("in_progress");
     expect(view.body.kernels.pendingReview).toBe(4);
@@ -191,6 +255,40 @@ describe("Autopilot from photo to report", () => {
       `/api/samples/${sampleId}/certificates`,
     );
     expect(certificates.body[0]?.status).toBe("valid");
+
+    // The report was built when the sample completed, and is served from storage.
+    const stored = () =>
+      [...t.storage.files.keys()].filter(
+        (key) => key.includes(sampleId) && key.includes("/reports/"),
+      );
+    expect(stored()).toHaveLength(1);
+    const first = await t.app.inject({
+      method: "GET",
+      url: `/api/samples/${sampleId}/report.pdf`,
+      headers: bearer(token),
+    });
+    expect(first.statusCode).toBe(200);
+    expect(first.rawPayload.equals(t.storage.files.get(stored()[0]!)!)).toBe(
+      true,
+    );
+    // A rewritten summary makes a new report, replacing the old one.
+    const summarize = t.classifier.summarize.bind(t.classifier);
+    t.classifier.summarize = () =>
+      Promise.resolve({
+        text: "A different summary.",
+        usage: {
+          inputTokens: 1,
+          outputTokens: 1,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+        },
+      });
+    const old = stored()[0];
+    await api("POST", `/api/samples/${sampleId}/summary`);
+    await t.jobs.idle();
+    t.classifier.summarize = summarize;
+    expect(stored()).toHaveLength(1);
+    expect(stored()[0]).not.toBe(old);
   });
 
   it("sends kernels to a person when the two passes disagree, and every harmful one", async () => {
@@ -204,7 +302,10 @@ describe("Autopilot from photo to report", () => {
           const again = seen.has(v.number);
           seen.add(v.number);
           if (v.number === 3) return { ...v, cls: "ergot", confidence: "high" };
-          // The second opinion on kernel 10 differs from the first.
+          // The second opinion on kernel 10 differs from the first, and the
+          // expert can't tell either.
+          if (req.expert && v.number === 10)
+            return { ...v, cls: "unclear", confidence: "low" as const };
           if (again && v.number === 10) return { ...v, cls: "shrivelled" };
           return v;
         }),
@@ -219,6 +320,83 @@ describe("Autopilot from photo to report", () => {
         disagreement: 1,
       });
       expect(view.body.status).toBe("in_progress");
+    } finally {
+      t.classifier.classify = original;
+    }
+  });
+
+  it("lets the expert pass settle what the first looks couldn't", async () => {
+    const original = t.classifier.classify.bind(t.classifier);
+    t.classifier.classify = async (req: ClassifyRequest) => {
+      const res = await original(req);
+      if (!req.expert) return res;
+      return {
+        ...res,
+        verdicts: res.verdicts.map((v) =>
+          // Kernel 14 turns out to be ergot: harmful, so a person checks it.
+          v.number === 14
+            ? { ...v, cls: "ergot", confidence: "high" as const }
+            : { ...v, confidence: "high" as const, reason: "clearly sound" },
+        ),
+      };
+    };
+    try {
+      const photo = await syntheticBoard(30);
+      const { sampleId } = await photographed(photo.jpeg);
+      const view = await api<
+        SampleView & { autopilot: { expertSettled: number } }
+      >("GET", `/api/samples/${sampleId}`);
+      // 7, 21 and 28 settled by the expert as sound; 14 is ergot.
+      expect(view.body.autopilot.flaggedByReason).toEqual({ harmful: 1 });
+      expect(view.body.autopilot.expertSettled).toBe(3);
+      const pending = await api<
+        { number: number; aiClass: string; firstClass: string }[]
+      >("GET", `/api/samples/${sampleId}/review`);
+      expect(pending.body).toMatchObject([
+        { number: 14, aiClass: "ergot", firstClass: "sound" },
+      ]);
+    } finally {
+      t.classifier.classify = original;
+    }
+  });
+
+  it("without the expert pass, uncertain kernels go straight to a person", async () => {
+    await api("PATCH", "/api/org", { autopilot: { expertReview: false } });
+    try {
+      const before = t.classifier.requests.length;
+      const photo = await syntheticBoard(20);
+      const { sampleId } = await photographed(photo.jpeg);
+      expect(t.classifier.requests.slice(before).some((r) => r.expert)).toBe(
+        false,
+      );
+      const view = await api<SampleView>("GET", `/api/samples/${sampleId}`);
+      expect(view.body.autopilot.flaggedByReason).toEqual({
+        low_confidence: 2,
+      });
+    } finally {
+      await api("PATCH", "/api/org", { autopilot: { expertReview: true } });
+    }
+  });
+
+  it("reads the photo's side when nobody gave it", async () => {
+    const original = t.classifier.classify.bind(t.classifier);
+    const sides: string[] = [];
+    t.classifier.classify = async (req: ClassifyRequest) => {
+      sides.push(req.side);
+      const res = await original(req);
+      return req.side === "auto" ? { ...res, side: "crease" as const } : res;
+    };
+    try {
+      const photo = await syntheticBoard(40);
+      const { batchId } = await photographed(photo.jpeg);
+      const batch = await api<{ side: string; sideDetected: boolean }>(
+        "GET",
+        `/api/batches/${batchId}`,
+      );
+      expect(batch.body).toMatchObject({ side: "crease", sideDetected: true });
+      // The first look asks; later looks are told.
+      expect(sides[0]).toBe("auto");
+      expect(sides.at(-1)).toBe("crease");
     } finally {
       t.classifier.classify = original;
     }
@@ -264,6 +442,46 @@ describe("Autopilot from photo to report", () => {
     const done = await api<SampleView>("GET", `/api/samples/${sampleId}`);
     expect(done.body.status).toBe("completed");
     expect(done.body.result?.source).not.toBe("estimate");
+  });
+
+  it("suggests the standard this organisation uses for the crop", async () => {
+    const none = await api<{ suggestion: unknown }>(
+      "GET",
+      "/api/standards/suggest?crop=barley",
+    );
+    expect(none.body.suggestion).toBeNull();
+    const make = (name: string) =>
+      api<{ id: string }>("POST", "/api/standards", {
+        name,
+        crop: "barley",
+        grades: [{ grade: "1", maxDefectPct: {} }],
+      });
+    const older = await make("Barley intake");
+    const newer = await make("Barley malting");
+    // Nothing used yet: the newest.
+    const first = await api<{
+      suggestion: { standard: { id: string }; reason: { kind: string } };
+    }>("GET", "/api/standards/suggest?crop=barley");
+    expect(first.body.suggestion).toMatchObject({
+      standard: { id: newer.body.id },
+      reason: { kind: "newest" },
+    });
+    // Used most: the older one.
+    for (let i = 0; i < 2; i++)
+      await api("POST", "/api/samples", {
+        crop: "barley",
+        standardId: older.body.id,
+      });
+    const sample = await api<{ id: string }>("POST", "/api/samples", {
+      crop: "barley",
+    });
+    const view = await api<{
+      suggestedStandard: { standard: { id: string }; reason: object };
+    }>("GET", `/api/samples/${sample.body.id}`);
+    expect(view.body.suggestedStandard).toMatchObject({
+      standard: { id: older.body.id },
+      reason: { kind: "usage", used: 2, of: 2 },
+    });
   });
 
   it("asks for the corners when it can't find the board", async () => {

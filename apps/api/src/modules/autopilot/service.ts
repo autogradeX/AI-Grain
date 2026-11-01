@@ -29,6 +29,7 @@ import {
   processBatch,
 } from "../batches/service.js";
 import { issueCertificate } from "../certificates/service.js";
+import { prepareReport } from "../reports/service.js";
 import { ensureCrop } from "../crops/service.js";
 import {
   estimateFor,
@@ -41,6 +42,7 @@ import { getStandard } from "../standards/routes.js";
 import {
   autopilotOf,
   flagFor,
+  wantsExpert,
   wantsSecondOpinion,
   type AutopilotPolicy,
 } from "./triage.js";
@@ -101,6 +103,66 @@ export async function secondOpinion(
   });
 }
 
+const looked = (cls: string | null, confidence: string | null) =>
+  cls ? `"${cls}" (${confidence ?? "no"} confidence)` : null;
+
+/** What the earlier looks said about a kernel, for the expert pass. */
+function expertNote(k: typeof kernels.$inferSelect): string {
+  const parts = [
+    k.isCluster ? "this tile shows touching kernels" : null,
+    k.aiClass
+      ? `first look: ${looked(k.aiClass, k.aiConfidence)}${k.aiReason ? `, ${k.aiReason.slice(0, 160)}` : ""}`
+      : null,
+    k.aiClass2 ? `second look: ${looked(k.aiClass2, k.aiConfidence2)}` : null,
+  ].filter(Boolean);
+  return parts.join("; ");
+}
+
+/**
+ * The expert pass: kernels the first two looks couldn't settle (touching
+ * kernels, "unclear", low confidence, disagreement) go to the Advanced tier
+ * on smaller sheets, with what the earlier looks said. Triage then accepts
+ * its confident verdicts; the rest still go to a person.
+ */
+export async function expertReview(
+  ctx: AppContext,
+  batchId: string,
+): Promise<void> {
+  const c = await batchContext(ctx, batchId);
+  if (!c || !c.policy.expertReview) return;
+  const rows = await ctx.db
+    .select()
+    .from(kernels)
+    .where(eq(kernels.batchId, batchId));
+  const todo = rows.filter(
+    (k) =>
+      !k.expertClass &&
+      k.reviewStatus === "pending" &&
+      wantsExpert({ ...k, draw: 0 }, c.classes, c.policy),
+  );
+  if (!todo.length) return;
+  // A failure here isn't fatal: those kernels go to a person.
+  await classifyKernels(ctx, batchId, todo, {
+    kind: "expert",
+    expertNotes: Object.fromEntries(todo.map((k) => [k.number, expertNote(k)])),
+    save: (verdicts: KernelVerdict[]) =>
+      ctx.db.transaction(async (tx) => {
+        for (const v of verdicts) {
+          await tx
+            .update(kernels)
+            .set({
+              expertClass: v.cls,
+              expertConfidence: v.confidence,
+              expertReason: v.reason.slice(0, 500),
+            })
+            .where(
+              and(eq(kernels.batchId, batchId), eq(kernels.number, v.number)),
+            );
+        }
+      }),
+  });
+}
+
 /** Decides, per kernel, whether a person has to look at it (see flagFor). */
 export async function triageBatch(
   ctx: AppContext,
@@ -116,6 +178,8 @@ export async function triageBatch(
       aiConfidence: kernels.aiConfidence,
       aiClass2: kernels.aiClass2,
       aiConfidence2: kernels.aiConfidence2,
+      expertClass: kernels.expertClass,
+      expertConfidence: kernels.expertConfidence,
       flagReason: kernels.flagReason,
       reviewStatus: kernels.reviewStatus,
     })
@@ -159,7 +223,7 @@ export async function runBatch(
   if (c.policy.enabled) await classifyAndTriage(ctx, batchId);
 }
 
-/** Classification and what follows it: second opinion, triage, finishing. */
+/** Classification and what follows it: second opinion, expert pass, triage, finishing. */
 export async function classifyAndTriage(
   ctx: AppContext,
   batchId: string,
@@ -169,7 +233,10 @@ export async function classifyAndTriage(
   const classified = await classifyBatch(ctx, batchId, false);
   const c = await batchContext(ctx, batchId);
   if (!c) return;
-  if (classified && c.policy.enabled) await secondOpinion(ctx, batchId);
+  if (classified && c.policy.enabled) {
+    await secondOpinion(ctx, batchId);
+    await expertReview(ctx, batchId);
+  }
   await triageBatch(ctx, batchId);
   if (classified) await markClassified(ctx, batchId);
   await finishIfReady(ctx, c.sample.id);
@@ -381,5 +448,7 @@ export async function finishIfReady(
       // The report stands without a summary; it can be written later.
     }
   }
+  // Build the PDF now, so opening it is instant.
+  await prepareReport(ctx, sampleId, sample.orgId).catch(() => undefined);
   return true;
 }

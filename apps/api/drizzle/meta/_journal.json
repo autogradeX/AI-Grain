@@ -57,6 +57,13 @@
       "when": 1793527641880,
       "tag": "0007_autopilot",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793537959107,
+      "tag": "0008_expert_review",
+      "breakpoints": true
     }
   ]
 }

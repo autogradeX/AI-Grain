@@ -65,6 +65,17 @@ export interface AutopilotPolicy {
   enabled: boolean;
   spotCheckPct: number;
   autoSummary: boolean;
+  /** Kernels the first looks can't settle go to the Advanced tier before a person. */
+  expertReview: boolean;
+}
+
+/** The standard a sample most likely needs, and why. */
+export interface StandardSuggestion {
+  standard: { id: string; name: string; allowEstimate: boolean };
+  reason:
+    | { kind: "usage"; used: number; of: number }
+    | { kind: "only" }
+    | { kind: "newest" };
 }
 
 /** Why a kernel went to a person; null when the AI's verdict stands. */
@@ -162,6 +173,8 @@ export interface Sample {
   batches: {
     id: string;
     side: "front" | "crease";
+    /** The side was read from the photo. */
+    sideDetected: boolean;
     status: BatchStatus;
     kernelCount: number | null;
     error: string | null;
@@ -174,7 +187,12 @@ export interface Sample {
     /** Kernels whose AI verdict stands without a person. */
     acceptedByAi: number;
     flaggedByReason: Partial<Record<FlagReason, number>>;
+    /** Kernels sent to the expert check, and how many it settled. */
+    expertAsked: number;
+    expertSettled: number;
   };
+  /** Set while the sample has no standard. */
+  suggestedStandard: StandardSuggestion | null;
 }
 
 export interface Kernel {
@@ -193,6 +211,9 @@ export interface Kernel {
   reviewStatus: "pending" | "confirmed" | "corrected";
   aiClass2: string | null;
   aiConfidence2: "high" | "medium" | "low" | null;
+  /** The first look's class; aiClass is the expert check's when it ran. */
+  firstClass: string | null;
+  expertClass: string | null;
   flagReason: FlagReason | null;
   needsReview: boolean;
 }
@@ -201,6 +222,7 @@ export interface Batch {
   id: string;
   sampleId: string;
   side: "front" | "crease";
+  sideDetected: boolean;
   status: BatchStatus;
   error: string | null;
   kernelCount: number | null;
@@ -226,6 +248,8 @@ export interface ReviewKernel {
   finalClass: string | null;
   reviewStatus: "pending" | "confirmed" | "corrected";
   aiClass2: string | null;
+  firstClass: string | null;
+  expertClass: string | null;
   flagReason: FlagReason | null;
 }
 

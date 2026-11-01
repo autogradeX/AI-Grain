@@ -21,6 +21,10 @@ import {
 import { useT } from "../i18n";
 import { common, useGrainLabels } from "../i18n/common";
 import { m } from "./SamplesPage.i18n";
+import {
+  StandardSuggestionNote,
+  useStandardSuggestion,
+} from "../components/StandardSuggestion";
 
 const PAGE = 25;
 
@@ -191,7 +195,11 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
     queryFn: () => api.get<Standard[]>("/standards"),
   });
   const [crop, setCrop] = useState("wheat");
-  const [standardId, setStandardId] = useState("");
+  // Undefined until the user picks: the suggested standard is preselected.
+  const [picked, setPicked] = useState<string | undefined>(undefined);
+  const suggestion = useStandardSuggestion(crop);
+  const standardId = picked ?? suggestion.data?.standard.id ?? "";
+  const setStandardId = (id: string) => setPicked(id);
   const [source, setSource] = useState("");
   const [mass, setMass] = useState("");
   const create = useMutation({
@@ -220,7 +228,7 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
             value={crop}
             onChange={(c) => {
               setCrop(c);
-              setStandardId("");
+              setPicked(undefined);
             }}
           />
         </Field>
@@ -239,6 +247,9 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
               </option>
             ))}
           </select>
+          {suggestion.data && standardId === suggestion.data.standard.id && (
+            <StandardSuggestionNote suggestion={suggestion.data} />
+          )}
         </Field>
         <Field label={t("source")}>
           <input value={source} onChange={(e) => setSource(e.target.value)} />

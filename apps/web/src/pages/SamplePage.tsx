@@ -24,6 +24,7 @@ import {
 import { useT, type Translate } from "../i18n";
 import { common, useGrainLabels } from "../i18n/common";
 import { MODEL_TIERS, useModelLabel } from "../i18n/models";
+import { StandardSuggestionNote } from "../components/StandardSuggestion";
 import { AutopilotCard } from "./AutopilotCard";
 import { m } from "./SamplePage.i18n";
 
@@ -191,6 +192,12 @@ function DetailsCard({
     },
   });
 
+  const applySuggestion = useMutation({
+    mutationFn: (standardId: string) =>
+      api.patch<Sample>(`/samples/${sample.id}`, { standardId }),
+    onSuccess: update,
+  });
+
   if (!editing) {
     return (
       <Card
@@ -203,7 +210,21 @@ function DetailsCard({
       >
         <dl className="facts">
           <dt>{t("standard")}</dt>
-          <dd>{sample.standard?.name ?? t("noStandard")}</dd>
+          <dd>
+            {sample.standard?.name ?? t("noStandard")}
+            {sample.suggestedStandard && (
+              <StandardSuggestionNote
+                suggestion={sample.suggestedStandard}
+                busy={applySuggestion.isPending}
+                {...(editable && {
+                  onUse: () =>
+                    applySuggestion.mutate(
+                      sample.suggestedStandard!.standard.id,
+                    ),
+                })}
+              />
+            )}
+          </dd>
           <dt>{t("aiModel")}</dt>
           <dd>{modelLabel(sample.effectiveModel)}</dd>
           {sample.notes && (
@@ -418,6 +439,9 @@ function PhotosCard({
                       side: t(b.side === "crease" ? "creaseSide" : "topSide"),
                     })}
                   </strong>
+                  {b.sideDetected && b.status === "classified" && (
+                    <span className="muted small"> · {t("sideDetected")}</span>
+                  )}
                   <div className="muted small">
                     {t("kernelsAndDate", {
                       count: b.kernelCount ?? "?",

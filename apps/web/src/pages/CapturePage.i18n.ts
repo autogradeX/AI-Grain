@@ -62,6 +62,38 @@ export const m = defineMessages({
     en: "Mark the corners myself",
     hi: "कोने मैं ख़ुद चिह्नित करूँगा",
   },
+  sideAuto: {
+    en: "Detect it from the photo",
+    hi: "फ़ोटो से पहचानें",
+  },
+  manyHint: {
+    en: "You can choose several photos at once: each becomes its own batch.",
+    hi: "आप एक साथ कई फ़ोटो चुन सकते हैं: हर फ़ोटो अपना बैच बनेगी।",
+  },
+  manyTitle_one: { en: "{count} photo", hi: "{count} फ़ोटो" },
+  manyTitle_other: { en: "{count} photos", hi: "{count} फ़ोटो" },
+  photoN: { en: "Photo {n}", hi: "फ़ोटो {n}" },
+  batchN: { en: "Batch {n}", hi: "बैच {n}" },
+  manyAutoHint: {
+    en: "Each photo becomes a batch. Grid corners and the kernels' side are found automatically.",
+    hi: "हर फ़ोटो एक बैच बनेगी। ग्रिड के कोने और दानों की तरफ़ अपने आप पहचानी जाती है।",
+  },
+  lastPhotos: {
+    en: "These are all the photos of the sample: finish automatically",
+    hi: "नमूने की बस यही फ़ोटो हैं: अपने आप पूरा करें",
+  },
+  uploadingN: {
+    en: "Uploading {n} of {total}…",
+    hi: "{total} में से {n} अपलोड हो रही है…",
+  },
+  findKernelsMany_one: {
+    en: "Find kernels in {count} photo",
+    hi: "{count} फ़ोटो में दाने खोजें",
+  },
+  findKernelsMany_other: {
+    en: "Find kernels in {count} photos",
+    hi: "{count} फ़ोटो में दाने खोजें",
+  },
   lastPhoto: {
     en: "This is the last photo of the sample: finish automatically",
     hi: "यह नमूने की आख़िरी फ़ोटो है: अपने आप पूरा करें",

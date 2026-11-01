@@ -35,6 +35,14 @@ export const m = defineMessages({
     en: "Use as a reference example for Model Orchestration",
     hi: "मॉडल ऑर्केस्ट्रेशन के लिए संदर्भ उदाहरण बनाएँ",
   },
+  firstLook: {
+    en: "First look said: {class}",
+    hi: "पहली जाँच का कहना: {class}",
+  },
+  expertChecked: {
+    en: "Expert check ran, but wasn't sure enough to settle it",
+    hi: "विशेषज्ञ जाँच हुई, पर इसे तय करने लायक भरोसा नहीं था",
+  },
   secondOpinion: {
     en: "Second look said: {class}",
     hi: "दूसरी जाँच का कहना: {class}",

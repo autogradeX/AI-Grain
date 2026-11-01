@@ -26,6 +26,8 @@ import {
 import { ensureCrop } from "../crops/service.js";
 import { loadSample } from "../samples/service.js";
 import {
+  aiVerdict,
+  aiVerdictConfidence,
   batchPrefix,
   expireStaleBatches,
   kernelSummary,
@@ -85,7 +87,8 @@ export function batchRoutes(ctx: AppContext) {
       const upload = await readUpload(request);
       const fields = z
         .object({
-          side: z.enum(["front", "crease"]).default("front"),
+          // "auto": Model Orchestration reads the side from the photo.
+          side: z.enum(["front", "crease", "auto"]).default("auto"),
           corners: z.string().optional(),
           imageWidth: z.coerce.number().positive().optional(),
           imageHeight: z.coerce.number().positive().optional(),
@@ -115,7 +118,8 @@ export function batchRoutes(ctx: AppContext) {
         .values({
           orgId: me.orgId,
           sampleId: sample.id,
-          side: fields.side,
+          side: fields.side === "crease" ? "crease" : "front",
+          sideDetected: fields.side === "auto",
           originalKey: "",
           originalWidth: normalized.width,
           originalHeight: normalized.height,
@@ -157,9 +161,13 @@ export function batchRoutes(ctx: AppContext) {
           h: kernels.h,
           cell: kernels.cell,
           isCluster: kernels.isCluster,
-          aiClass: kernels.aiClass,
-          aiConfidence: kernels.aiConfidence,
-          aiReason: kernels.aiReason,
+          aiClass: aiVerdict,
+          aiConfidence: aiVerdictConfidence,
+          aiReason: sql<
+            string | null
+          >`coalesce(${kernels.expertReason}, ${kernels.aiReason})`,
+          firstClass: kernels.aiClass,
+          expertClass: kernels.expertClass,
           finalClass: kernels.finalClass,
           reviewStatus: kernels.reviewStatus,
           aiClass2: kernels.aiClass2,
@@ -235,7 +243,16 @@ export function batchRoutes(ctx: AppContext) {
         // Keeps the operator's decisions; only Claude's verdicts are cleared.
         await ctx.db
           .update(kernels)
-          .set({ aiClass: null, aiConfidence: null, aiReason: null })
+          .set({
+            aiClass: null,
+            aiConfidence: null,
+            aiReason: null,
+            aiClass2: null,
+            aiConfidence2: null,
+            expertClass: null,
+            expertConfidence: null,
+            expertReason: null,
+          })
           .where(eq(kernels.batchId, id));
       }
       await ctx.db
@@ -295,9 +312,13 @@ export function batchRoutes(ctx: AppContext) {
           number: kernels.number,
           cell: kernels.cell,
           isCluster: kernels.isCluster,
-          aiClass: kernels.aiClass,
-          aiConfidence: kernels.aiConfidence,
-          aiReason: kernels.aiReason,
+          aiClass: aiVerdict,
+          aiConfidence: aiVerdictConfidence,
+          aiReason: sql<
+            string | null
+          >`coalesce(${kernels.expertReason}, ${kernels.aiReason})`,
+          firstClass: kernels.aiClass,
+          expertClass: kernels.expertClass,
           finalClass: kernels.finalClass,
           reviewStatus: kernels.reviewStatus,
           aiClass2: kernels.aiClass2,
@@ -333,7 +354,7 @@ export function batchRoutes(ctx: AppContext) {
         .select({
           id: kernels.id,
           sampleId: kernels.sampleId,
-          aiClass: kernels.aiClass,
+          aiClass: aiVerdict,
         })
         .from(kernels)
         .where(and(eq(kernels.orgId, me.orgId), inArray(kernels.id, ids)));

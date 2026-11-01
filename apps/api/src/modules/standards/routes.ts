@@ -8,6 +8,7 @@ import { audit } from "../../lib/audit.js";
 import { badRequest, notFound } from "../../lib/errors.js";
 import { authenticate, authOf, requireRole } from "../auth/guard.js";
 import { ensureCrop, normalizeCropKey } from "../crops/service.js";
+import { suggestStandard } from "./suggest.js";
 
 const Pct = z.number().min(0).max(100);
 const ClassId = z.string().max(40);
@@ -86,6 +87,21 @@ export function standardRoutes(ctx: AppContext) {
             : and(eq(standards.orgId, me.orgId), eq(standards.archived, false)),
         )
         .orderBy(standards.crop, desc(standards.updatedAt));
+    });
+
+    /** The standard a new sample of this crop most likely needs (see suggestStandard). */
+    app.get("/standards/suggest", async (request) => {
+      const me = authOf(request);
+      const { crop } = z
+        .object({ crop: z.string().trim().min(1).max(60) })
+        .parse(request.query);
+      return {
+        suggestion: await suggestStandard(
+          ctx,
+          me.orgId,
+          normalizeCropKey(crop),
+        ),
+      };
     });
 
     app.get("/standards/:id", async (request) => {

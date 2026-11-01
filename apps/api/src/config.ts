@@ -52,6 +52,8 @@ const EnvSchema = z.object({
   REQUIRE_EMAIL_VERIFICATION: bool.default(false),
   ANTHROPIC_API_KEY: z.string().optional(),
   DEFAULT_MODEL: z.enum(CLAUDE_MODELS).default("claude-sonnet-5-5"),
+  /** Autopilot's expert pass (the Advanced tier) for kernels earlier looks couldn't settle. */
+  EXPERT_MODEL: z.enum(CLAUDE_MODELS).default("claude-opus-5-5"),
   /** Claude requests run in parallel per batch, up to this many at once. */
   CLASSIFY_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(3),
   SMTP_URL: z.string().optional(),

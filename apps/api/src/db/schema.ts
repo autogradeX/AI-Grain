@@ -51,6 +51,8 @@ export interface AutopilotSettings {
   spotCheckPct?: number;
   /** Write the plain-language summary when a sample finishes. */
   autoSummary?: boolean;
+  /** Send kernels the first two looks couldn't settle to the Advanced tier before a person. */
+  expertReview?: boolean;
 }
 
 export const organizations = pgTable("organizations", {
@@ -309,6 +311,8 @@ export const batches = pgTable("batches", {
     .references(() => samples.id, { onDelete: "cascade" }),
   /** "front" for the first photo, "crease" for the optional flipped photo. */
   side: text("side").$type<"front" | "crease">().notNull().default("front"),
+  /** The side wasn't given at upload: Model Orchestration reads it from the photo. */
+  sideDetected: boolean("side_detected").notNull().default(false),
   status: batchStatusEnum("status").notNull().default("uploaded"),
   originalKey: text("original_key").notNull(),
   originalWidth: integer("original_width").notNull(),
@@ -377,6 +381,15 @@ export const kernels = pgTable(
     aiClass2: text("ai_class2"),
     aiConfidence2: text("ai_confidence2").$type<"high" | "medium" | "low">(),
     /**
+     * Expert verdict (Autopilot, Advanced tier) for kernels the first two
+     * looks couldn't settle. When present it is the AI's verdict.
+     */
+    expertClass: text("expert_class"),
+    expertConfidence: text("expert_confidence").$type<
+      "high" | "medium" | "low"
+    >(),
+    expertReason: text("expert_reason"),
+    /**
      * Why a person must look at this kernel; null when the AI's verdict stands.
      * Set by triage after classification.
      */
@@ -408,7 +421,7 @@ export const analysisRuns = pgTable("analysis_runs", {
     onDelete: "cascade",
   }),
   kind: text("kind")
-    .$type<"classify" | "second_opinion" | "summary">()
+    .$type<"classify" | "second_opinion" | "expert" | "summary">()
     .notNull(),
   model: text("model").notNull(),
   requests: integer("requests").notNull().default(0),

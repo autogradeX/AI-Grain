@@ -139,6 +139,14 @@ export const m = defineMessages({
     hi: "टोकन संख्या और सूची मूल्य से अनुमानित; असली खर्च आपके बिल में देखें।",
   },
   aiHandled: { en: "Kernels settled by AI", hi: "AI द्वारा तय दाने" },
+  settledByExpert: {
+    en: "Kernels settled by the expert check",
+    hi: "विशेषज्ञ जाँच से तय हुए दाने",
+  },
+  settledByExpertNote: {
+    en: "instead of going to a person",
+    hi: "व्यक्ति के पास जाने के बजाय",
+  },
   aiHandledNote: {
     en: "no person needed · {count} samples finished by Autopilot",
     hi: "किसी व्यक्ति की ज़रूरत नहीं · {count} नमूने ऑटोपायलट ने पूरे किए",

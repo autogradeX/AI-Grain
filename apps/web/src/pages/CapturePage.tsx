@@ -13,6 +13,8 @@ import { useT } from "../i18n";
 import { useSample } from "./SamplePage";
 import { m } from "./CapturePage.i18n";
 
+type Side = "auto" | "front" | "crease";
+
 interface Photo {
   blob: Blob;
   url: string;
@@ -40,10 +42,14 @@ export function CapturePage() {
   const t = useT(m);
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [mode, setMode] = useState<"choose" | "live">("choose");
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [corners, setCorners] = useState<Corners | null>(null);
-  const [side, setSide] = useState<"front" | "crease">("front");
+  const [side, setSide] = useState<Side>("auto");
+  // Several photos chosen at once: each becomes its own batch.
+  const [many, setMany] = useState<Photo[]>([]);
+  const [progress, setProgress] = useState(0);
   // Corners: found by the server unless the operator marks them.
   const [manualCorners, setManualCorners] = useState(false);
   const [lastPhoto, setLastPhoto] = useState(false);
@@ -59,6 +65,49 @@ export function CapturePage() {
     },
     [photo],
   );
+  useEffect(
+    () => () => {
+      for (const p of many) URL.revokeObjectURL(p.url);
+    },
+    [many],
+  );
+
+  const chooseMany = async (files: FileList) => {
+    try {
+      setLoadError(null);
+      const list = await Promise.all(
+        [...files].map((f) => loadPhoto(f, t("notAnImage"))),
+      );
+      if (list.length === 1) {
+        setPhoto(list[0]!);
+        setCorners(insetCorners(list[0]!.width, list[0]!.height));
+      } else setMany(list);
+    } catch (err) {
+      setLoadError(err);
+    }
+  };
+
+  const uploadMany = useMutation({
+    mutationFn: async () => {
+      // One at a time, in the order chosen; corners and side found by the server.
+      for (const [i, p] of many.entries()) {
+        setProgress(i + 1);
+        const form = new FormData();
+        form.set("side", side);
+        if (autopilot && lastPhoto && i === many.length - 1)
+          form.set("finish", "true");
+        form.set("photo", p.blob, `board-${i + 1}.jpg`);
+        await api.upload<{ id: string }>(`/samples/${id}/batches`, form);
+      }
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["sample", id] });
+      void qc.invalidateQueries({ queryKey: ["samples"] });
+      void navigate(`/app/samples/${id}`, { replace: true });
+    },
+    // Photos already sent stay in the sample: show it, with the error.
+    onError: () => void qc.invalidateQueries({ queryKey: ["sample", id] }),
+  });
 
   const accept = async (blob: Blob, preset?: Corners) => {
     try {
@@ -72,7 +121,6 @@ export function CapturePage() {
     }
   };
 
-  const qc = useQueryClient();
   const upload = useMutation({
     mutationFn: () => {
       const form = new FormData();
@@ -115,7 +163,7 @@ export function CapturePage() {
         />
       )}
 
-      {mode === "choose" && !photo && (
+      {mode === "choose" && !photo && many.length === 0 && (
         <Card>
           <ol className="small steps">
             <li>{t("stepSpread")}</li>
@@ -149,11 +197,13 @@ export function CapturePage() {
             ref={galleryInput}
             type="file"
             accept="image/*"
+            multiple
             hidden
             onChange={(e) =>
-              e.target.files?.[0] && void accept(e.target.files[0])
+              e.target.files?.length && void chooseMany(e.target.files)
             }
           />
+          <p className="muted small">{t("manyHint")}</p>
           <ErrorNote error={loadError} />
         </Card>
       )}
@@ -192,8 +242,9 @@ export function CapturePage() {
           <Field label={t("whichSide")}>
             <select
               value={side}
-              onChange={(e) => setSide(e.target.value as "front" | "crease")}
+              onChange={(e) => setSide(e.target.value as Side)}
             >
+              <option value="auto">{t("sideAuto")}</option>
               <option value="front">{t("sideFront")}</option>
               <option value="crease">{t("sideCrease")}</option>
             </select>
@@ -224,6 +275,55 @@ export function CapturePage() {
               onClick={() => upload.mutate()}
             >
               {upload.isPending ? t("uploading") : t("findKernels")}
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {mode === "choose" && many.length > 0 && (
+        <Card title={t.n("manyTitle", many.length)}>
+          <ul className="capture-many">
+            {many.map((p, i) => (
+              <li key={p.url}>
+                <img src={p.url} alt={t("photoN", { n: i + 1 })} />
+                <span className="muted small">{t("batchN", { n: i + 1 })}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="muted small">{t("manyAutoHint")}</p>
+          <Field label={t("whichSide")}>
+            <select
+              value={side}
+              onChange={(e) => setSide(e.target.value as Side)}
+            >
+              <option value="auto">{t("sideAuto")}</option>
+              <option value="front">{t("sideFront")}</option>
+              <option value="crease">{t("sideCrease")}</option>
+            </select>
+          </Field>
+          {autopilot && (
+            <label className="row small">
+              <input
+                type="checkbox"
+                checked={lastPhoto}
+                onChange={(e) => setLastPhoto(e.target.checked)}
+              />
+              {t("lastPhotos")}
+            </label>
+          )}
+          <ErrorNote error={uploadMany.error} />
+          <div className="row">
+            <button disabled={uploadMany.isPending} onClick={() => setMany([])}>
+              {t("retake")}
+            </button>
+            <button
+              className="primary"
+              disabled={uploadMany.isPending}
+              onClick={() => uploadMany.mutate()}
+            >
+              {uploadMany.isPending
+                ? t("uploadingN", { n: progress, total: many.length })
+                : t.n("findKernelsMany", many.length)}
             </button>
           </div>
         </Card>

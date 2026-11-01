@@ -68,6 +68,40 @@ const request = {
 };
 
 describe("ClaudeClassifier", () => {
+  it("asks for the side when it wasn't given, and passes expert notes", async () => {
+    const captured: Captured[] = [];
+    const classifier = new ClaudeClassifier({
+      apiKey: "test-key",
+      fetch: fakeFetch(
+        captured,
+        message(
+          JSON.stringify({
+            side: "crease",
+            kernels: [1, 2, 3].map((number) => ({
+              number,
+              class: "sound",
+              confidence: "high",
+              reason: "clear",
+            })),
+          }),
+        ),
+      ),
+    });
+    const res = await classifier.classify({
+      ...request,
+      model: "claude-opus-5-5",
+      side: "auto",
+      expert: { notes: { 2: 'first look: "broken" (low confidence)' } },
+    });
+    expect(res.side).toBe("crease");
+    const body = JSON.stringify(captured[0]!.body);
+    expect(body).toContain("Expert pass");
+    expect(body).toContain('#2: first look: \\"broken\\" (low confidence)');
+    expect(body).toContain("say which");
+    // The schema asks for the side.
+    expect(body).toContain('"required":["side","kernels"]');
+  });
+
   it("sends a cached prefix, a JSON schema and refusal fallbacks", async () => {
     const captured: Captured[] = [];
     const classifier = new ClaudeClassifier({

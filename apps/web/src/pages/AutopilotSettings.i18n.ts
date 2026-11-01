@@ -20,9 +20,13 @@ export const m = defineMessages({
     en: "Write the plain-language summary when a sample finishes",
     hi: "नमूना पूरा होने पर सरल भाषा में सारांश लिखें",
   },
+  expert: {
+    en: "Expert check: kernels the first two looks can't settle (touching, unclear, low confidence, disagreement) go to the Advanced tier before a person",
+    hi: "विशेषज्ञ जाँच: जिन दानों को पहली दो जाँचें तय न कर सकें (सटे हुए, अस्पष्ट, कम भरोसा, असहमति), वे व्यक्ति से पहले Advanced स्तर पर जाते हैं",
+  },
   always: {
-    en: "Always sent to a person: touching kernels, uncertain or unclear verdicts, harmful classes such as ergot, and kernels where two AI passes disagree.",
-    hi: "हमेशा व्यक्ति के पास: सटे हुए दाने, अनिश्चित या अस्पष्ट फ़ैसले, अरगट जैसे हानिकारक वर्ग, और वे दाने जिन पर AI की दो जाँचें असहमत हों।",
+    en: "Always sent to a person: harmful classes such as ergot, a random spot check, and any kernel the expert check isn't sure about.",
+    hi: "हमेशा व्यक्ति के पास: अरगट जैसे हानिकारक वर्ग, बेतरतीब नमूना जाँच, और हर वह दाना जिस पर विशेषज्ञ जाँच को भरोसा न हो।",
   },
   saved: { en: "Saved.", hi: "सहेजा गया।" },
 });

@@ -25,9 +25,16 @@ For every numbered tile, give exactly one class:
 - One defect class from the list in the request. If several defects apply, choose the one the grader would sort the kernel into: the most serious defect.
 - "unclear" if the photo is too poor to judge (blur, glare, cut off, two kernels overlapping). Say so instead of guessing.
 
-Also give a confidence (high, medium or low) and a short reason naming what you see, for example "germ end split, rootlet visible". The grader checks every flagged kernel by eye and makes the final call, so be honest about uncertainty: subtle defects such as light heat damage, early sprouting, or Fusarium versus weather bleaching should usually get medium or low confidence.
+Also give a confidence and a short reason naming what you see, for example "germ end split, rootlet visible":
+- high: the tile clearly shows it.
+- medium: fairly sure, but a subtle feature could change it (light heat damage, early sprouting, Fusarium versus weather bleaching).
+- low: you can't really tell from this photo.
+Kernels you are unsure about are checked again and, if needed, by the grader, so be honest about uncertainty, but don't mark a clear kernel low just to be safe.
 
 Return one entry for every number on the sheet, and no other numbers.`;
+
+/** Added to an expert-pass sheet, before the per-kernel notes. */
+export const EXPERT_NOTE = `Expert pass: earlier looks at these kernels disagreed or were unsure. Their notes follow, by number. Judge each tile yourself from the photo; the notes are only context. Where a note says a tile shows touching kernels, give a class only if every kernel in the tile has it (usually "sound"), otherwise "unclear". Give high confidence only when the tile clearly shows the class.`;
 
 export function classifyContext(input: {
   cropLabel: string;

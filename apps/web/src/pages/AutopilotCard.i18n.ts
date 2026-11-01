@@ -18,6 +18,15 @@ export const m = defineMessages({
     en: "Every defect checked twice",
     hi: "हर दोष दो बार जाँचा गया",
   },
+  stepExpert: { en: "Expert check", hi: "विशेषज्ञ जाँच" },
+  expertDetail: {
+    en: "Settled {settled} of {asked} unsure kernels",
+    hi: "{asked} अनिश्चित दानों में से {settled} तय किए",
+  },
+  expertNone: {
+    en: "For kernels the first looks can't settle",
+    hi: "उन दानों के लिए जिन्हें पहली जाँचें तय न कर सकें",
+  },
   stepReview: { en: "Your review", hi: "आपकी समीक्षा" },
   reviewWaiting_one: { en: "{count} kernel waiting", hi: "{count} दाना बाकी" },
   reviewWaiting_other: {

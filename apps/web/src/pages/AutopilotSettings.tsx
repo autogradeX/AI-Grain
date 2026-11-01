@@ -77,6 +77,15 @@ export function AutopilotSettingsCard() {
             />
             {t("summary")}
           </label>
+          <label className="row small">
+            <input
+              type="checkbox"
+              checked={a.expertReview}
+              disabled={disabled}
+              onChange={(e) => save.mutate({ expertReview: e.target.checked })}
+            />
+            {t("expert")}
+          </label>
         </>
       )}
       <ErrorNote error={save.error} />

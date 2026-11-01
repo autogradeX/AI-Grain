@@ -130,4 +130,29 @@ describe("kernel detection", () => {
     expect(detection.kernels).toHaveLength(13);
     expect(detection.kernels.filter((k) => k.isCluster)).toHaveLength(1);
   });
+
+  it("separates kernels that only touch", async () => {
+    const photo = await syntheticBoard(12);
+    // Three kernels in a row, end to end, and two side by side.
+    const overlay = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${photo.width}" height="${photo.height}">
+        <ellipse cx="700" cy="1500" rx="21" ry="11" fill="#d8b46a"/>
+        <ellipse cx="741" cy="1500" rx="21" ry="11" fill="#d8b46a"/>
+        <ellipse cx="782" cy="1500" rx="21" ry="11" fill="#d8b46a"/>
+        <ellipse cx="1000" cy="1600" rx="21" ry="11" fill="#d8b46a"/>
+        <ellipse cx="1000" cy="1621" rx="21" ry="11" fill="#d8b46a"/>
+      </svg>`,
+    );
+    const jpeg = await sharp(photo.jpeg)
+      .composite([{ input: overlay }])
+      .jpeg()
+      .toBuffer();
+    const board = await straightenBoard(jpeg, photo.corners as Corners);
+    const detection = await detectKernels(board);
+    expect(detection.kernels).toHaveLength(17);
+    expect(detection.kernels.filter((k) => k.isCluster)).toHaveLength(0);
+    // Each part is about one kernel.
+    const areas = detection.kernels.map((k) => k.area);
+    expect(Math.max(...areas) / Math.min(...areas)).toBeLessThan(1.8);
+  });
 });

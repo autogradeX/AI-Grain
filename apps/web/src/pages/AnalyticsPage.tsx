@@ -26,6 +26,7 @@ interface Analytics {
     spotChecked: number;
     spotCheckAgreement: number | null;
     completedByAutopilot: number;
+    settledByExpert: number;
   };
   perDay: { date: string; created: number; completed: number }[];
   groupTrend: {
@@ -192,6 +193,11 @@ export function AnalyticsPage() {
                   : `${Math.round(a.totals.spotCheckAgreement * 100)} %`
               }
               note={t("spotAgreementNote", { count: a.totals.spotChecked })}
+            />
+            <Kpi
+              label={t("settledByExpert")}
+              value={String(a.totals.settledByExpert)}
+              note={t("settledByExpertNote")}
             />
             <Kpi
               label={t("completedSamples")}

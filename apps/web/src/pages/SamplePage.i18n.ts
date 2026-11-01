@@ -54,6 +54,10 @@ export const m = defineMessages({
   batchTitle: { en: "Batch {number} · {side}", hi: "बैच {number} · {side}" },
   creaseSide: { en: "crease side", hi: "खाँचे वाली तरफ़" },
   topSide: { en: "top side", hi: "ऊपरी तरफ़" },
+  sideDetected: {
+    en: "side read from the photo",
+    hi: "तरफ़ फ़ोटो से पहचानी गई",
+  },
   kernelsAndDate: {
     en: "{count} kernels · {date}",
     hi: "{count} दाने · {date}",

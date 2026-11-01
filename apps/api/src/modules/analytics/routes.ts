@@ -171,7 +171,9 @@ export function analyticsRoutes(ctx: AppContext) {
       const reviews = await ctx.db
         .select({
           userId: kernels.reviewedBy,
-          aiClass: kernels.aiClass,
+          aiClass: sql<
+            string | null
+          >`coalesce(${kernels.expertClass}, ${kernels.aiClass})`,
           finalClass: kernels.finalClass,
           status: kernels.reviewStatus,
         })
@@ -339,6 +341,7 @@ export function analyticsRoutes(ctx: AppContext) {
             .select({
               classified: sql<number>`count(${kernels.aiClass})::int`,
               acceptedByAi: sql<number>`count(*) filter (where ${kernels.aiClass} is not null and ${kernels.flagReason} is null)::int`,
+              settledByExpert: sql<number>`count(*) filter (where ${kernels.expertClass} is not null and ${kernels.flagReason} is null)::int`,
               spotChecked: sql<number>`count(*) filter (where ${kernels.flagReason} = 'spot_check' and ${kernels.reviewStatus} <> 'pending')::int`,
               spotAgreed: sql<number>`count(*) filter (where ${kernels.flagReason} = 'spot_check' and ${kernels.reviewStatus} = 'confirmed')::int`,
             })
@@ -365,6 +368,7 @@ export function analyticsRoutes(ctx: AppContext) {
           costPerCompletedSampleUsd: completed.length
             ? costTotal / completed.length
             : null,
+          settledByExpert: ai?.settledByExpert ?? 0,
           aiHandledRate: ai?.classified
             ? ai.acceptedByAi / ai.classified
             : null,

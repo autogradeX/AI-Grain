@@ -46,10 +46,18 @@ import { MAX_REFERENCES_PER_REQUEST } from "../references/routes.js";
 /** A kernel a person must look at: triage gave it a reason (see autopilot/triage.ts). */
 export const needsReview: SQL<boolean> = sql<boolean>`(${kernels.flagReason} is not null)`;
 
-/** The class that counts: the operator's decision, else Claude's. */
+/** The class that counts: the operator's decision, else the expert pass's, else the first look's. */
 export const effectiveClass = sql<
   string | null
->`coalesce(${kernels.finalClass}, ${kernels.aiClass})`;
+>`coalesce(${kernels.finalClass}, ${kernels.expertClass}, ${kernels.aiClass})`;
+
+/** The AI's verdict: the expert pass's when there is one, else the first look's. */
+export const aiVerdict = sql<
+  string | null
+>`coalesce(${kernels.expertClass}, ${kernels.aiClass})`;
+export const aiVerdictConfidence = sql<
+  "high" | "medium" | "low" | null
+>`case when ${kernels.expertClass} is not null then ${kernels.expertConfidence} else ${kernels.aiConfidence} end`;
 
 export const batchPrefix = (b: {
   orgId: string;
@@ -131,10 +139,16 @@ export async function processBatch(
       await boardPreview(board, board.width),
     );
     await ctx.storage.put(`${prefix}/preview.jpg`, await boardPreview(board));
+    // Uploads in parallel: one at a time is slow against cloud storage.
+    await mapLimit(detection.kernels, 16, (k) =>
+      ctx.storage.put(
+        `${prefix}/kernels/${k.number}.jpg`,
+        crops.get(k.number)!,
+      ),
+    );
     const rows: (typeof kernels.$inferInsert)[] = [];
     for (const k of detection.kernels) {
       const cropKey = `${prefix}/kernels/${k.number}.jpg`;
-      await ctx.storage.put(cropKey, crops.get(k.number)!);
       rows.push({
         orgId: batch.orgId,
         sampleId: batch.sampleId,
@@ -242,8 +256,10 @@ export async function classifyKernels(
   batchId: string,
   todo: KernelRow[],
   options: {
-    kind: "classify" | "second_opinion";
+    kind: "classify" | "second_opinion" | "expert";
     shuffle?: boolean;
+    /** Expert pass: what earlier looks said, by kernel number. Smaller sheets, Advanced tier. */
+    expertNotes?: Record<number, string>;
     save: (verdicts: KernelVerdict[]) => Promise<void>;
   },
 ): Promise<string | null> {
@@ -255,7 +271,14 @@ export async function classifyKernels(
     .where(eq(batches.id, batchId));
   if (!row) return "batch not found";
   const { batch, sample, standard } = row;
-  const model = await modelFor(ctx, sample.id);
+  const expert = options.expertNotes;
+  const model = expert
+    ? ctx.config.EXPERT_MODEL
+    : await modelFor(ctx, sample.id);
+  // The first look reads the side from the photo when nobody gave it.
+  const side =
+    options.kind === "classify" && batch.sideDetected ? "auto" : batch.side;
+  const sideVotes = { front: 0, crease: 0 };
   const started = Date.now();
   const total: Usage = {
     inputTokens: 0,
@@ -273,8 +296,10 @@ export async function classifyKernels(
       ? [...todo].sort((a, b) => mix(a.id) - mix(b.id))
       : todo;
     const chunks: KernelRow[][] = [];
-    for (let i = 0; i < ordered.length; i += KERNELS_PER_SHEET) {
-      chunks.push(ordered.slice(i, i + KERNELS_PER_SHEET));
+    // Expert sheets are smaller: fewer tiles to weigh per request.
+    const perSheet = expert ? EXPERT_KERNELS_PER_SHEET : KERNELS_PER_SHEET;
+    for (let i = 0; i < ordered.length; i += perSheet) {
+      chunks.push(ordered.slice(i, i + perSheet));
     }
     const results = await mapLimit(
       chunks,
@@ -287,7 +312,7 @@ export async function classifyKernels(
               jpeg: await ctx.storage.get(k.cropKey),
             })),
           );
-          const { verdicts, usage } = await ctx.classifier.classify({
+          const result = await ctx.classifier.classify({
             model,
             cropLabel: crop.label,
             standardName: standard?.name ?? null,
@@ -296,8 +321,11 @@ export async function classifyKernels(
             sheet: await buildSheet(tiles),
             numbers: chunk.map((k) => k.number),
             windowCm: batch.cropWindowCm ?? 1.6,
-            side: batch.side,
+            side,
+            ...(expert && { expert: { notes: expert } }),
           });
+          const { verdicts, usage } = result;
+          if (result.side) sideVotes[result.side] += chunk.length;
           requests++;
           total.inputTokens += usage.inputTokens;
           total.outputTokens += usage.outputTokens;
@@ -313,6 +341,11 @@ export async function classifyKernels(
       },
     );
     failure = results.find((r) => r !== null) ?? null;
+    if (sideVotes.front + sideVotes.crease > 0) {
+      await setBatch(ctx, batchId, {
+        side: sideVotes.crease > sideVotes.front ? "crease" : "front",
+      });
+    }
   } catch (err) {
     failure = err instanceof Error ? err.message : String(err);
   }
@@ -329,6 +362,9 @@ export async function classifyKernels(
   });
   return failure;
 }
+
+/** Expert-pass sheets hold fewer kernels than first-look sheets. */
+export const EXPERT_KERNELS_PER_SHEET = 12;
 
 /** A stable pseudo-random number for an id, for shuffling and spot checks. */
 export function mix(id: string): number {

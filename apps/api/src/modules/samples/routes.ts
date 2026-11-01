@@ -48,6 +48,8 @@ import {
   policyForOrg,
   writeSummary,
 } from "../autopilot/service.js";
+import { prepareReport } from "../reports/service.js";
+import { suggestStandard } from "../standards/suggest.js";
 
 const Mass = z.number().positive().max(100_000);
 const Pct = z.number().min(0).max(100);
@@ -87,7 +89,20 @@ export function sampleRoutes(ctx: AppContext) {
         if (r.reason) flagged[r.reason] = r.count;
         else accepted += r.count;
       }
-      return { ...policy, acceptedByAi: accepted, flaggedByReason: flagged };
+      const [expert] = await ctx.db
+        .select({
+          asked: count(kernels.expertClass),
+          settled: sql<number>`count(*) filter (where ${kernels.expertClass} is not null and ${kernels.flagReason} is null)::int`,
+        })
+        .from(kernels)
+        .where(eq(kernels.sampleId, sampleId));
+      return {
+        ...policy,
+        acceptedByAi: accepted,
+        flaggedByReason: flagged,
+        expertAsked: expert?.asked ?? 0,
+        expertSettled: expert?.settled ?? 0,
+      };
     }
 
     async function editable(orgId: string, id: string) {
@@ -244,6 +259,7 @@ export function sampleRoutes(ctx: AppContext) {
           .select({
             id: batches.id,
             side: batches.side,
+            sideDetected: batches.sideDetected,
             status: batches.status,
             kernelCount: batches.kernelCount,
             error: batches.error,
@@ -293,6 +309,11 @@ export function sampleRoutes(ctx: AppContext) {
         batches: batchRows,
         kernels: summary,
         autopilot: await autopilotStatus(id, me.orgId),
+        // No standard yet: the one this organisation most likely wants.
+        suggestedStandard:
+          !sample.standardId && sample.status === "in_progress"
+            ? await suggestStandard(ctx, me.orgId, sample.crop)
+            : null,
       };
     });
 
@@ -361,6 +382,8 @@ export function sampleRoutes(ctx: AppContext) {
       if (problems.length)
         throw badRequest(`Before completing: ${problems.join(", ")}.`);
       const { row, certificate } = await completeSample(ctx, sample, me.id);
+      // Build the PDF now, so opening it is instant.
+      ctx.jobs.run(`report ${id}`, () => prepareReport(ctx, id, me.orgId));
       return {
         ...row,
         certificate: { code: certificate.code, version: certificate.version },
@@ -472,7 +495,10 @@ export function sampleRoutes(ctx: AppContext) {
       if (!sample.result)
         throw badRequest("Enter the weights before asking for a summary");
       try {
-        return await writeSummary(ctx, id);
+        const row = await writeSummary(ctx, id);
+        if (row.status === "completed")
+          ctx.jobs.run(`report ${id}`, () => prepareReport(ctx, id, me.orgId));
+        return row;
       } catch (err) {
         throw badRequest(
           `Model Orchestration could not write the summary: ${err instanceof Error ? err.message : String(err)}`,
