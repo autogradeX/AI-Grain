@@ -440,7 +440,7 @@ export function Layout() {
 
       <div className="app-main">
         <OfflineBanner />
-        {user && !user.emailVerified && (
+        {user && user.emailEnabled && !user.emailVerified && (
           <div className="banner">
             {t("confirmEmail", { email: user.email })}
           </div>

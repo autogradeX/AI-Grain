@@ -84,7 +84,7 @@ function ProfileCard() {
         </Field>
         <div className="row">
           {user && <Badge>{tc(ROLE_NAME[user.role])}</Badge>}
-          {user?.emailVerified ? (
+          {!user?.emailEnabled ? null : user.emailVerified ? (
             <Badge tone="good">{t("emailConfirmed")}</Badge>
           ) : (
             <button

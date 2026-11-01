@@ -135,7 +135,12 @@ export function authRoutes(ctx: AppContext) {
       }
       if (!user.active)
         throw unauthorized("This account has been disabled", "disabled");
-      if (ctx.config.REQUIRE_EMAIL_VERIFICATION && !user.emailVerifiedAt) {
+      // Only with a mail server: otherwise nobody could ever confirm.
+      if (
+        ctx.config.REQUIRE_EMAIL_VERIFICATION &&
+        ctx.config.SMTP_URL &&
+        !user.emailVerifiedAt
+      ) {
         throw new HttpError(
           403,
           "Confirm your email address first",

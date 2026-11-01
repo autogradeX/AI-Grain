@@ -17,6 +17,7 @@ const session: Session = {
     name: "A",
     role: "admin",
     emailVerified: true,
+    emailEnabled: true,
     org: { id: "o1", name: "O" },
   },
 };

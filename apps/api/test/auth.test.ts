@@ -188,6 +188,72 @@ describe("password and email flows", () => {
     expect(t.mailer.sent).toHaveLength(0);
   });
 
+  it("asks to confirm the email only when the server can send email", async () => {
+    const reg = await t.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload: {
+        orgName: "No Mail",
+        name: "Nia",
+        email: "nia@nomail.test",
+        password: "correct horse battery",
+      },
+    });
+    expect(reg.json<{ user: { emailEnabled: boolean } }>().user).toMatchObject({
+      emailVerified: false,
+      emailEnabled: false,
+    });
+
+    // With verification required but no mail server, signing in still works.
+    const strict = await createTestApp({ REQUIRE_EMAIL_VERIFICATION: "true" });
+    const payload = {
+      orgName: "Strict",
+      name: "Sam",
+      email: "sam@strict.test",
+      password: "correct horse battery",
+    };
+    await strict.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload,
+    });
+    const login = await strict.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: payload.email, password: payload.password },
+    });
+    expect(login.statusCode).toBe(200);
+    await strict.close();
+
+    // With a mail server, it is asked for.
+    const mail = await createTestApp({ SMTP_URL: "smtp://localhost:2525" });
+    const withMail = await mail.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload,
+    });
+    expect(
+      withMail.json<{ user: { emailEnabled: boolean } }>().user.emailEnabled,
+    ).toBe(true);
+    await mail.close();
+    const strictMail = await createTestApp({
+      SMTP_URL: "smtp://localhost:2525",
+      REQUIRE_EMAIL_VERIFICATION: "true",
+    });
+    await strictMail.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      payload,
+    });
+    const blocked = await strictMail.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: payload.email, password: payload.password },
+    });
+    expect(blocked.statusCode).toBe(403);
+    await strictMail.close();
+  });
+
   it("verifies an email address", async () => {
     const { token: access } = await register(t);
     const token = tokenFromMail(t.mailer, "admin@farm.test");

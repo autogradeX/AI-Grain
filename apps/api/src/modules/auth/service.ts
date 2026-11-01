@@ -60,7 +60,9 @@ export async function publicUser(ctx: AppContext, userId: string) {
     .from(users)
     .innerJoin(organizations, eq(organizations.id, users.orgId))
     .where(eq(users.id, userId));
-  return row;
+  // Without a mail server no confirmation email can arrive, so the app
+  // doesn't ask for one.
+  return row && { ...row, emailEnabled: Boolean(ctx.config.SMTP_URL) };
 }
 
 /** Starts a new session: a new refresh-token family in a cookie, and an access token in the body. */

@@ -120,7 +120,9 @@ export function UsersPage() {
                 {!u.active && <Badge tone="bad">{t("disabled")}</Badge>}
                 <div className="muted small">
                   {u.email}
-                  {!u.emailVerified && t("unconfirmed")} ·{" "}
+                  {me?.emailEnabled &&
+                    !u.emailVerified &&
+                    t("unconfirmed")} ·{" "}
                   {t("lastSignIn", { date: formatDate(u.lastLoginAt) })}
                 </div>
               </div>

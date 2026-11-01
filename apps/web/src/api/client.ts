@@ -45,6 +45,8 @@ export interface CurrentUser {
   name: string;
   role: "admin" | "grader" | "viewer";
   emailVerified: boolean;
+  /** The server can send email; without it, nobody is asked to confirm theirs. */
+  emailEnabled: boolean;
   org: { id: string; name: string };
 }
 
