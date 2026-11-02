@@ -277,7 +277,8 @@ export function batchRoutes(ctx: AppContext) {
       }
       await ctx.db
         .update(batches)
-        .set({ status: "classifying", error: null })
+        // classifyBatch clears a failure message; detection warnings stay.
+        .set({ status: "classifying" })
         .where(eq(batches.id, id));
       ctx.jobs.run(`classify ${id}`, () => classifyAndTriage(ctx, id));
       reply.code(202);

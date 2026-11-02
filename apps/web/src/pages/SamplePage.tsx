@@ -461,7 +461,15 @@ function PhotosCard({
                       date: formatDate(b.createdAt),
                     })}
                   </div>
-                  {b.error && <div className="error small">{b.error}</div>}
+                  {b.error && (
+                    <div
+                      className={
+                        b.status === "failed" ? "error small" : "warn small"
+                      }
+                    >
+                      {b.error}
+                    </div>
+                  )}
                 </div>
                 <BatchStatusBadge status={b.status} />
               </Link>

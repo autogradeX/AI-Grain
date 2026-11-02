@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { BOARD_PX_PER_CM, cellAt, rawToSharp, type RawImage } from "./board.js";
 
 /** Detection runs on a downscaled board: faster, and it smooths out printed grid lines. */
@@ -13,7 +14,7 @@ export interface DetectOptions {
   maxAreaCm2?: number;
 }
 
-/** How much brighter than the board a pixel must be to count as an object. */
+/** How much a pixel must differ from the background around it to count as an object (at most). */
 const MIN_CONTRAST = 30;
 
 export interface DetectedKernel {
@@ -32,17 +33,24 @@ export interface DetectedKernel {
 
 export interface Detection {
   kernels: DetectedKernel[];
+  /** Contrast with the local background that counts as an object (grey levels). */
   threshold: number;
+  /** +1: objects brighter than the background (dark board). −1: darker (light paper or cloth). */
+  polarity: 1 | -1;
   medianArea: number;
   /** Bright regions too large to be kernels, which were left out. */
   ignoredLargeRegions: number;
+  /** Objects cut off by the edge of the photo, left out (they can't be judged whole). */
+  edgeObjects: number;
 }
 
 /**
- * Finds kernels on a dark board by classic image processing: grayscale,
- * Otsu threshold, morphological opening, connected components. Counting
- * stays out of the language model, which is unreliable at exact counts of
- * many small objects.
+ * Finds kernels by classic image processing: grayscale, contrast with the
+ * local background, Otsu threshold, morphological opening, connected
+ * components. Works on the dark grid board (kernels brighter) and on light
+ * paper or cloth (kernels darker), and under uneven light. Counting stays
+ * out of the language model, which is unreliable at exact counts of many
+ * small objects.
  */
 export async function detectKernels(
   board: RawImage,
@@ -59,13 +67,24 @@ export async function detectKernels(
     .raw()
     .toBuffer();
 
-  // Otsu alone splits the board from the *light* kernels and misses dark ones
-  // (heat damage, black point), which are the defects that matter most. Cap the
-  // threshold at a fixed contrast above the board, which covers most of the image.
-  const background = median(gray);
-  const threshold = Math.min(otsu(gray), background + MIN_CONTRAST);
+  // The background as it is at each point (light falls off across a photo):
+  // a median over about 2 cm, which kernels are too small to pull along.
+  const bg = await localBackground(gray, width, height);
+  // A dark board has bright kernels; light paper or cloth has dark ones.
+  const polarity: 1 | -1 = median(gray) < 128 ? 1 : -1;
+  const contrast = new Uint8Array(gray.length);
+  for (let i = 0; i < gray.length; i++) {
+    const v = polarity * (gray[i]! - bg[i]!);
+    contrast[i] = v > 0 ? Math.min(255, v) : 0;
+  }
+  // Otsu alone splits the background from the most contrasting kernels and
+  // misses faint ones (heat damage, black point on a dark board; chalky or
+  // pale kernels on paper), which are the defects that matter most. Cap the
+  // threshold at a fixed contrast.
+  const threshold = Math.max(8, Math.min(otsu(contrast), MIN_CONTRAST));
   let mask: Uint8Array = new Uint8Array(width * height);
-  for (let i = 0; i < gray.length; i++) mask[i] = gray[i]! > threshold ? 1 : 0;
+  for (let i = 0; i < gray.length; i++)
+    mask[i] = contrast[i]! > threshold ? 1 : 0;
   if (radius > 0) {
     mask = dilate(erode(mask, width, height, radius), width, height, radius);
   }
@@ -75,8 +94,31 @@ export async function detectKernels(
   const maxArea = (options.maxAreaCm2 ?? 4) * cm2;
   const labels = new Int32Array(width * height);
   const all = label(mask, width, height, labels);
-  const found = all.filter((b) => b.area >= minArea && b.area <= maxArea);
-  const ignoredLargeRegions = all.filter((b) => b.area > maxArea).length;
+  const atEdge = (b: Blob) =>
+    b.minX <= 0 || b.minY <= 0 || b.maxX >= width - 1 || b.maxY >= height - 1;
+  // Printed grid lines and board edges: long and thin, unlike any kernel.
+  const isLine = (b: Blob) => {
+    const w = b.maxX - b.minX + 1;
+    const h = b.maxY - b.minY + 1;
+    return Math.max(w, h) / Math.min(w, h) > 8 && Math.min(w, h) <= 5;
+  };
+  const sized = all.filter(
+    (b) => b.area >= minArea && b.area <= maxArea && !isLine(b),
+  );
+  const found = sized.filter((b) => !atEdge(b));
+  const edgeObjects = sized.length - found.length;
+  // Large areas, and edge bands, are usually table showing past a corner.
+  // Large areas unlike the background (usually table showing past a
+  // misplaced corner): measured against the whole photo's background, since
+  // the local background follows them.
+  const globalBg = median(gray);
+  let wide: Uint8Array = new Uint8Array(gray.length);
+  for (let i = 0; i < gray.length; i++)
+    wide[i] = polarity * (gray[i]! - globalBg) > MIN_CONTRAST ? 1 : 0;
+  wide = dilate(erode(wide, width, height, 2), width, height, 2);
+  const ignoredLargeRegions = label(wide, width, height).filter(
+    (b) => b.area > maxArea,
+  ).length;
 
   const areas = found.map((b) => b.area).sort((a, b) => a - b);
   const medianArea = areas.length ? areas[Math.floor(areas.length / 2)]! : 0;
@@ -122,12 +164,47 @@ export async function detectKernels(
   return {
     kernels,
     threshold,
+    polarity,
     medianArea: Math.round(medianArea * SCALE * SCALE),
     ignoredLargeRegions,
+    edgeObjects,
   };
 }
 
-/** Median gray level. The board covers most of the image, so this is the board's brightness. */
+/** The background brightness around each pixel: a median over about 2 cm, at low resolution. */
+async function localBackground(
+  gray: Buffer,
+  width: number,
+  height: number,
+): Promise<Uint8Array> {
+  const small = {
+    w: Math.max(4, Math.round(width / 8)),
+    h: Math.max(4, Math.round(height / 8)),
+  };
+  // Separate pipelines: sharp applies one resize per pipeline.
+  const reduced = await sharp(gray, { raw: { width, height, channels: 1 } })
+    .resize(small.w, small.h, { kernel: "linear" })
+    .extractChannel(0)
+    .raw()
+    .toBuffer();
+  const filtered = await sharp(reduced, {
+    raw: { width: small.w, height: small.h, channels: 1 },
+  })
+    .median(7)
+    .extractChannel(0)
+    .raw()
+    .toBuffer();
+  const data = await sharp(filtered, {
+    raw: { width: small.w, height: small.h, channels: 1 },
+  })
+    .resize(width, height, { kernel: "linear" })
+    .extractChannel(0)
+    .raw()
+    .toBuffer();
+  return new Uint8Array(data.buffer, data.byteOffset, data.length);
+}
+
+/** Median gray level. The background covers most of the image, so this is its brightness. */
 function median(gray: Uint8Array | Buffer): number {
   const hist = new Array<number>(256).fill(0);
   for (const v of gray) hist[v]!++;

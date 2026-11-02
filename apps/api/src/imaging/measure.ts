@@ -35,9 +35,10 @@ const LINE_RADIUS = 3;
  */
 export function measureKernel(
   gray: Gray,
-  threshold: number,
+  detection: { threshold: number; polarity: 1 | -1 },
   box: { x: number; y: number; w: number; h: number; area: number },
 ): { lengthMm: number; widthMm: number } | null {
+  const { threshold, polarity } = detection;
   const pad = Math.round(BOARD_PX_PER_CM * 0.15);
   const x0 = Math.max(0, box.x - pad);
   const y0 = Math.max(0, box.y - pad);
@@ -46,8 +47,16 @@ export function measureKernel(
   const w = x1 - x0;
   const h = y1 - y0;
   if (w <= 2 || h <= 2) return null;
-  const value = (i: number) =>
+  const raw = (i: number) =>
     gray.data[(y0 + Math.floor(i / w)) * gray.width + x0 + (i % w)]!;
+  // The background here: the median along the crop's edge.
+  const edge: number[] = [];
+  for (let x = 0; x < w; x++) edge.push(raw(x), raw((h - 1) * w + x));
+  for (let y = 0; y < h; y++) edge.push(raw(y * w), raw(y * w + w - 1));
+  edge.sort((a, b) => a - b);
+  const background = edge[edge.length >> 1]!;
+  // Contrast with the background, positive towards the kernel.
+  const value = (i: number) => polarity * (raw(i) - background);
   // The kernel's pixels at a brightness level: bright pixels, opened to drop
   // printed grid lines (thinner than a kernel), connected to the pixel
   // nearest the box centre. Null when the region runs off into a neighbour.

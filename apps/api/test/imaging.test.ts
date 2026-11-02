@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Corners } from "../src/db/schema.js";
 import {
   cellAt,
+  fullFrameCorners,
   normalizeUpload,
   straightenBoard,
 } from "../src/imaging/board.js";
@@ -14,7 +15,7 @@ import {
   cropWindowCm,
 } from "../src/imaging/sheets.js";
 import sharp from "sharp";
-import { syntheticBoard } from "./helpers.js";
+import { kernelsOnPaper, syntheticBoard } from "./helpers.js";
 
 describe("homography", () => {
   it("maps each source corner onto its target", () => {
@@ -164,7 +165,7 @@ describe("kernel detection", () => {
     const detection = await detectKernels(board);
     const gray = await boardGray(board);
     const sizes = detection.kernels.map((k) =>
-      measureKernel(gray, detection.threshold, k),
+      measureKernel(gray, detection, k),
     );
     expect(sizes.every((s) => s !== null)).toBe(true);
     for (const s of sizes) {
@@ -190,11 +191,21 @@ describe("kernel detection", () => {
     const detection = await detectKernels(board);
     const gray = await boardGray(board);
     const rotated = detection.kernels.find((k) => k.w > 60 && k.h > 60)!;
-    const size = measureKernel(gray, detection.threshold, rotated)!;
+    const size = measureKernel(gray, detection, rotated)!;
     // 60 px × 18 px at 60 px/cm: 10 mm × 3 mm.
     expect(size.lengthMm).toBeGreaterThan(9.4);
     expect(size.lengthMm).toBeLessThan(10.6);
     expect(size.widthMm).toBeGreaterThan(2.6);
     expect(size.widthMm).toBeLessThan(3.5);
+  });
+
+  it("finds dark kernels on light paper under uneven light", async () => {
+    const jpeg = await kernelsOnPaper(30);
+    const board = await straightenBoard(jpeg, fullFrameCorners(900, 1200));
+    const detection = await detectKernels(board);
+    expect(detection.polarity).toBe(-1);
+    // Every kernel, the darkest ones too; not the table strip at the edge.
+    expect(detection.kernels).toHaveLength(30);
+    expect(detection.kernels.some((k) => k.isCluster)).toBe(false);
   });
 });

@@ -197,7 +197,18 @@ async function maskImage(img: Gray) {
   };
 }
 
-export async function findGridCorners(jpeg: Buffer): Promise<Corners | null> {
+export interface FoundBoard {
+  corners: Corners;
+  /**
+   * The printed grid lines were found, so the corners sit on the 1 cm grid
+   * and sizes in mm are right. False: only a dark area of board-like shape.
+   */
+  grid: boolean;
+}
+
+export async function findGridCorners(
+  jpeg: Buffer,
+): Promise<FoundBoard | null> {
   const img = await grayscale(jpeg);
   const small = await maskImage(img);
   const { width, height } = small;
@@ -274,12 +285,18 @@ export async function findGridCorners(jpeg: Buffer): Promise<Corners | null> {
     for (let x = 0; x < WARP_W; x += 2) row.push(warp[y * WARP_W + x]!);
     rowProfile.push(median(row));
   }
-  const [x0, x1] = outerLines(colProfile, GRID_COLS) ?? [0, 1];
-  const [y0, y1] = outerLines(rowProfile, GRID_ROWS) ?? [0, 1];
+  const cols = outerLines(colProfile, GRID_COLS);
+  const rows = outerLines(rowProfile, GRID_ROWS);
+  const [x0, x1] = cols ?? [0, 1];
+  const [y0, y1] = rows ?? [0, 1];
 
   const back = (u: number, v: number) => {
     const p = apply(h, u * WARP_W, v * WARP_H);
     return { x: p.x / img.scale, y: p.y / img.scale };
   };
-  return [back(x0, y0), back(x1, y0), back(x1, y1), back(x0, y1)];
+  return {
+    corners: [back(x0, y0), back(x1, y0), back(x1, y1), back(x0, y1)],
+    // One axis is enough (a tilted or partly shaded board may hide the other).
+    grid: cols !== null || rows !== null,
+  };
 }

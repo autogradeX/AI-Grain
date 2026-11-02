@@ -50,23 +50,28 @@ const maxError = (
 describe("finding the grid corners", () => {
   it("finds the corners of a board on a lighter background", async () => {
     const board = await syntheticBoard(40);
-    const corners = await findGridCorners(board.jpeg);
-    expect(corners).not.toBeNull();
+    const found = await findGridCorners(board.jpeg);
+    expect(found?.grid).toBe(true);
+    const corners = found?.corners;
+    expect(corners).toBeDefined();
     // Within half a grid cell (30 px at 60 px/cm).
     expect(maxError(corners!, board.corners)).toBeLessThan(30);
   });
 
   it("puts the corners on the printed grid, not the card's edge", async () => {
     const card = await cardWithMargins();
-    const corners = await findGridCorners(card.jpeg);
-    expect(corners).not.toBeNull();
+    const found = await findGridCorners(card.jpeg);
+    expect(found?.grid).toBe(true);
+    const corners = found?.corners;
+    expect(corners).toBeDefined();
     expect(maxError(corners!, card.grid)).toBeLessThan(15);
   });
 
   it("handles a board photographed at an angle", async () => {
     const card = await cardWithMargins(7);
-    const corners = await findGridCorners(card.jpeg);
-    expect(corners).not.toBeNull();
+    const found = await findGridCorners(card.jpeg);
+    const corners = found?.corners;
+    expect(corners).toBeDefined();
     // The grid's sides stay about 20 × 28 cells long.
     const top = Math.hypot(
       corners![1].x - corners![0].x,

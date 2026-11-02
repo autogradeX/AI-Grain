@@ -55,8 +55,8 @@ export const m = defineMessages({
   checkPhoto: { en: "Check the photo", hi: "फ़ोटो जाँचें" },
   photoPreview: { en: "The board photo", hi: "बोर्ड की फ़ोटो" },
   autoCornersHint: {
-    en: "The grid's corners are found automatically. The whole board must be in the photo, on a lighter surface.",
-    hi: "ग्रिड के कोने अपने आप ढूँढे जाते हैं। पूरा बोर्ड फ़ोटो में हो, हल्के रंग की सतह पर।",
+    en: "The grid's corners are found automatically: keep the whole board in the photo, on a lighter surface. No board? Plain paper or cloth that contrasts with the kernels works too, but kernel sizes in mm need the board.",
+    hi: "ग्रिड के कोने अपने आप ढूँढे जाते हैं: पूरा बोर्ड फ़ोटो में रखें, हल्के रंग की सतह पर। बोर्ड नहीं है? दानों से अलग रंग का सादा काग़ज़ या कपड़ा भी चलेगा, पर दानों का आकार मिमी में बोर्ड से ही मिलता है।",
   },
   markMyself: {
     en: "Mark the corners myself",

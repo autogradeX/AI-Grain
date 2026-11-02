@@ -383,6 +383,8 @@ export const batches = pgTable("batches", {
   originalHeight: integer("original_height").notNull(),
   boardKey: text("board_key"),
   corners: jsonb("corners").$type<Corners>(),
+  /** The corners sit on the 1 cm grid, so sizes in mm are right. False for photos without the grid board. */
+  scaleKnown: boolean("scale_known").notNull().default(true),
   kernelCount: integer("kernel_count"),
   /** Side of the square crop window, shared by every kernel crop in the batch. */
   cropWindowCm: doublePrecision("crop_window_cm"),

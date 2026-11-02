@@ -11,6 +11,7 @@ import {
 import {
   bearer,
   createTestApp,
+  kernelsOnPaper,
   multipart,
   register,
   syntheticBoard,
@@ -584,7 +585,30 @@ describe("Autopilot from photo to report", () => {
     await t.jobs.idle();
   });
 
-  it("asks for the corners when it can't find the board", async () => {
+  it("works on a photo without the grid board, without sizes in mm", async () => {
+    const { sampleId, batchId } = await photographed(await kernelsOnPaper(24));
+    const batch = await api<{
+      status: string;
+      kernelCount: number;
+      scaleKnown: boolean;
+      error: string | null;
+      kernels: { lengthMm: number | null }[];
+    }>("GET", `/api/batches/${batchId}`);
+    expect(batch.body).toMatchObject({
+      status: "classified",
+      kernelCount: 24,
+      scaleKnown: false,
+    });
+    expect(batch.body.error).toMatch(/No grid board in this photo/);
+    expect(batch.body.kernels.every((k) => k.lengthMm === null)).toBe(true);
+    const view = await api<{ dimensions: unknown }>(
+      "GET",
+      `/api/samples/${sampleId}`,
+    );
+    expect(view.body.dimensions).toBeNull();
+  });
+
+  it("fails clearly when the photo shows no kernels", async () => {
     const blank = await sharp({
       create: { width: 900, height: 1200, channels: 3, background: "#c8c0b0" },
     })
@@ -596,7 +620,7 @@ describe("Autopilot from photo to report", () => {
       `/api/batches/${batchId}`,
     );
     expect(batch.body.status).toBe("failed");
-    expect(batch.body.error).toMatch(/Mark its four corners/);
+    expect(batch.body.error).toMatch(/No kernels were found/);
     // The sample doesn't finish without that photo.
     const sampleId = (
       await api<{ sampleId: string }>("GET", `/api/batches/${batchId}`)

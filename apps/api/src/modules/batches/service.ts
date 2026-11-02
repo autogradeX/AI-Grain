@@ -31,7 +31,7 @@ import {
   standards,
   type Corners,
 } from "../../db/schema.js";
-import { straightenBoard } from "../../imaging/board.js";
+import { fullFrameCorners, straightenBoard } from "../../imaging/board.js";
 import { findGridCorners } from "../../imaging/corners.js";
 import { detectKernels } from "../../imaging/detect.js";
 import { boardGray, measureKernel } from "../../imaging/measure.js";
@@ -121,16 +121,21 @@ export async function processBatch(
     const prefix = batchPrefix(batch);
     const original = await ctx.storage.get(batch.originalKey);
     // No corners from the operator: find the grid in the photo.
-    const corners = given ?? (await findGridCorners(original));
+    // Corners: the operator's, else the board's (on its printed grid when the
+    // lattice is visible). Without a board (kernels on plain paper or cloth)
+    // the whole photo is used: kernels are still counted and classified, but
+    // there is no scale for sizes in mm.
+    let corners = given;
+    let scaleKnown = true;
     if (!corners) {
-      await setBatch(ctx, batchId, {
-        status: "failed",
-        error:
-          "The grid board wasn't found in this photo. Mark its four corners, or retake the photo with the whole board on a lighter surface.",
-      });
-      return;
+      const found = await findGridCorners(original);
+      if (found) corners = found.corners;
+      else {
+        corners = fullFrameCorners(batch.originalWidth, batch.originalHeight);
+        scaleKnown = false;
+      }
     }
-    await setBatch(ctx, batchId, { corners });
+    await setBatch(ctx, batchId, { corners, scaleKnown });
     const board = await straightenBoard(original, corners);
     const detection = await detectKernels(board);
     const windowCm = cropWindowCm(detection.kernels);
@@ -142,6 +147,17 @@ export async function processBatch(
       await boardPreview(board, board.width),
     );
     await ctx.storage.put(`${prefix}/preview.jpg`, await boardPreview(board));
+    if (detection.kernels.length === 0) {
+      await ctx.db.delete(kernels).where(eq(kernels.batchId, batchId));
+      await setBatch(ctx, batchId, {
+        status: "failed",
+        boardKey: `${prefix}/board.jpg`,
+        kernelCount: 0,
+        error:
+          "No kernels were found in this photo. Spread them in one layer, not touching, on a plain surface that contrasts with them (the grid board is best), with even light, then retake the photo.",
+      });
+      return;
+    }
     // Uploads in parallel: one at a time is slow against cloud storage.
     await mapLimit(detection.kernels, 16, (k) =>
       ctx.storage.put(
@@ -154,9 +170,8 @@ export async function processBatch(
     const rows: (typeof kernels.$inferInsert)[] = [];
     for (const k of detection.kernels) {
       const cropKey = `${prefix}/kernels/${k.number}.jpg`;
-      const size = k.isCluster
-        ? null
-        : measureKernel(gray, detection.threshold, k);
+      const size =
+        k.isCluster || !scaleKnown ? null : measureKernel(gray, detection, k);
       rows.push({
         orgId: batch.orgId,
         sampleId: batch.sampleId,
@@ -185,10 +200,12 @@ export async function processBatch(
       boardKey: `${prefix}/board.jpg`,
       kernelCount: rows.length,
       cropWindowCm: windowCm,
-      // Not a failure, but worth a look: usually a corner is off the grid.
-      error: detection.ignoredLargeRegions
-        ? "Large bright areas were left out. Check that the corners sit on the grid, then re-mark them if needed."
-        : null,
+      // Not failures, but worth a look.
+      error: !scaleKnown
+        ? "No grid board in this photo: kernels were counted and classified, but kernel sizes in mm need the grid board (or mark its four corners)."
+        : detection.ignoredLargeRegions
+          ? "Large areas were left out. Check that the corners sit on the grid, then re-mark them if needed."
+          : null,
     });
   } catch (err) {
     await setBatch(ctx, batchId, {
@@ -397,7 +414,17 @@ export async function classifyBatch(
   /** False when more steps follow (second opinion, triage): the batch stays busy. */
   done = true,
 ): Promise<boolean> {
-  await setBatch(ctx, batchId, { status: "classifying", error: null });
+  // A failure message goes on a retry; a warning from detection stays.
+  const [current] = await ctx.db
+    .select({ status: batches.status, error: batches.error })
+    .from(batches)
+    .where(eq(batches.id, batchId));
+  await setBatch(ctx, batchId, {
+    status: "classifying",
+    ...(current?.error?.startsWith("Classification incomplete") && {
+      error: null,
+    }),
+  });
   const todo = await ctx.db
     .select()
     .from(kernels)
@@ -414,12 +441,12 @@ export async function classifyBatch(
     });
     return false;
   }
-  if (done) await setBatch(ctx, batchId, { status: "classified", error: null });
+  if (done) await setBatch(ctx, batchId, { status: "classified" });
   return true;
 }
 
 export async function markClassified(ctx: AppContext, batchId: string) {
-  await setBatch(ctx, batchId, { status: "classified", error: null });
+  await setBatch(ctx, batchId, { status: "classified" });
 }
 
 async function saveVerdicts(

@@ -1,0 +1,1 @@
+ALTER TABLE "batches" ADD COLUMN "scale_known" boolean DEFAULT true NOT NULL;

@@ -309,3 +309,31 @@ export function multipart(
     headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
   };
 }
+
+/**
+ * Brown kernels on light paper, no grid board, with light falling off
+ * towards the bottom and a strip of dark table along the bottom edge: a
+ * photo taken without the board.
+ */
+export async function kernelsOnPaper(kernelCount: number) {
+  const width = 900;
+  const height = 1200;
+  const kernels: string[] = [];
+  for (let i = 0; i < kernelCount; i++) {
+    const col = i % 6;
+    const row = Math.floor(i / 6);
+    const cx = 110 + col * 135;
+    const cy = 120 + row * 130;
+    kernels.push(
+      `<ellipse cx="${cx}" cy="${cy}" rx="26" ry="18" fill="${i % 7 === 3 ? "#4a3020" : "#9a5a2a"}" transform="rotate(${(i * 37) % 180} ${cx} ${cy})"/>`,
+    );
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+    <defs><linearGradient id="light" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e6d3dc"/><stop offset="1" stop-color="#a99aa1"/>
+    </linearGradient></defs>
+    <rect width="100%" height="100%" fill="url(#light)"/>
+    <rect x="0" y="${height - 25}" width="${width}" height="25" fill="#222"/>
+    ${kernels.join("")}</svg>`;
+  return sharp(Buffer.from(svg)).jpeg({ quality: 90 }).toBuffer();
+}

@@ -18,7 +18,7 @@ export function classLines(classes: readonly ClassDef[]): string {
 /** System prompt for kernel classification. Stable across requests so it can be cached. */
 export const CLASSIFY_SYSTEM = `You are assisting a grain grader who screens samples with a phone camera and a precise scale.
 
-You receive sheets of numbered close-up photos. Each tile shows one kernel (or one piece of material) on a dark board, and every tile on a sheet is at the same scale, so sizes are comparable between tiles. Small parts of neighbouring kernels may show at tile edges; judge only the object centred in the tile.
+You receive sheets of numbered close-up photos. Each tile shows one kernel (or one piece of material) on a plain background (usually the dark grid board, sometimes light paper), and every tile on a sheet is at the same scale, so sizes are comparable between tiles. Small parts of neighbouring kernels may show at tile edges; judge only the object centred in the tile.
 
 For every numbered tile, give exactly one class:
 - "sound" if the kernel shows no defect.
@@ -51,7 +51,7 @@ ${classLines(input.classes)}`;
 /** System prompt for suggesting a new crop's defect classes. */
 export const CROP_SYSTEM = `You help a grain quality lab set up a new commodity (a cereal, pulse, oilseed, millet, spice seed or similar) in a photo-based screening tool.
 
-The tool photographs kernels or seeds one by one on a dark board, sorts each into "sound" or one defect class, and estimates mass percentages from each object's projected area. Classes fall into exactly four groups:
+The tool photographs kernels or seeds one by one on a plain background (usually a dark grid board), sorts each into "sound" or one defect class, and estimates mass percentages from each object's projected area. Classes fall into exactly four groups:
 - admixture: kernels of other cultivated grains or seeds mixed in.
 - broken_defective: damaged or substandard kernels of the commodity itself (broken, shrivelled, discoloured, insect-damaged, sprouted, immature, and so on).
 - impurity: foreign material that isn't grain: stones, soil, chaff, husks, stalks, weed seeds, dead insects.

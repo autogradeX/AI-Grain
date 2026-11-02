@@ -129,7 +129,9 @@ export function BatchPage() {
         </div>
         <BatchStatusBadge status={b.status} />
       </div>
-      {b.error && <p className="error">{b.error}</p>}
+      {b.error && (
+        <p className={b.status === "failed" ? "error" : "warn"}>{b.error}</p>
+      )}
       {busy && (
         <Spinner
           label={
