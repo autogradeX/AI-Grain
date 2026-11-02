@@ -121,7 +121,7 @@ export function BatchPage() {
           </h1>
           <div className="muted small">
             {t("counts", {
-              kernels: b.kernelCount ?? "…",
+              kernels: b.grainCount ?? b.kernelCount ?? "…",
               flagged: b.summary.flagged,
               pending: b.summary.pendingReview,
             })}

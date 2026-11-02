@@ -1,5 +1,5 @@
 import { BOARD_PX_PER_CM, rawToSharp, type RawImage } from "./board.js";
-import { dilate, erode } from "./detect.js";
+import { contrastMap, dilate, erode } from "./detect.js";
 
 /**
  * Kernel length and breadth from the straightened board, at full resolution
@@ -15,13 +15,14 @@ export interface Gray {
   height: number;
 }
 
-export async function boardGray(board: RawImage): Promise<Gray> {
-  const data = await rawToSharp(board).grayscale().raw().toBuffer();
-  return {
-    data: new Uint8Array(data.buffer, data.byteOffset, data.length),
-    width: board.width,
-    height: board.height,
-  };
+/**
+ * The board's contrast with its local background (brightness and colour) at
+ * full resolution: what measurement thresholds, on any background.
+ */
+export async function boardContrast(board: RawImage): Promise<Gray> {
+  const rgb = await rawToSharp(board).removeAlpha().raw().toBuffer();
+  const { contrast } = await contrastMap(rgb, board.width, board.height, 32);
+  return { data: contrast, width: board.width, height: board.height };
 }
 
 const MM_PER_PX = 10 / BOARD_PX_PER_CM;
@@ -34,12 +35,17 @@ const LINE_RADIUS = 3;
  * neighbour (much larger than the kernel's detected area).
  */
 export function measureKernel(
+  /** From boardContrast: 0 on background, higher on kernels. */
   gray: Gray,
-  detection: { threshold: number; polarity: 1 | -1 },
+  detection: { threshold: number },
   box: { x: number; y: number; w: number; h: number; area: number },
+  /** Scale: the board's 0.1 mm per pixel unless a reference coin gave another. */
+  mmPerPx = MM_PER_PX,
 ): { lengthMm: number; widthMm: number } | null {
-  const { threshold, polarity } = detection;
-  const pad = Math.round(BOARD_PX_PER_CM * 0.15);
+  const { threshold } = detection;
+  const polarity = 1;
+  // About 1.5 mm around the kernel (at least a few pixels).
+  const pad = Math.max(4, Math.round(1.5 / mmPerPx));
   const x0 = Math.max(0, box.x - pad);
   const y0 = Math.max(0, box.y - pad);
   const x1 = Math.min(gray.width, box.x + box.w + pad);
@@ -164,8 +170,8 @@ export function measureKernel(
     if (b > maxB) maxB = b;
   }
   // +1: extents run from pixel centre to pixel centre.
-  const length = (maxA - minA + 1) * MM_PER_PX;
-  const breadth = (maxB - minB + 1) * MM_PER_PX;
+  const length = (maxA - minA + 1) * mmPerPx;
+  const breadth = (maxB - minB + 1) * mmPerPx;
   return {
     lengthMm: Math.round(Math.max(length, breadth) * 100) / 100,
     widthMm: Math.round(Math.min(length, breadth) * 100) / 100,

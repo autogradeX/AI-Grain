@@ -251,6 +251,10 @@ export function userRoutes(ctx: AppContext) {
               expertReview: z.boolean().optional(),
             })
             .optional(),
+          // Kernel size without the board: the reference coin's diameter (null clears it).
+          measurement: z
+            .object({ referenceMm: z.number().min(5).max(100).nullable() })
+            .optional(),
           // The report layout, replaced as a whole.
           report: z
             .object({
@@ -279,6 +283,12 @@ export function userRoutes(ctx: AppContext) {
           ...(body.name !== undefined && { name: body.name }),
           ...(body.defaultModel !== undefined && {
             defaultModel: body.defaultModel,
+          }),
+          ...(body.measurement && {
+            measurement:
+              body.measurement.referenceMm === null
+                ? {}
+                : { referenceMm: body.measurement.referenceMm },
           }),
           ...(body.report && {
             report: Object.fromEntries(

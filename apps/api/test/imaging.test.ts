@@ -7,7 +7,7 @@ import {
   straightenBoard,
 } from "../src/imaging/board.js";
 import { detectKernels } from "../src/imaging/detect.js";
-import { boardGray, measureKernel } from "../src/imaging/measure.js";
+import { boardContrast, measureKernel } from "../src/imaging/measure.js";
 import { applyHomography as apply, homography } from "@ai-grain/core";
 import {
   buildSheet,
@@ -113,7 +113,7 @@ describe("kernel detection", () => {
     expect(detection.ignoredLargeRegions).toBeGreaterThan(0);
   });
 
-  it("flags touching kernels as a cluster", async () => {
+  it("separates even heavily overlapping kernels by their area", async () => {
     const photo = await syntheticBoard(12);
     // Add two overlapping kernels to the photo.
     const overlay = Buffer.from(
@@ -129,8 +129,9 @@ describe("kernel detection", () => {
       .toBuffer();
     const board = await straightenBoard(jpeg, photo.corners as Corners);
     const detection = await detectKernels(board);
-    expect(detection.kernels).toHaveLength(13);
-    expect(detection.kernels.filter((k) => k.isCluster)).toHaveLength(1);
+    // Three kernels, so three objects (12 + 3).
+    expect(detection.kernels).toHaveLength(15);
+    expect(detection.kernels.filter((k) => k.isCluster)).toHaveLength(0);
   });
 
   it("separates kernels that only touch", async () => {
@@ -163,7 +164,7 @@ describe("kernel detection", () => {
     const photo = await syntheticBoard(20);
     const board = await straightenBoard(photo.jpeg, photo.corners as Corners);
     const detection = await detectKernels(board);
-    const gray = await boardGray(board);
+    const gray = await boardContrast(board);
     const sizes = detection.kernels.map((k) =>
       measureKernel(gray, detection, k),
     );
@@ -189,7 +190,7 @@ describe("kernel detection", () => {
       .toBuffer();
     const board = await straightenBoard(jpeg, photo.corners as Corners);
     const detection = await detectKernels(board);
-    const gray = await boardGray(board);
+    const gray = await boardContrast(board);
     const rotated = detection.kernels.find((k) => k.w > 60 && k.h > 60)!;
     const size = measureKernel(gray, detection, rotated)!;
     // 60 px × 18 px at 60 px/cm: 10 mm × 3 mm.

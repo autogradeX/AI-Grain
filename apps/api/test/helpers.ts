@@ -315,7 +315,11 @@ export function multipart(
  * towards the bottom and a strip of dark table along the bottom edge: a
  * photo taken without the board.
  */
-export async function kernelsOnPaper(kernelCount: number) {
+export async function kernelsOnPaper(
+  kernelCount: number,
+  /** Diameter of a brass reference coin drawn below the kernels, in pixels. */
+  coinPx?: number,
+) {
   const width = 900;
   const height = 1200;
   const kernels: string[] = [];
@@ -334,6 +338,7 @@ export async function kernelsOnPaper(kernelCount: number) {
     </linearGradient></defs>
     <rect width="100%" height="100%" fill="url(#light)"/>
     <rect x="0" y="${height - 25}" width="${width}" height="25" fill="#222"/>
-    ${kernels.join("")}</svg>`;
+    ${kernels.join("")}
+    ${coinPx ? `<circle cx="450" cy="950" r="${coinPx / 2}" fill="#b08d57"/>` : ""}</svg>`;
   return sharp(Buffer.from(svg)).jpeg({ quality: 90 }).toBuffer();
 }

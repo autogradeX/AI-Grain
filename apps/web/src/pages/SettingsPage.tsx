@@ -22,6 +22,7 @@ import { useModelLabel } from "../i18n/models";
 import { AppSettingsCard } from "../pwa/Pwa";
 import { AutopilotSettingsCard } from "./AutopilotSettings";
 import { ReportLayoutCard } from "./ReportLayout";
+import { MeasurementSettingsCard } from "./MeasurementSettings";
 import { m } from "./SettingsPage.i18n";
 
 const ROLE_NAME = {
@@ -47,6 +48,7 @@ export function SettingsPage() {
       <SessionsCard />
       <AutopilotSettingsCard />
       {can.admin && <ReportLayoutCard />}
+      {can.admin && <MeasurementSettingsCard />}
       <OrgCard />
       {can.admin && <AuditCard />}
     </div>

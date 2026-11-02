@@ -20,6 +20,8 @@ export interface Org {
   isSiteOwner: boolean;
   autopilot: AutopilotPolicy;
   report: ReportSettings;
+  /** Reference coin for kernel size without the board. */
+  measurement: { referenceMm?: number };
 }
 
 export interface Standard {
@@ -178,6 +180,10 @@ export interface Sample {
     sideDetected: boolean;
     status: BatchStatus;
     kernelCount: number | null;
+    /** Kernels including touching groups counted by size. */
+    grainCount: number | null;
+    /** False for photos without the grid board: no sizes in mm. */
+    scaleKnown: boolean;
     error: string | null;
     createdAt: string;
   }[];
@@ -270,6 +276,8 @@ export interface Batch {
   status: BatchStatus;
   error: string | null;
   kernelCount: number | null;
+  grainCount: number | null;
+  scaleKnown: boolean;
   cropWindowCm: number | null;
   corners: { x: number; y: number }[] | null;
   originalWidth: number;

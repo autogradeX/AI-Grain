@@ -1,13 +1,19 @@
 import sharp from "sharp";
 import { BOARD_PX_PER_CM, cellAt, rawToSharp, type RawImage } from "./board.js";
 
-/** Detection runs on a downscaled board: faster, and it smooths out printed grid lines. */
-const DETECT_PX_PER_CM = 25;
-const SCALE = BOARD_PX_PER_CM / DETECT_PX_PER_CM;
+/**
+ * Detection runs on a downscaled board by default: faster, and it smooths
+ * out printed grid lines. Small or densely spread kernels (rice) need more.
+ */
+const DEFAULT_PX_PER_CM = 25;
 
 export interface DetectOptions {
   /** Smallest object to keep, in cm². Smaller blobs are dust or grid noise. */
   minAreaCm2?: number;
+  /** Resolution to detect at, in pixels per board cm (the board is 100). */
+  pxPerCm?: number;
+  /** Look for a round reference coin, much larger than a kernel, and leave it out. */
+  findCoin?: boolean;
   /** Erosion radius in detection pixels, to remove thin grid lines before labelling. */
   openingRadius?: number;
   /** Larger bright areas are not kernels: usually table showing past a misplaced corner. */
@@ -42,6 +48,13 @@ export interface Detection {
   ignoredLargeRegions: number;
   /** Objects cut off by the edge of the photo, left out (they can't be judged whole). */
   edgeObjects: number;
+  /**
+   * Kernels counted, with each group of touching kernels that couldn't be
+   * separated counted by its area (area ÷ a single kernel's area).
+   */
+  grainCount: number;
+  /** The reference coin, when asked to find one: its diameter in board pixels. */
+  coin?: { x: number; y: number; diameterPx: number };
 }
 
 /**
@@ -57,31 +70,39 @@ export async function detectKernels(
   options: DetectOptions = {},
 ): Promise<Detection> {
   const minAreaCm2 = options.minAreaCm2 ?? 0.02;
-  const radius = options.openingRadius ?? 1;
+  const DETECT_PX_PER_CM = Math.min(
+    BOARD_PX_PER_CM,
+    options.pxPerCm ?? DEFAULT_PX_PER_CM,
+  );
+  const SCALE = BOARD_PX_PER_CM / DETECT_PX_PER_CM;
+  // About 0.4 mm: wide enough to drop printed grid lines, not kernels.
+  const radius =
+    options.openingRadius ?? Math.max(1, Math.round(DETECT_PX_PER_CM / 25));
 
   const width = Math.round(board.width / SCALE);
   const height = Math.round(board.height / SCALE);
-  const gray = await rawToSharp(board)
+  const rgb = await rawToSharp(board)
     .resize(width, height, { kernel: "linear" })
-    .grayscale()
+    .removeAlpha()
     .raw()
     .toBuffer();
-
-  // The background as it is at each point (light falls off across a photo):
-  // a median over about 2 cm, which kernels are too small to pull along.
-  const bg = await localBackground(gray, width, height);
-  // A dark board has bright kernels; light paper or cloth has dark ones.
-  const polarity: 1 | -1 = median(gray) < 128 ? 1 : -1;
-  const contrast = new Uint8Array(gray.length);
-  for (let i = 0; i < gray.length; i++) {
-    const v = polarity * (gray[i]! - bg[i]!);
-    contrast[i] = v > 0 ? Math.min(255, v) : 0;
-  }
+  // The background surface is fitted at about 3 px per cm.
+  const { contrast, polarity, gray } = await contrastMap(
+    rgb,
+    width,
+    height,
+    Math.max(1, Math.round(DETECT_PX_PER_CM / 3)),
+  );
   // Otsu alone splits the background from the most contrasting kernels and
   // misses faint ones (heat damage, black point on a dark board; chalky or
   // pale kernels on paper), which are the defects that matter most. Cap the
   // threshold at a fixed contrast.
-  const threshold = Math.max(8, Math.min(otsu(contrast), MIN_CONTRAST));
+  // On light paper faint objects (white kernels) still differ in tone, and
+  // the paper itself varies more under a lamp, so Otsu decides within limits.
+  const threshold =
+    polarity === 1
+      ? Math.max(8, Math.min(otsu(contrast), MIN_CONTRAST))
+      : Math.max(20, Math.min(otsu(contrast), 60));
   let mask: Uint8Array = new Uint8Array(width * height);
   for (let i = 0; i < gray.length; i++)
     mask[i] = contrast[i]! > threshold ? 1 : 0;
@@ -100,14 +121,16 @@ export async function detectKernels(
   const isLine = (b: Blob) => {
     const w = b.maxX - b.minX + 1;
     const h = b.maxY - b.minY + 1;
-    return Math.max(w, h) / Math.min(w, h) > 8 && Math.min(w, h) <= 5;
+    return (
+      Math.max(w, h) / Math.min(w, h) > 8 &&
+      Math.min(w, h) <= DETECT_PX_PER_CM * 0.2
+    );
   };
-  const sized = all.filter(
-    (b) => b.area >= minArea && b.area <= maxArea && !isLine(b),
-  );
-  const found = sized.filter((b) => !atEdge(b));
-  const edgeObjects = sized.length - found.length;
-  // Large areas, and edge bands, are usually table showing past a corner.
+  const sized = all.filter((b) => b.area >= minArea && !isLine(b));
+  const inside = sized.filter((b) => !atEdge(b));
+  const edgeObjects = sized.filter(
+    (b) => atEdge(b) && b.area <= maxArea,
+  ).length;
   // Large areas unlike the background (usually table showing past a
   // misplaced corner): measured against the whole photo's background, since
   // the local background follows them.
@@ -115,24 +138,55 @@ export async function detectKernels(
   let wide: Uint8Array = new Uint8Array(gray.length);
   for (let i = 0; i < gray.length; i++)
     wide[i] = polarity * (gray[i]! - globalBg) > MIN_CONTRAST ? 1 : 0;
-  wide = dilate(erode(wide, width, height, 2), width, height, 2);
+  wide = dilate(
+    erode(wide, width, height, radius * 2),
+    width,
+    height,
+    radius * 2,
+  );
   const ignoredLargeRegions = label(wide, width, height).filter(
     (b) => b.area > maxArea,
   ).length;
 
-  const areas = found.map((b) => b.area).sort((a, b) => a - b);
+  const areas = inside
+    .filter((b) => b.area <= maxArea)
+    .map((b) => b.area)
+    .sort((a, b) => a - b);
   const medianArea = areas.length ? areas[Math.floor(areas.length / 2)]! : 0;
+  // A reference coin: round, filled like a disc, and many times a kernel's
+  // area. The largest such object is taken.
+  let coinBlob: Blob | null = null;
+  if (options.findCoin && medianArea > 0) {
+    for (const b of inside) {
+      const w = b.maxX - b.minX + 1;
+      const h = b.maxY - b.minY + 1;
+      const round = w / h > 0.8 && w / h < 1.25;
+      const disc = b.area / (w * h) > 0.7 && b.area / (w * h) < 0.86;
+      if (round && disc && b.area > medianArea * 6)
+        if (!coinBlob || b.area > coinBlob.area) coinBlob = b;
+    }
+  }
+  // Larger regions are kept when they could be a heap of touching kernels
+  // (up to about 80): the splitter separates them. Bigger is not kernels.
+  const found = inside.filter(
+    (b) => b !== coinBlob && (b.area <= maxArea || b.area <= medianArea * 80),
+  );
   const enough = areas.length >= 5;
   const isLarge = (b: Blob) => enough && b.area > medianArea * 2.2;
 
   // Touching kernels: separate them where they meet, so each is counted,
   // classified and weighed on its own. Two touching kernels are only about
   // twice a kernel's area, so anything clearly larger than one is tried.
-  const blobs = found.flatMap((b) =>
-    enough && b.area > medianArea * 1.5
-      ? (splitTouching(labels, width, b, medianArea, minArea) ?? [b])
-      : [b],
-  );
+  const blobs = found
+    .flatMap((b) =>
+      enough && b.area > medianArea * 1.5
+        ? (splitTouching(labels, width, b, medianArea, minArea, contrast) ?? [
+            b,
+          ])
+        : [b],
+    )
+    // A large region that didn't come apart isn't a kernel.
+    .filter((b) => b.area <= maxArea);
 
   const kernels = blobs
     .map((b) => {
@@ -168,40 +222,184 @@ export async function detectKernels(
     medianArea: Math.round(medianArea * SCALE * SCALE),
     ignoredLargeRegions,
     edgeObjects,
+    ...(coinBlob && {
+      coin: {
+        x: Math.round(((coinBlob.minX + coinBlob.maxX) / 2) * SCALE),
+        y: Math.round(((coinBlob.minY + coinBlob.maxY) / 2) * SCALE),
+        // The diameter of a disc of the same area.
+        diameterPx: Math.sqrt((4 * coinBlob.area) / Math.PI) * SCALE,
+      },
+    }),
+    grainCount: kernels.reduce(
+      (n, k) =>
+        n +
+        (k.isCluster && medianArea > 0
+          ? Math.max(1, Math.round(k.area / (medianArea * SCALE * SCALE)))
+          : 1),
+      0,
+    ),
   };
 }
 
-/** The background brightness around each pixel: a median over about 2 cm, at low resolution. */
-async function localBackground(
-  gray: Buffer,
+/**
+ * On a light background, how much brightness counts beside colour. Paper
+ * brightness swings widely under a lamp (spotlight, fall-off, shadows of the
+ * kernels themselves), while its tint stays steady; kernels differ in tint
+ * (brown is warmer, white rice is neutral against bluish paper).
+ */
+const LIGHT_BRIGHTNESS_WEIGHT = 0.35;
+
+/** Terms of the background surface: 1, x, y, x², xy, y², x²y, xy², x³, y³. */
+function terms(x: number, y: number): number[] {
+  return [
+    1,
+    x,
+    y,
+    x * x,
+    x * y,
+    y * y,
+    x * x * y,
+    x * y * y,
+    x * x * x,
+    y * y * y,
+  ];
+}
+
+/** Solves A·c = b for a small square system (Gaussian elimination with pivoting). */
+function solve(a: number[][], b: number[]): number[] {
+  const n = b.length;
+  const m = a.map((row, i) => [...row, b[i]!]);
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < n; r++)
+      if (Math.abs(m[r]![col]!) > Math.abs(m[pivot]![col]!)) pivot = r;
+    [m[col], m[pivot]] = [m[pivot]!, m[col]!];
+    const p = m[col]![col]!;
+    if (Math.abs(p) < 1e-12) continue;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = m[r]![col]! / p;
+      for (let c = col; c <= n; c++) m[r]![c]! -= f * m[col]![c]!;
+    }
+  }
+  return m.map((row, i) => (Math.abs(row[i]!) < 1e-12 ? 0 : row[n]! / row[i]!));
+}
+
+/**
+ * The background as a smooth surface per colour channel (a cubic in x and
+ * y), fitted to background pixels only: refitted a few times, each time
+ * leaving out pixels that differ from the surface (kernels, shadows, grid
+ * lines, table showing). Follows light falling off across the photo, and
+ * dense heaps of kernels can't pull it towards their own colour.
+ */
+function fitBackground(rgb: Buffer, width: number, height: number): number[][] {
+  const pts: { t: number[]; c: [number, number, number] }[] = [];
+  const step = Math.max(1, Math.round(Math.sqrt((width * height) / 6000)));
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const i = (y * width + x) * 3;
+      pts.push({
+        t: terms(x / width, y / height),
+        c: [rgb[i]!, rgb[i + 1]!, rgb[i + 2]!],
+      });
+    }
+  }
+  // Start from the pixels nearest the typical colour: the background is most of the photo.
+  const lum = pts.map((p) => 0.299 * p.c[0] + 0.587 * p.c[1] + 0.114 * p.c[2]);
+  const sorted = [...lum].sort((a, b) => a - b);
+  const mid = sorted[sorted.length >> 1]!;
+  const spread =
+    sorted[Math.floor(sorted.length * 0.75)]! -
+    sorted[Math.floor(sorted.length * 0.25)]!;
+  let use = lum.map((l) => Math.abs(l - mid) <= Math.max(12, spread));
+  let coef: number[][] = [];
+  for (let round = 0; round < 4; round++) {
+    coef = [0, 1, 2].map((ch) => {
+      const k = 10;
+      const ata = Array.from({ length: k }, () => new Array<number>(k).fill(0));
+      const atb = new Array<number>(k).fill(0);
+      pts.forEach((p, n) => {
+        if (!use[n]) return;
+        for (let i = 0; i < k; i++) {
+          atb[i]! += p.t[i]! * p.c[ch]!;
+          for (let j = 0; j < k; j++) ata[i]![j]! += p.t[i]! * p.t[j]!;
+        }
+      });
+      return solve(ata, atb);
+    });
+    const resid = pts.map((p) => {
+      let d = 0;
+      for (let ch = 0; ch < 3; ch++) {
+        const fit = coef[ch]!.reduce((s, c, i) => s + c * p.t[i]!, 0);
+        d += (p.c[ch]! - fit) ** 2;
+      }
+      return Math.sqrt(d);
+    });
+    const r = [...resid].sort((a, b) => a - b);
+    // Background residuals are small and alike; keep those within a few times the typical one.
+    const cut = Math.max(8, r[Math.floor(r.length * 0.5)]! * 3);
+    use = resid.map((d) => d <= cut);
+  }
+  return coef;
+}
+
+/**
+ * How different each pixel is from the background, in brightness and
+ * colour: 0 on plain background, higher on kernels. Colour matters on light
+ * paper, where pale or white kernels are about as bright as the paper but
+ * warmer (or cooler) in tone. The background comes from `fitBackground`.
+ */
+export async function contrastMap(
+  rgb: Buffer,
   width: number,
   height: number,
-): Promise<Uint8Array> {
-  const small = {
-    w: Math.max(4, Math.round(width / 8)),
-    h: Math.max(4, Math.round(height / 8)),
-  };
-  // Separate pipelines: sharp applies one resize per pipeline.
-  const reduced = await sharp(gray, { raw: { width, height, channels: 1 } })
-    .resize(small.w, small.h, { kernel: "linear" })
-    .extractChannel(0)
+  reduce: number,
+): Promise<{ contrast: Uint8Array; gray: Uint8Array; polarity: 1 | -1 }> {
+  const sw = Math.max(8, Math.round(width / reduce));
+  const sh = Math.max(8, Math.round(height / reduce));
+  const reduced = await sharp(rgb, { raw: { width, height, channels: 3 } })
+    .resize(sw, sh, { kernel: "linear" })
     .raw()
     .toBuffer();
-  const filtered = await sharp(reduced, {
-    raw: { width: small.w, height: small.h, channels: 1 },
-  })
-    .median(7)
-    .extractChannel(0)
-    .raw()
-    .toBuffer();
-  const data = await sharp(filtered, {
-    raw: { width: small.w, height: small.h, channels: 1 },
-  })
-    .resize(width, height, { kernel: "linear" })
-    .extractChannel(0)
-    .raw()
-    .toBuffer();
-  return new Uint8Array(data.buffer, data.byteOffset, data.length);
+  const coef = fitBackground(reduced, sw, sh);
+  // Light background: mostly colour (see LIGHT_BRIGHTNESS_WEIGHT). On a dark
+  // board brightness counts fully: kernels are much brighter than the board.
+  const bgLum =
+    0.299 * coef[0]![0]! + 0.587 * coef[1]![0]! + 0.114 * coef[2]![0]!;
+  const lightBackground = bgLum >= 128;
+  const n = width * height;
+  const gray = new Uint8Array(n);
+  const contrast = new Uint8Array(n);
+  for (let y = 0; y < height; y++) {
+    const fy = y / height;
+    for (let x = 0; x < width; x++) {
+      const t = terms(x / width, fy);
+      const i = y * width + x;
+      const r = rgb[i * 3]!;
+      const g = rgb[i * 3 + 1]!;
+      const b = rgb[i * 3 + 2]!;
+      let br = 0;
+      let bgG = 0;
+      let bb = 0;
+      for (let k = 0; k < 10; k++) {
+        br += coef[0]![k]! * t[k]!;
+        bgG += coef[1]![k]! * t[k]!;
+        bb += coef[2]![k]! * t[k]!;
+      }
+      const l = 0.299 * r + 0.587 * g + 0.114 * b;
+      gray[i] = l;
+      // Brightness, red–green and yellow–blue differences; colour weighs more.
+      let dl = l - (0.299 * br + 0.587 * bgG + 0.114 * bb);
+      if (lightBackground) dl *= LIGHT_BRIGHTNESS_WEIGHT;
+      const da = r - g - (br - bgG);
+      const dy = (r + g) / 2 - b - ((br + bgG) / 2 - bb);
+      contrast[i] = Math.min(
+        255,
+        Math.round(Math.sqrt(dl * dl + 2.25 * (da * da + dy * dy))),
+      );
+    }
+  }
+  return { contrast, gray, polarity: lightBackground ? -1 : 1 };
 }
 
 /** Median gray level. The background covers most of the image, so this is its brightness. */
@@ -412,39 +610,88 @@ export function splitTouching(
   blob: Blob,
   medianArea: number,
   minArea: number,
+  /** The contrast map at the same resolution: lower where kernels meet. */
+  contrast?: Uint8Array,
 ): Blob[] | null {
   const bw = blob.maxX - blob.minX + 1;
   const bh = blob.maxY - blob.minY + 1;
   const sub = new Uint8Array(bw * bh);
+  const strength = new Float32Array(bw * bh);
   for (let y = 0; y < bh; y++) {
     for (let x = 0; x < bw; x++) {
-      if (labels[(blob.minY + y) * width + blob.minX + x] === blob.id)
+      const g = (blob.minY + y) * width + blob.minX + x;
+      if (labels[g] === blob.id) {
         sub[y * bw + x] = 1;
+        strength[y * bw + x] = contrast ? contrast[g]! : 0;
+      }
     }
   }
+  const minCore = Math.max(3, medianArea * 0.03);
+  /** Cores where `value` > level, renumbered 1..n; null below two. */
+  const coresAt = (value: Float32Array, level: number) => {
+    const core = new Uint8Array(bw * bh);
+    for (let i = 0; i < core.length; i++) core[i] = value[i]! > level ? 1 : 0;
+    const seeds = new Int32Array(bw * bh);
+    const cores = label(core, bw, bh, seeds).filter((c) => c.area >= minCore);
+    if (cores.length < 2) return null;
+    const keep = new Map(cores.map((c, i) => [c.id, i + 1]));
+    for (let i = 0; i < seeds.length; i++) seeds[i] = keep.get(seeds[i]!) ?? 0;
+    return { seeds, count: cores.length };
+  };
+
+  // Candidate cores: levels of the distance map (narrow necks where kernels
+  // touch go first) and, when given, of the contrast (fainter where they
+  // meet, for kernels pressed side by side).
+  const candidates: { seeds: Int32Array; count: number }[] = [];
   const dist = distanceMap(sub, bw, bh);
   let peak = 0;
   for (const v of dist) if (v > peak) peak = v;
-  // The level that gives the most cores (ties: the lowest level).
-  let best: { seeds: Int32Array; count: number } | null = null;
-  const core = new Uint8Array(bw * bh);
   for (let level = 1; level < peak - 0.5; level += 0.5) {
-    for (let i = 0; i < core.length; i++) core[i] = dist[i]! > level ? 1 : 0;
-    const seeds = new Int32Array(bw * bh);
-    const cores = label(core, bw, bh, seeds).filter(
-      (c) => c.area >= Math.max(3, medianArea * 0.03),
-    );
-    if (cores.length < 2) continue;
-    if (best && cores.length <= best.count) continue;
-    // Keep only the cores that passed the size filter, renumbered 1..n.
-    const keep = new Map(cores.map((c, i) => [c.id, i + 1]));
-    for (let i = 0; i < seeds.length; i++) seeds[i] = keep.get(seeds[i]!) ?? 0;
-    best = { seeds, count: cores.length };
+    const c = coresAt(dist, level);
+    if (c) candidates.push(c);
   }
-  if (!best) return null;
+  if (contrast) {
+    let lo = 255;
+    let hi = 0;
+    for (let i = 0; i < sub.length; i++) {
+      if (!sub[i]) continue;
+      lo = Math.min(lo, strength[i]!);
+      hi = Math.max(hi, strength[i]!);
+    }
+    for (let level = lo + 4; level < hi - 4; level += 4) {
+      const c = coresAt(strength, level);
+      if (c) candidates.push(c);
+    }
+  }
+  // As many kernels as the area holds (about area ÷ a kernel's area), each
+  // looking like a kernel rather than a sliver; nearer that number wins, and
+  // on a tie the larger count.
+  const expected = blob.area / medianArea;
+  candidates.sort(
+    (a, b) =>
+      Math.abs(a.count - expected) - Math.abs(b.count - expected) ||
+      b.count - a.count,
+  );
+  for (const c of candidates) {
+    // Far more pieces than the area holds: cut through kernels, not between.
+    if (c.count > Math.round(expected) + 1) continue;
+    const parts = growParts(c.seeds, c.count, sub, bw, bh, blob);
+    if (parts.every((p) => p.area >= Math.max(minArea, medianArea * 0.3)))
+      return parts;
+  }
+  return null;
+}
 
-  // Grow the cores back over the blob, breadth first (4-connected).
-  const owner = best.seeds;
+/** Grows numbered cores back over the blob's pixels (nearest core wins) and returns the parts. */
+function growParts(
+  seeds: Int32Array,
+  count: number,
+  sub: Uint8Array,
+  bw: number,
+  bh: number,
+  blob: Blob,
+): Blob[] {
+  const owner = Int32Array.from(seeds);
   let frontier: number[] = [];
   for (let i = 0; i < owner.length; i++) if (owner[i]) frontier.push(i);
   while (frontier.length) {
@@ -465,14 +712,12 @@ export function splitTouching(
     }
     frontier = next;
   }
-  const parts = Array.from({ length: best.count }, (_, i) => ({
-    id: blob.id,
+  const parts = Array.from({ length: count }, () => ({
     area: 0,
     minX: bw,
     minY: bh,
     maxX: 0,
     maxY: 0,
-    n: i + 1,
   }));
   for (let i = 0; i < owner.length; i++) {
     const n = owner[i]!;
@@ -486,9 +731,6 @@ export function splitTouching(
     if (y < p.minY) p.minY = y;
     if (y > p.maxY) p.maxY = y;
   }
-  // Every part must look like (part of) a kernel, not a sliver.
-  if (parts.some((p) => p.area < Math.max(minArea, medianArea * 0.3)))
-    return null;
   return parts.map((p) => ({
     id: blob.id,
     area: p.area,

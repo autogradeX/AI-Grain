@@ -349,6 +349,8 @@ export function sampleRoutes(ctx: AppContext) {
             sideDetected: batches.sideDetected,
             status: batches.status,
             kernelCount: batches.kernelCount,
+            grainCount: batches.grainCount,
+            scaleKnown: batches.scaleKnown,
             error: batches.error,
             createdAt: batches.createdAt,
           })

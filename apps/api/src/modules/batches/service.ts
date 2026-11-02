@@ -31,10 +31,10 @@ import {
   standards,
   type Corners,
 } from "../../db/schema.js";
-import { fullFrameCorners, straightenBoard } from "../../imaging/board.js";
+import { photoCorners, straightenBoard } from "../../imaging/board.js";
 import { findGridCorners } from "../../imaging/corners.js";
 import { detectKernels } from "../../imaging/detect.js";
-import { boardGray, measureKernel } from "../../imaging/measure.js";
+import { boardContrast, measureKernel } from "../../imaging/measure.js";
 import {
   boardPreview,
   buildSheet,
@@ -129,15 +129,35 @@ export async function processBatch(
     let scaleKnown = true;
     if (!corners) {
       const found = await findGridCorners(original);
-      if (found) corners = found.corners;
+      // A board-shaped dark area without a visible grid counts only when it
+      // isn't the whole photo (that is the paper or table itself).
+      const area = found ? quadArea(found.corners) : 0;
+      const whole = batch.originalWidth * batch.originalHeight;
+      if (found && (found.grid || area < whole * 0.85)) corners = found.corners;
       else {
-        corners = fullFrameCorners(batch.originalWidth, batch.originalHeight);
+        corners = photoCorners(batch.originalWidth, batch.originalHeight);
         scaleKnown = false;
       }
     }
-    await setBatch(ctx, batchId, { corners, scaleKnown });
-    const board = await straightenBoard(original, corners);
-    const detection = await detectKernels(board);
+    await setBatch(ctx, batchId, { corners });
+    const board = await straightenBoard(original, corners, !scaleKnown);
+    // Without the board the whole photo is one frame: detect at full
+    // resolution, so small kernels close together stay apart.
+    // Without the board, a reference coin of known size can give the scale.
+    const [org] = await ctx.db
+      .select({ measurement: organizations.measurement })
+      .from(organizations)
+      .where(eq(organizations.id, batch.orgId));
+    const referenceMm = org?.measurement.referenceMm;
+    const detection = await detectKernels(board, {
+      pxPerCm: scaleKnown ? 25 : 100,
+      findCoin: !scaleKnown && !!referenceMm,
+    });
+    const mmPerPx =
+      !scaleKnown && referenceMm && detection.coin
+        ? referenceMm / detection.coin.diameterPx
+        : null;
+    const sizesKnown = scaleKnown || mmPerPx !== null;
     const windowCm = cropWindowCm(detection.kernels);
     const crops = await cropKernels(board, detection.kernels, windowCm);
 
@@ -166,12 +186,14 @@ export async function processBatch(
       ),
     );
     // Length and breadth at full resolution; touching kernels aren't measured.
-    const gray = await boardGray(board);
+    const gray = await boardContrast(board);
     const rows: (typeof kernels.$inferInsert)[] = [];
     for (const k of detection.kernels) {
       const cropKey = `${prefix}/kernels/${k.number}.jpg`;
       const size =
-        k.isCluster || !scaleKnown ? null : measureKernel(gray, detection, k);
+        k.isCluster || !sizesKnown
+          ? null
+          : measureKernel(gray, detection, k, mmPerPx ?? undefined);
       rows.push({
         orgId: batch.orgId,
         sampleId: batch.sampleId,
@@ -199,13 +221,21 @@ export async function processBatch(
       status: "detected",
       boardKey: `${prefix}/board.jpg`,
       kernelCount: rows.length,
+      grainCount: detection.grainCount,
+      scaleKnown: sizesKnown,
+      mmPerPx,
       cropWindowCm: windowCm,
       // Not failures, but worth a look.
-      error: !scaleKnown
-        ? "No grid board in this photo: kernels were counted and classified, but kernel sizes in mm need the grid board (or mark its four corners)."
-        : detection.ignoredLargeRegions
-          ? "Large areas were left out. Check that the corners sit on the grid, then re-mark them if needed."
-          : null,
+      error:
+        mmPerPx !== null
+          ? `No grid board in this photo: kernel sizes come from the ${referenceMm} mm reference coin.`
+          : !scaleKnown
+            ? referenceMm
+              ? `No grid board in this photo and no ${referenceMm} mm reference coin found: kernels were counted and classified, but sizes in mm need the board or the coin beside the kernels.`
+              : "No grid board in this photo: kernels were counted and classified, but kernel sizes in mm need the grid board, or a reference coin (Settings → Kernel size without the board)."
+            : detection.ignoredLargeRegions
+              ? "Large areas were left out. Check that the corners sit on the grid, then re-mark them if needed."
+              : null,
     });
   } catch (err) {
     await setBatch(ctx, batchId, {
@@ -392,6 +422,17 @@ export async function classifyKernels(
 
 /** Expert-pass sheets hold fewer kernels than first-look sheets. */
 export const EXPERT_KERNELS_PER_SHEET = 12;
+
+/** Area of a quadrilateral (shoelace formula). */
+function quadArea(q: Corners): number {
+  let sum = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = q[i]!;
+    const b = q[(i + 1) % 4]!;
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(sum) / 2;
+}
 
 /** A stable pseudo-random number for an id, for shuffling and spot checks. */
 export function mix(id: string): number {

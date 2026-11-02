@@ -62,6 +62,10 @@ export const m = defineMessages({
     en: "{count} kernels · {date}",
     hi: "{count} दाने · {date}",
   },
+  byArea: {
+    en: "{count} more in touching groups, counted by size",
+    hi: "{count} और सटे हुए समूहों में, आकार से गिने",
+  },
   totalKernels: {
     en: "{count} kernels detected in total.",
     hi: "कुल {count} दाने मिले।",

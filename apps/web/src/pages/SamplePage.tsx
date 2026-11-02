@@ -419,7 +419,7 @@ function PhotosCard({
     (b) => b.status === "detected" || (b.status === "failed" && b.kernelCount),
   );
   const totalKernels = sample.batches.reduce(
-    (n, b) => n + (b.kernelCount ?? 0),
+    (n, b) => n + (b.grainCount ?? b.kernelCount ?? 0),
     0,
   );
 
@@ -457,9 +457,13 @@ function PhotosCard({
                   )}
                   <div className="muted small">
                     {t("kernelsAndDate", {
-                      count: b.kernelCount ?? "?",
+                      count: b.grainCount ?? b.kernelCount ?? "?",
                       date: formatDate(b.createdAt),
                     })}
+                    {b.grainCount !== null &&
+                      b.kernelCount !== null &&
+                      b.grainCount > b.kernelCount &&
+                      ` · ${t("byArea", { count: b.grainCount - b.kernelCount })}`}
                   </div>
                   {b.error && (
                     <div

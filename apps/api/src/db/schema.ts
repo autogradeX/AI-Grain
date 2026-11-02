@@ -73,6 +73,12 @@ export interface ReportSettings {
   showSummary?: boolean;
 }
 
+/** Measuring kernel size in photos without the grid board. */
+export interface MeasurementSettings {
+  /** Diameter of the reference coin placed beside the kernels, in mm. */
+  referenceMm?: number;
+}
+
 /** Where completed results are pushed (APMC, eNAM bridge, ERP). */
 export interface IntegrationSettings {
   webhookUrl?: string;
@@ -90,6 +96,10 @@ export const organizations = pgTable("organizations", {
     .notNull()
     .default({}),
   report: jsonb("report").$type<ReportSettings>().notNull().default({}),
+  measurement: jsonb("measurement")
+    .$type<MeasurementSettings>()
+    .notNull()
+    .default({}),
   integration: jsonb("integration")
     .$type<IntegrationSettings>()
     .notNull()
@@ -386,6 +396,13 @@ export const batches = pgTable("batches", {
   /** The corners sit on the 1 cm grid, so sizes in mm are right. False for photos without the grid board. */
   scaleKnown: boolean("scale_known").notNull().default(true),
   kernelCount: integer("kernel_count"),
+  /** Kernels including those in touching groups, counted by area. */
+  grainCount: integer("grain_count"),
+  /**
+   * Millimetres per straightened-board pixel when a reference coin gave the
+   * scale (photo without the board); null: the board's own 0.1 mm.
+   */
+  mmPerPx: doublePrecision("mm_per_px"),
   /** Side of the square crop window, shared by every kernel crop in the batch. */
   cropWindowCm: doublePrecision("crop_window_cm"),
   /** Set by a device that queued the photo offline, so a retried upload isn't stored twice. */

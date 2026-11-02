@@ -608,6 +608,34 @@ describe("Autopilot from photo to report", () => {
     expect(view.body.dimensions).toBeNull();
   });
 
+  it("measures kernel size from a reference coin when there's no board", async () => {
+    await api("PATCH", "/api/org", { measurement: { referenceMm: 27 } });
+    try {
+      // The coin is 162 px across for 27 mm: 6 px per mm. Kernels are
+      // ellipses 52 × 36 px: 8.67 × 6 mm.
+      const { sampleId, batchId } = await photographed(
+        await kernelsOnPaper(24, 162),
+      );
+      const batch = await api<{
+        kernelCount: number;
+        scaleKnown: boolean;
+        mmPerPx: number;
+        error: string;
+      }>("GET", `/api/batches/${batchId}`);
+      expect(batch.body).toMatchObject({ kernelCount: 24, scaleKnown: true });
+      expect(batch.body.error).toMatch(/27 mm reference coin/);
+      const view = await api<{
+        dimensions: { meanLengthMm: number; meanBreadthMm: number };
+      }>("GET", `/api/samples/${sampleId}`);
+      expect(view.body.dimensions.meanLengthMm).toBeGreaterThan(8.2);
+      expect(view.body.dimensions.meanLengthMm).toBeLessThan(9.1);
+      expect(view.body.dimensions.meanBreadthMm).toBeGreaterThan(5.6);
+      expect(view.body.dimensions.meanBreadthMm).toBeLessThan(6.5);
+    } finally {
+      await api("PATCH", "/api/org", { measurement: { referenceMm: null } });
+    }
+  });
+
   it("fails clearly when the photo shows no kernels", async () => {
     const blank = await sharp({
       create: { width: 900, height: 1200, channels: 3, background: "#c8c0b0" },

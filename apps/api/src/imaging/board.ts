@@ -47,10 +47,33 @@ export function fullFrameCorners(width: number, height: number): Corners {
   ];
 }
 
+/**
+ * Corners for a photo without the board: the whole photo, fitted into the
+ * board's 20 × 28 shape with its own proportions (centred, the rest filled),
+ * so nothing is stretched and one pixel is the same size in both directions.
+ */
+export function photoCorners(width: number, height: number): Corners {
+  const aspect = GRID_COLS / GRID_ROWS;
+  let w = width;
+  let h = height;
+  if (width / height < aspect) w = height * aspect;
+  else h = width / aspect;
+  const x0 = (width - w) / 2;
+  const y0 = (height - h) / 2;
+  return [
+    { x: x0, y: y0 },
+    { x: x0 + w, y: y0 },
+    { x: x0 + w, y: y0 + h },
+    { x: x0, y: y0 + h },
+  ];
+}
+
 /** Maps the quadrilateral at `corners` onto a straight 20 × 28 cm board image. */
 export async function straightenBoard(
   original: Buffer,
   corners: Corners,
+  /** Fill what lies outside the photo with its edge instead of black. */
+  extend = false,
 ): Promise<RawImage> {
   const src = await sharp(original)
     .removeAlpha()
@@ -80,10 +103,16 @@ export async function straightenBoard(
       const x0 = Math.floor(fx);
       const y0 = Math.floor(fy);
       const o = (y * BOARD_WIDTH + x) * 3;
-      if (x0 < 0 || y0 < 0 || x0 + 1 >= sw || y0 + 1 >= sh) continue;
-      const dx = fx - x0;
-      const dy = fy - y0;
-      const i00 = (y0 * sw + x0) * sc;
+      if (x0 < 0 || y0 < 0 || x0 + 1 >= sw || y0 + 1 >= sh) {
+        if (!extend) continue;
+      }
+      // Outside the photo (a photo fitted with its own proportions): the
+      // nearest edge pixel, so no black bands look like objects.
+      const cx = Math.min(sw - 2, Math.max(0, x0));
+      const cy = Math.min(sh - 2, Math.max(0, y0));
+      const dx = cx === x0 ? fx - x0 : 0;
+      const dy = cy === y0 ? fy - y0 : 0;
+      const i00 = (cy * sw + cx) * sc;
       const i10 = i00 + sc;
       const i01 = i00 + sw * sc;
       const i11 = i01 + sc;
