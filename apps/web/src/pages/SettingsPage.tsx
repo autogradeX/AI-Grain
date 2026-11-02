@@ -21,6 +21,7 @@ import { common } from "../i18n/common";
 import { useModelLabel } from "../i18n/models";
 import { AppSettingsCard } from "../pwa/Pwa";
 import { AutopilotSettingsCard } from "./AutopilotSettings";
+import { StationCard } from "./StationCard";
 import { ReportLayoutCard } from "./ReportLayout";
 import { MeasurementSettingsCard } from "./MeasurementSettings";
 import { m } from "./SettingsPage.i18n";
@@ -46,6 +47,7 @@ export function SettingsPage() {
       <ProfileCard />
       <PasswordCard />
       <SessionsCard />
+      <StationCard />
       <AutopilotSettingsCard />
       {can.admin && <ReportLayoutCard />}
       {can.admin && <MeasurementSettingsCard />}

@@ -226,7 +226,10 @@ export function userRoutes(ctx: AppContext) {
       return {
         ...rest,
         // The webhook secret is only shown to admins, on the integration page.
-        integration: { webhookUrl: integration.webhookUrl ?? null },
+        integration: {
+          webhookUrl: integration.webhookUrl ?? null,
+          centralUrl: integration.centralUrl ?? null,
+        },
         // With defaults filled in, as the pipeline applies them.
         autopilot: autopilotOf(org.autopilot),
         effectiveModel: org.defaultModel ?? ctx.config.DEFAULT_MODEL,

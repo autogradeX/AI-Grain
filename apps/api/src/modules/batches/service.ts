@@ -12,11 +12,12 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { summarizeDimensions } from "@ai-grain/core";
-import type {
-  ClassifierError,
-  KernelVerdict,
-  ReferenceExample,
-  Usage,
+import {
+  ClassifierUnavailableError,
+  type ClassifierError,
+  type KernelVerdict,
+  type ReferenceExample,
+  type Usage,
 } from "../../ai/classifier.js";
 import type { ClaudeModel } from "../../config.js";
 import { CLAUDE_MODELS } from "../../config.js";
@@ -319,14 +320,14 @@ export async function classifyKernels(
     expertNotes?: Record<number, string>;
     save: (verdicts: KernelVerdict[]) => Promise<void>;
   },
-): Promise<string | null> {
+): Promise<ClassifyFailure | null> {
   const [row] = await ctx.db
     .select({ batch: batches, sample: samples, standard: standards })
     .from(batches)
     .innerJoin(samples, eq(samples.id, batches.sampleId))
     .leftJoin(standards, eq(standards.id, samples.standardId))
     .where(eq(batches.id, batchId));
-  if (!row) return "batch not found";
+  if (!row) return { message: "batch not found", unavailable: false };
   const { batch, sample, standard } = row;
   const expert = options.expertNotes;
   const model = expert
@@ -344,7 +345,7 @@ export async function classifyKernels(
     cacheWriteTokens: 0,
   };
   let requests = 0;
-  let failure: string | null;
+  let failure: ClassifyFailure | null;
   try {
     const crop = await ensureCrop(ctx, sample.orgId, sample.crop);
     const classes = classesWithDefinitions(crop.classes, standard?.definitions);
@@ -393,7 +394,10 @@ export async function classifyKernels(
           await setBatch(ctx, batchId, { updatedAt: new Date() });
           return null;
         } catch (err) {
-          return (err as ClassifierError).message || String(err);
+          return {
+            message: (err as ClassifierError).message || String(err),
+            unavailable: err instanceof ClassifierUnavailableError,
+          };
         }
       },
     );
@@ -404,7 +408,10 @@ export async function classifyKernels(
       });
     }
   } catch (err) {
-    failure = err instanceof Error ? err.message : String(err);
+    failure = {
+      message: err instanceof Error ? err.message : String(err),
+      unavailable: err instanceof ClassifierUnavailableError,
+    };
   }
   await ctx.db.insert(analysisRuns).values({
     orgId: sample.orgId,
@@ -415,9 +422,36 @@ export async function classifyKernels(
     requests,
     ...total,
     durationMs: Date.now() - started,
-    error: failure,
+    error: failure?.message ?? null,
   });
   return failure;
+}
+
+/** Why a classification pass stopped; `unavailable`: no internet, try again later. */
+export interface ClassifyFailure {
+  message: string;
+  unavailable: boolean;
+}
+
+/** Waiting for Model Orchestration: the next try after 30 s, 1, 2, 4 … up to 5 minutes. */
+export function retryDelayMs(retries: number): number {
+  return Math.min(5 * 60_000, 30_000 * 2 ** retries);
+}
+
+/** Puts a batch on hold until Model Orchestration can be reached; the sweeper resumes it. */
+export async function waitForInternet(ctx: AppContext, batchId: string) {
+  const [b] = await ctx.db
+    .select({ retries: batches.retries })
+    .from(batches)
+    .where(eq(batches.id, batchId));
+  const retries = b?.retries ?? 0;
+  await setBatch(ctx, batchId, {
+    status: "waiting",
+    retries: retries + 1,
+    retryAt: new Date(Date.now() + retryDelayMs(retries)),
+    error:
+      "Waiting for internet: Model Orchestration can't be reached. Classification carries on by itself when the connection is back.",
+  });
 }
 
 /** Expert-pass sheets hold fewer kernels than first-look sheets. */
@@ -462,7 +496,8 @@ export async function classifyBatch(
     .where(eq(batches.id, batchId));
   await setBatch(ctx, batchId, {
     status: "classifying",
-    ...(current?.error?.startsWith("Classification incomplete") && {
+    ...((current?.error?.startsWith("Classification incomplete") ||
+      current?.error?.startsWith("Waiting for internet")) && {
       error: null,
     }),
   });
@@ -475,10 +510,14 @@ export async function classifyBatch(
     kind: "classify",
     save: (verdicts) => saveVerdicts(ctx, batchId, verdicts),
   });
+  if (failure?.unavailable) {
+    await waitForInternet(ctx, batchId);
+    return false;
+  }
   if (failure) {
     await setBatch(ctx, batchId, {
       status: "failed",
-      error: `Classification incomplete: ${failure}. Retry to classify the remaining kernels.`,
+      error: `Classification incomplete: ${failure.message}. Retry to classify the remaining kernels.`,
     });
     return false;
   }

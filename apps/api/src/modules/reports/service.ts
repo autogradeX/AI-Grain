@@ -26,6 +26,7 @@ import { currentCertificate } from "../certificates/service.js";
 import { ensureCrop } from "../crops/service.js";
 import { loadSample, type SampleRow } from "../samples/service.js";
 import { getStandard } from "../standards/routes.js";
+import { verifyBase } from "../integration/service.js";
 import { renderReport, renderSlip } from "./pdf.js";
 
 /** Gallery pages show at most this many kernels. */
@@ -231,7 +232,9 @@ async function buildReport(
   });
 
   const crop = await ensureCrop(ctx, sample.orgId, sample.crop);
-  const verifyUrl = cert ? `${ctx.config.APP_URL}/verify/${cert.code}` : null;
+  const verifyUrl = cert
+    ? `${await verifyBase(ctx, sample.orgId)}/verify/${cert.code}`
+    : null;
   const render = format === "slip" ? renderSlip : renderReport;
   return render({
     layout: org?.report ?? {},

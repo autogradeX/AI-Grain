@@ -1,10 +1,35 @@
-import { and, asc, desc, eq, gt, isNotNull, isNull } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+} from "drizzle-orm";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { AppContext } from "../../context.js";
-import { apiKeys, organizations, samples } from "../../db/schema.js";
+import {
+  apiKeys,
+  certificates,
+  organizations,
+  remoteCertificates,
+  samples,
+  type CertificatePayload,
+  type IntegrationSettings,
+} from "../../db/schema.js";
+import { outboxStatus, sendNow } from "./outbox.js";
+import { hashPayload } from "../certificates/service.js";
 import { audit } from "../../lib/audit.js";
-import { badRequest, notFound, unauthorized } from "../../lib/errors.js";
+import {
+  badRequest,
+  conflict,
+  forbidden,
+  notFound,
+  unauthorized,
+} from "../../lib/errors.js";
 import { authenticate, authOf, requireRole } from "../auth/guard.js";
 import { loadSample } from "../samples/service.js";
 import {
@@ -44,6 +69,7 @@ export function integrationRoutes(ctx: AppContext) {
         .select({
           id: apiKeys.id,
           name: apiKeys.name,
+          scope: apiKeys.scope,
           prefix: apiKeys.prefix,
           createdAt: apiKeys.createdAt,
           lastUsedAt: apiKeys.lastUsedAt,
@@ -55,6 +81,9 @@ export function integrationRoutes(ctx: AppContext) {
         keys,
         webhookUrl: org?.integration.webhookUrl ?? null,
         webhookSecret: org?.integration.webhookSecret ?? null,
+        centralUrl: org?.integration.centralUrl ?? null,
+        centralKeySet: Boolean(org?.integration.centralKey),
+        outbox: await outboxStatus(ctx, me.orgId),
         schema: RESULT_SCHEMA,
       };
     });
@@ -62,8 +91,12 @@ export function integrationRoutes(ctx: AppContext) {
     /** Creates an API key. The key is in this response only. */
     app.post("/integration/keys", admin, async (request, reply) => {
       const me = authOf(request);
-      const { name } = z
-        .object({ name: z.string().trim().min(1).max(80) })
+      const { name, scope } = z
+        .object({
+          name: z.string().trim().min(1).max(80),
+          // "station": a mandi station sends its results here.
+          scope: z.enum(["read", "station"]).default("read"),
+        })
         .parse(request.body);
       const k = newApiKey();
       const [row] = await ctx.db
@@ -71,6 +104,7 @@ export function integrationRoutes(ctx: AppContext) {
         .values({
           orgId: me.orgId,
           name,
+          scope,
           prefix: k.prefix,
           keyHash: k.keyHash,
           createdBy: me.id,
@@ -143,7 +177,9 @@ export function integrationRoutes(ctx: AppContext) {
       await ctx.db
         .update(organizations)
         .set({
-          integration: url ? { webhookUrl: url, webhookSecret: secret! } : {},
+          integration: url
+            ? { ...org?.integration, webhookUrl: url, webhookSecret: secret! }
+            : withoutWebhook(org?.integration ?? {}),
         })
         .where(eq(organizations.id, me.orgId));
       await audit(ctx.db, {
@@ -153,6 +189,95 @@ export function integrationRoutes(ctx: AppContext) {
         detail: { url, rotated: rotateSecret },
       });
       return { webhookUrl: url, webhookSecret: url ? secret : null };
+    });
+
+    /**
+     * A station's central server: where results and certificates go when
+     * there is internet, and where report QR codes point. The key is kept
+     * when only the URL changes; null clears both.
+     */
+    app.put("/integration/central", admin, async (request) => {
+      const me = authOf(request);
+      const { url, key } = z
+        .object({
+          url: z
+            .url({ protocol: /^https?$/ })
+            .max(300)
+            .nullable(),
+          key: z.string().trim().startsWith("agk_").max(100).optional(),
+        })
+        .parse(request.body);
+      if (
+        url &&
+        ctx.config.NODE_ENV === "production" &&
+        !url.startsWith("https://")
+      )
+        throw badRequest("The central server's address must use https");
+      const [org] = await ctx.db
+        .select({ integration: organizations.integration })
+        .from(organizations)
+        .where(eq(organizations.id, me.orgId));
+      const current = org?.integration ?? {};
+      const { centralUrl: _u, centralKey: _k, ...rest } = current;
+      const centralKey = key ?? current.centralKey;
+      if (url && !centralKey)
+        throw badRequest("Enter the station key from the central server");
+      await ctx.db
+        .update(organizations)
+        .set({
+          integration: url
+            ? {
+                ...rest,
+                centralUrl: url.replace(/\/+$/, ""),
+                centralKey: centralKey!,
+              }
+            : rest,
+        })
+        .where(eq(organizations.id, me.orgId));
+      await audit(ctx.db, {
+        orgId: me.orgId,
+        userId: me.id,
+        action: "integration.central_updated",
+        detail: { url },
+      });
+      return { centralUrl: url, centralKeySet: Boolean(url && centralKey) };
+    });
+
+    /** Checks the central server answers and accepts this station's key. */
+    app.post("/integration/central/test", admin, async (request) => {
+      const me = authOf(request);
+      const [org] = await ctx.db
+        .select({ integration: organizations.integration })
+        .from(organizations)
+        .where(eq(organizations.id, me.orgId));
+      const { centralUrl, centralKey } = org?.integration ?? {};
+      if (!centralUrl || !centralKey)
+        return { ok: false, status: null, error: "No central server set up" };
+      try {
+        const res = await (ctx.fetch ?? fetch)(`${centralUrl}/api/v1/ingest`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${centralKey}`,
+          },
+          body: JSON.stringify({ id: "test", event: "test", data: {} }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        return { ok: res.ok, status: res.status };
+      } catch (err) {
+        return {
+          ok: false,
+          status: null,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    });
+
+    /** Sends everything waiting now, instead of at its next retry. */
+    app.post("/integration/outbox/send", admin, async (request) => {
+      const me = authOf(request);
+      const sent = await sendNow(ctx, me.orgId);
+      return { sent, outbox: await outboxStatus(ctx, me.orgId) };
     });
 
     /** Sends a test event, so the receiving side can be checked. */
@@ -166,16 +291,57 @@ export function integrationRoutes(ctx: AppContext) {
   };
 }
 
-/** The organisation of the API key on the request, or 401. */
-async function keyOrg(ctx: AppContext, request: FastifyRequest) {
+function withoutWebhook(s: IntegrationSettings): IntegrationSettings {
+  const { webhookUrl: _u, webhookSecret: _s, ...rest } = s;
+  return rest;
+}
+
+/** The API key on the request (its organisation, scope and name), or 401. */
+async function requestKey(ctx: AppContext, request: FastifyRequest) {
   const header = request.headers.authorization;
   const key = header?.startsWith("Bearer ")
     ? header.slice(7).trim()
     : String(request.headers["x-api-key"] ?? "");
-  const orgId = key ? await orgForKey(ctx, key) : null;
-  if (!orgId) throw unauthorized("A valid API key is required", "api_key");
-  return orgId;
+  const found = key ? await orgForKey(ctx, key) : null;
+  if (!found) throw unauthorized("A valid API key is required", "api_key");
+  return found;
 }
+
+const keyOrg = async (ctx: AppContext, request: FastifyRequest) =>
+  (await requestKey(ctx, request)).orgId;
+
+const CertificateIn = z.object({
+  code: z.string().min(4).max(40),
+  version: z.number().int().min(1),
+  payload: z.record(z.string(), z.unknown()),
+  payloadHash: z.string().min(16).max(128),
+  issuedAt: z.iso.datetime({ offset: true }),
+});
+
+const IngestBody = z.discriminatedUnion("event", [
+  z.object({
+    id: z.string().max(64),
+    event: z.literal("sample.completed"),
+    data: z.object({
+      result: z.record(z.string(), z.unknown()),
+      certificate: CertificateIn,
+    }),
+  }),
+  z.object({
+    id: z.string().max(64),
+    event: z.literal("certificate.withdrawn"),
+    data: z.object({
+      sampleId: z.string().max(64),
+      codes: z.array(z.string().max(40)).max(50),
+      reason: z.string().max(500),
+    }),
+  }),
+  z.object({
+    id: z.string().max(64),
+    event: z.literal("test"),
+    data: z.unknown(),
+  }),
+]);
 
 /**
  * Read-only API for connected systems (APMC, eNAM bridge, ERP), with an API
@@ -217,6 +383,71 @@ export function machineRoutes(ctx: AppContext) {
             ? rows.at(-1)!.completedAt!.toISOString()
             : null,
       };
+    });
+
+    /**
+     * A mandi station sends its results and certificates here (a key with the
+     * station scope). Idempotent: a retried delivery changes nothing. Each
+     * certificate's hash is checked against its contents before it is kept.
+     */
+    app.post("/ingest", async (request) => {
+      const key = await requestKey(ctx, request);
+      if (key.scope !== "station")
+        throw forbidden("This key can't send results: create a station key");
+      const body = IngestBody.parse(request.body);
+      if (body.event === "test") return { ok: true };
+      if (body.event === "certificate.withdrawn") {
+        if (body.data.codes.length)
+          await ctx.db
+            .update(remoteCertificates)
+            .set({
+              status: "withdrawn",
+              withdrawnAt: new Date(),
+              withdrawnReason: body.data.reason,
+            })
+            .where(
+              and(
+                eq(remoteCertificates.orgId, key.orgId),
+                inArray(remoteCertificates.code, body.data.codes),
+              ),
+            );
+        return { ok: true };
+      }
+      const { result, certificate } = body.data;
+      const payload = certificate.payload as unknown as CertificatePayload;
+      if (hashPayload(payload) !== certificate.payloadHash)
+        throw badRequest("The certificate doesn't match its hash");
+      const [existing] = await ctx.db
+        .select({ orgId: remoteCertificates.orgId })
+        .from(remoteCertificates)
+        .where(eq(remoteCertificates.code, certificate.code));
+      if (existing && existing.orgId !== key.orgId)
+        throw conflict("That certificate code belongs to another organisation");
+      const [local] = await ctx.db
+        .select({ id: certificates.id })
+        .from(certificates)
+        .where(eq(certificates.code, certificate.code));
+      if (local) throw conflict("That certificate code is already used here");
+      const station =
+        typeof result.organisation === "string" && result.organisation
+          ? result.organisation
+          : key.name;
+      await ctx.db
+        .insert(remoteCertificates)
+        .values({
+          orgId: key.orgId,
+          station,
+          stationSampleId:
+            typeof result.sampleId === "string" ? result.sampleId : "",
+          code: certificate.code,
+          version: certificate.version,
+          payload,
+          payloadHash: certificate.payloadHash,
+          issuedAt: new Date(certificate.issuedAt),
+          result,
+        })
+        .onConflictDoNothing();
+      return { ok: true };
     });
 
     /** One result, by sample number or id. */

@@ -206,20 +206,41 @@ describe("integration with APMC, eNAM and ERP systems", () => {
     expect(download.body.purityPct).toBe(event.data.purityPct);
   });
 
-  it("retries a failing webhook and records the failure", async () => {
+  it("keeps results that couldn't be sent and sends them later", async () => {
+    // The test button tries once.
     t.webhooks.sent.length = 0;
     t.webhooks.status = 500;
-    try {
-      const res = await api<{ delivered: boolean; status: number }>(
-        "POST",
-        "/api/integration/webhook/test",
-      );
-      expect(res.body).toMatchObject({ delivered: false, status: 500 });
-      expect(t.webhooks.sent).toHaveLength(3);
-    } finally {
-      t.webhooks.status = 200;
-    }
-  }, 15000);
+    const test = await api<{ delivered: boolean; status: number }>(
+      "POST",
+      "/api/integration/webhook/test",
+    );
+    expect(test.body).toMatchObject({ delivered: false, status: 500 });
+    expect(t.webhooks.sent).toHaveLength(1);
+
+    // A completed result waits in the outbox while the receiver fails…
+    const sample = await completedSample();
+    let status = await api<{
+      outbox: {
+        waiting: number;
+        recent: { lastError: string | null; sampleNumber: number }[];
+      };
+    }>("GET", "/api/integration");
+    expect(status.body.outbox.waiting).toBe(1);
+    expect(status.body.outbox.recent[0]).toMatchObject({
+      sampleNumber: sample.number,
+      lastError: "HTTP 500",
+    });
+
+    // …and goes out once it answers again.
+    t.webhooks.status = 200;
+    const sent = await api<{ sent: number; outbox: { waiting: number } }>(
+      "POST",
+      "/api/integration/outbox/send",
+    );
+    expect(sent.body).toMatchObject({ sent: 1, outbox: { waiting: 0 } });
+    status = await api("GET", "/api/integration");
+    expect(status.body.outbox.waiting).toBe(0);
+  });
 
   it("lets only admins manage keys", async () => {
     const res = await api("POST", "/api/integration/keys", { name: "x" }, {});

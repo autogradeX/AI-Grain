@@ -8,11 +8,11 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { AppContext } from "../../context.js";
 import {
   apiKeys,
+  certificates,
   organizations,
   samples,
-  type IntegrationSettings,
 } from "../../db/schema.js";
-import { audit } from "../../lib/audit.js";
+import { enqueue } from "./outbox.js";
 import { kernelSummary } from "../batches/service.js";
 import { currentCertificate } from "../certificates/service.js";
 import { ensureCrop } from "../crops/service.js";
@@ -141,7 +141,7 @@ export async function assayingResult(ctx: AppContext, sample: SampleRow) {
           code: cert.code,
           version: cert.version,
           sha256: cert.payloadHash,
-          verifyUrl: `${ctx.config.APP_URL}/verify/${cert.code}`,
+          verifyUrl: `${await verifyBase(ctx, sample.orgId)}/verify/${cert.code}`,
         }
       : null,
   };
@@ -162,14 +162,19 @@ export function newApiKey() {
   return { key, prefix: key.slice(0, 12), keyHash: hashKey(key) };
 }
 
-/** The organisation an API key belongs to, or null when unknown or revoked. */
+/** The organisation, scope and name of an API key, or null when unknown or revoked. */
 export async function orgForKey(
   ctx: AppContext,
   key: string,
-): Promise<string | null> {
+): Promise<{ orgId: string; scope: "read" | "station"; name: string } | null> {
   if (!key.startsWith(KEY_PREFIX)) return null;
   const [row] = await ctx.db
-    .select({ id: apiKeys.id, orgId: apiKeys.orgId })
+    .select({
+      id: apiKeys.id,
+      orgId: apiKeys.orgId,
+      scope: apiKeys.scope,
+      name: apiKeys.name,
+    })
     .from(apiKeys)
     .where(and(eq(apiKeys.keyHash, hashKey(key)), isNull(apiKeys.revokedAt)));
   if (!row) return null;
@@ -177,7 +182,7 @@ export async function orgForKey(
     .update(apiKeys)
     .set({ lastUsedAt: new Date() })
     .where(eq(apiKeys.id, row.id));
-  return row.orgId;
+  return { orgId: row.orgId, scope: row.scope, name: row.name };
 }
 
 // --- Webhooks -------------------------------------------------------------
@@ -189,26 +194,21 @@ export const newWebhookSecret = () =>
   `whsec_${randomBytes(24).toString("base64url")}`;
 
 /**
- * Sends one event to the organisation's webhook, with an HMAC signature, and
- * up to three attempts. Returns whether it was delivered. A receiver that
- * misses one (or this instance stopping mid-retry) can catch up from
- * GET /api/v1/results?since=… .
+ * Sends one event to the organisation's webhook, once, signed (the "Send a
+ * test" button). Results themselves go through the outbox, which retries
+ * until they are delivered.
  */
 export async function sendWebhook(
   ctx: AppContext,
   orgId: string,
   event: string,
   data: unknown,
-  settings?: IntegrationSettings,
 ): Promise<{ delivered: boolean; status: number | null; error?: string }> {
-  let integration = settings;
-  if (!integration) {
-    const [org] = await ctx.db
-      .select({ integration: organizations.integration })
-      .from(organizations)
-      .where(eq(organizations.id, orgId));
-    integration = org?.integration;
-  }
+  const [org] = await ctx.db
+    .select({ integration: organizations.integration })
+    .from(organizations)
+    .where(eq(organizations.id, orgId));
+  const integration = org?.integration;
   if (!integration?.webhookUrl || !integration.webhookSecret)
     return { delivered: false, status: null, error: "No webhook set up" };
   const id = randomBytes(12).toString("hex");
@@ -218,51 +218,56 @@ export async function sendWebhook(
     createdAt: new Date().toISOString(),
     data,
   });
-  const send = ctx.fetch ?? fetch;
-  let last: { status: number | null; error?: string } = { status: null };
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0)
-      await new Promise((r) => setTimeout(r, attempt * attempt * 1000));
-    try {
-      const res = await send(integration.webhookUrl, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "user-agent": "AI-Grain-Webhook/1",
-          "x-aigrain-event": event,
-          "x-aigrain-delivery": id,
-          "x-aigrain-signature": signBody(integration.webhookSecret, body),
-        },
-        body,
-        signal: AbortSignal.timeout(10_000),
-      });
-      last = { status: res.status };
-      if (res.ok) {
-        await audit(ctx.db, {
-          orgId,
-          userId: null,
-          action: "integration.webhook_delivered",
-          detail: { event, id, status: res.status },
-        });
-        return { delivered: true, status: res.status };
-      }
-    } catch (err) {
-      last = {
-        status: null,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
+  try {
+    const res = await (ctx.fetch ?? fetch)(integration.webhookUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "user-agent": "AI-Grain/1",
+        "x-aigrain-event": event,
+        "x-aigrain-delivery": id,
+        "x-aigrain-signature": signBody(integration.webhookSecret, body),
+      },
+      body,
+      signal: AbortSignal.timeout(10_000),
+    });
+    return { delivered: res.ok, status: res.status };
+  } catch (err) {
+    return {
+      delivered: false,
+      status: null,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
-  await audit(ctx.db, {
-    orgId,
-    userId: null,
-    action: "integration.webhook_failed",
-    detail: { event, id, ...last },
-  });
-  return { delivered: false, ...last };
 }
 
-/** After a sample completes: push its result to the webhook, when one is set up. */
+/** Where certificates are verified: the central server for a station, else this server. */
+export async function verifyBase(ctx: AppContext, orgId: string) {
+  const [org] = await ctx.db
+    .select({ integration: organizations.integration })
+    .from(organizations)
+    .where(eq(organizations.id, orgId));
+  return (org?.integration.centralUrl ?? ctx.config.APP_URL).replace(
+    /\/+$/,
+    "",
+  );
+}
+
+/** The certificate as a station sends it to its central server. */
+function certificateForCentral(cert: typeof certificates.$inferSelect) {
+  return {
+    code: cert.code,
+    version: cert.version,
+    payload: cert.payload,
+    payloadHash: cert.payloadHash,
+    issuedAt: cert.issuedAt.toISOString(),
+  };
+}
+
+/**
+ * After a sample completes: queue its result for the webhook, and its
+ * result and certificate for the central server, when they are set up.
+ */
 export async function notifyCompleted(
   ctx: AppContext,
   sampleId: string,
@@ -272,16 +277,28 @@ export async function notifyCompleted(
     .from(samples)
     .where(eq(samples.id, sampleId));
   if (!sample || sample.status !== "completed") return;
-  const [org] = await ctx.db
-    .select({ integration: organizations.integration })
-    .from(organizations)
-    .where(eq(organizations.id, sample.orgId));
-  if (!org?.integration.webhookUrl) return;
-  await sendWebhook(
-    ctx,
-    sample.orgId,
-    "sample.completed",
-    await assayingResult(ctx, sample),
-    org.integration,
-  );
+  const result = await assayingResult(ctx, sample);
+  const cert = await currentCertificate(ctx, sample.id);
+  await enqueue(ctx, sample.orgId, "sample.completed", {
+    webhook: result,
+    ...(cert && {
+      central: { result, certificate: certificateForCentral(cert) },
+    }),
+  });
+}
+
+/** After a sample is reopened: its certificates no longer stand, wherever they were sent. */
+export async function notifyWithdrawn(
+  ctx: AppContext,
+  orgId: string,
+  sampleId: string,
+  codes: string[],
+  reason: string,
+): Promise<void> {
+  if (!codes.length) return;
+  const data = { sampleId, codes, reason };
+  await enqueue(ctx, orgId, "certificate.withdrawn", {
+    webhook: data,
+    central: data,
+  });
 }

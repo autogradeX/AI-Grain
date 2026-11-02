@@ -25,6 +25,8 @@ import {
   dimensionsFor,
   kernelSummary,
   markClassified,
+  waitForInternet,
+  type ClassifyFailure,
   mix,
   modelFor,
   processBatch,
@@ -76,9 +78,9 @@ async function batchContext(ctx: AppContext, batchId: string) {
 export async function secondOpinion(
   ctx: AppContext,
   batchId: string,
-): Promise<void> {
+): Promise<ClassifyFailure | null> {
   const c = await batchContext(ctx, batchId);
-  if (!c) return;
+  if (!c) return null;
   const rows = await ctx.db
     .select()
     .from(kernels)
@@ -86,9 +88,9 @@ export async function secondOpinion(
   const todo = rows.filter(
     (k) => !k.aiClass2 && wantsSecondOpinion({ ...k, draw: 0 }, c.classes),
   );
-  if (!todo.length) return;
+  if (!todo.length) return null;
   // A failure here isn't fatal: kernels without a second verdict go to a person.
-  await classifyKernels(ctx, batchId, todo, {
+  return classifyKernels(ctx, batchId, todo, {
     kind: "second_opinion",
     shuffle: true,
     save: (verdicts: KernelVerdict[]) =>
@@ -129,9 +131,9 @@ function expertNote(k: typeof kernels.$inferSelect): string {
 export async function expertReview(
   ctx: AppContext,
   batchId: string,
-): Promise<void> {
+): Promise<ClassifyFailure | null> {
   const c = await batchContext(ctx, batchId);
-  if (!c || !c.policy.expertReview) return;
+  if (!c || !c.policy.expertReview) return null;
   const rows = await ctx.db
     .select()
     .from(kernels)
@@ -142,9 +144,9 @@ export async function expertReview(
       k.reviewStatus === "pending" &&
       wantsExpert({ ...k, draw: 0 }, c.classes, c.policy),
   );
-  if (!todo.length) return;
+  if (!todo.length) return null;
   // A failure here isn't fatal: those kernels go to a person.
-  await classifyKernels(ctx, batchId, todo, {
+  return classifyKernels(ctx, batchId, todo, {
     kind: "expert",
     expertNotes: Object.fromEntries(todo.map((k) => [k.number, expertNote(k)])),
     save: (verdicts: KernelVerdict[]) =>
@@ -225,6 +227,14 @@ export async function runBatch(
   if (c.policy.enabled) await classifyAndTriage(ctx, batchId);
 }
 
+async function batchStatus(ctx: AppContext, batchId: string) {
+  const [b] = await ctx.db
+    .select({ status: batches.status })
+    .from(batches)
+    .where(eq(batches.id, batchId));
+  return b?.status;
+}
+
 /** Classification and what follows it: second opinion, expert pass, triage, finishing. */
 export async function classifyAndTriage(
   ctx: AppContext,
@@ -236,9 +246,19 @@ export async function classifyAndTriage(
   const c = await batchContext(ctx, batchId);
   if (!c) return;
   if (classified && c.policy.enabled) {
-    await secondOpinion(ctx, batchId);
-    await expertReview(ctx, batchId);
+    // Without internet the later looks wait too (rather than sending their
+    // kernels to a person); kernels already looked at keep their verdicts.
+    const second = await secondOpinion(ctx, batchId);
+    const expert = second?.unavailable
+      ? second
+      : await expertReview(ctx, batchId);
+    if (second?.unavailable || expert?.unavailable) {
+      await waitForInternet(ctx, batchId);
+      return;
+    }
   }
+  // Waiting for internet: nothing to triage or finish yet.
+  if (!classified && (await batchStatus(ctx, batchId)) === "waiting") return;
   await triageBatch(ctx, batchId);
   if (classified) await markClassified(ctx, batchId);
   await finishIfReady(ctx, c.sample.id);
@@ -282,6 +302,14 @@ export async function completionProblems(
   }
   if ((await busyBatches(ctx, sample.id)).length)
     problems.push("wait for photos to finish processing");
+  const waiting = await ctx.db
+    .select({ id: batches.id })
+    .from(batches)
+    .where(and(eq(batches.sampleId, sample.id), eq(batches.status, "waiting")));
+  if (waiting.length)
+    problems.push(
+      `wait for internet: ${waiting.length} photo(s) to be classified by Model Orchestration`,
+    );
   const [failed] = await ctx.db
     .select({ id: batches.id })
     .from(batches)

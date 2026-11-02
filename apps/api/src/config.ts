@@ -50,6 +50,13 @@ const EnvSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   ALLOW_SIGNUP: bool.default(true),
   REQUIRE_EMAIL_VERIFICATION: bool.default(false),
+  /**
+   * A station at a mandi, on its local Wi-Fi: the app shows phones the
+   * address to open, and works without internet (see docs/station.md).
+   */
+  STATION_MODE: bool.default(false),
+  /** The address phones open, e.g. http://192.168.1.20:3000 (set at install; else found from the network cards). */
+  STATION_ADDRESS: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   DEFAULT_MODEL: z.enum(CLAUDE_MODELS).default("claude-sonnet-5-5"),
   /** Autopilot's expert pass (the Advanced tier) for kernels earlier looks couldn't settle. */

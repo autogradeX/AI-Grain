@@ -134,7 +134,9 @@ export type BatchStatus =
   | "detected"
   | "classifying"
   | "classified"
-  | "failed";
+  | "failed"
+  /** Model Orchestration couldn't be reached: carries on by itself when online. */
+  | "waiting";
 
 export interface KernelSummary {
   byClass: Record<string, number>;

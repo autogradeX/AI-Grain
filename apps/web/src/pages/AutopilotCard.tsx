@@ -72,6 +72,15 @@ export function AutopilotCard({ sample }: { sample: Sample }) {
   const photos = sample.batches.length;
   const busy = sample.batches.some((b) => BUSY.has(b.status));
   const failed = sample.batches.some((b) => b.status === "failed");
+  const waiting = sample.batches.filter((b) => b.status === "waiting");
+  const retry = useMutation({
+    mutationFn: () =>
+      Promise.all(
+        waiting.map((b) => api.post(`/batches/${b.id}/classify`, {})),
+      ),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: ["sample", sample.id] }),
+  });
   const classified = k.total > 0 && k.classified === k.total && !busy;
   const pending = k.pendingReview;
   const completed = sample.status === "completed";
@@ -89,11 +98,13 @@ export function AutopilotCard({ sample }: { sample: Sample }) {
     ? { tone: "good" as const, label: t("done") }
     : busy
       ? { tone: "info" as const, label: t("working") }
-      : pending > 0 || failed
-        ? { tone: "warn" as const, label: t("needsYou") }
-        : photos === 0
-          ? { tone: "neutral" as const, label: t("waitingPhotos") }
-          : { tone: "info" as const, label: t("working") };
+      : waiting.length
+        ? { tone: "warn" as const, label: t("offline") }
+        : pending > 0 || failed
+          ? { tone: "warn" as const, label: t("needsYou") }
+          : photos === 0
+            ? { tone: "neutral" as const, label: t("waitingPhotos") }
+            : { tone: "info" as const, label: t("working") };
 
   return (
     <Card
@@ -159,7 +170,7 @@ export function AutopilotCard({ sample }: { sample: Sample }) {
         />
       </ol>
 
-      {k.total > 0 && (
+      {k.classified > 0 && (
         <div className="ai-share">
           <div className="ai-share-bar" aria-hidden>
             <span style={{ width: `${share}%` }} />
@@ -185,6 +196,21 @@ export function AutopilotCard({ sample }: { sample: Sample }) {
       )}
 
       {failed && !completed && <p className="warn small">{t("failedPhoto")}</p>}
+      {waiting.length > 0 && !completed && (
+        <div className="row wrap small">
+          <span className="warn">{t.n("waitingInternet", waiting.length)}</span>
+          {can.write && (
+            <button
+              type="button"
+              disabled={retry.isPending}
+              onClick={() => retry.mutate()}
+            >
+              {t("tryNow")}
+            </button>
+          )}
+        </div>
+      )}
+      <ErrorNote error={retry.error} />
       {completed && !sample.completedBy && (
         <p className="muted small">
           {sample.result?.source === "estimate"

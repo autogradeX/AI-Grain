@@ -127,6 +127,11 @@ export async function createTestApp(env: Record<string, string> = {}) {
   // Outgoing webhooks: recorded, answered with `webhooks.status`.
   const webhooks = {
     status: 200,
+    /** Throw instead of answering: no internet. */
+    offline: false,
+    /** Answers instead of `status`, e.g. by passing the request to another test app. */
+    handler: null as
+      null | ((url: string, init: RequestInit) => Promise<Response>),
     sent: [] as {
       url: string;
       headers: Record<string, string>;
@@ -134,11 +139,16 @@ export async function createTestApp(env: Record<string, string> = {}) {
     }[],
   };
   const fakeFetch = ((url: string, init: RequestInit) => {
+    if (webhooks.offline)
+      return Promise.reject(
+        new TypeError("fetch failed: getaddrinfo ENOTFOUND"),
+      );
     webhooks.sent.push({
       url,
       headers: init.headers as Record<string, string>,
       body: init.body as string,
     });
+    if (webhooks.handler) return webhooks.handler(url, init);
     return Promise.resolve(new Response("", { status: webhooks.status }));
   }) as unknown as typeof fetch;
   let jobs!: JobRunner;

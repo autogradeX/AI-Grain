@@ -42,6 +42,8 @@ export function useSample(id: string) {
       const d = q.state.data;
       if (!d) return false;
       if (d.batches.some((b) => BUSY.has(b.status))) return 2000;
+      // Waiting for internet: the server resumes by itself; look now and then.
+      if (d.batches.some((b) => b.status === "waiting")) return 15000;
       // Autopilot is finishing it: result, report and summary arrive shortly.
       return d.autoFinish &&
         d.status === "in_progress" &&
@@ -514,6 +516,7 @@ export function BatchStatusBadge({ status }: { status: string }) {
     classifying: [t("statusClassifying"), "info"],
     classified: [t("statusClassified"), "good"],
     failed: [t("statusFailed"), "bad"],
+    waiting: [t("statusWaiting"), "warn"],
   };
   const [label, tone] = map[status] ?? [status, "neutral"];
   return <Badge tone={tone}>{label}</Badge>;

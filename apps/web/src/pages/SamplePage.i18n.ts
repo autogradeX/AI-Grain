@@ -81,6 +81,10 @@ export const m = defineMessages({
 
   // Batch status
   statusUploaded: { en: "Uploaded", hi: "अपलोड हुआ" },
+  statusWaiting: {
+    en: "Waiting for internet",
+    hi: "इंटरनेट का इंतज़ार",
+  },
   statusDetecting: { en: "Finding kernels…", hi: "दाने ढूँढे जा रहे हैं…" },
   statusDetected: { en: "Ready to classify", hi: "वर्गीकरण के लिए तैयार" },
   statusClassifying: {

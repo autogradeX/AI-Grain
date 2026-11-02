@@ -60,6 +60,7 @@ import {
   policyForOrg,
   writeSummary,
 } from "../autopilot/service.js";
+import { notifyWithdrawn } from "../integration/service.js";
 import { prepareReport } from "../reports/service.js";
 import { suggestStandard } from "../standards/suggest.js";
 
@@ -93,7 +94,8 @@ export function sampleRoutes(ctx: AppContext) {
       const byReason = await ctx.db
         .select({ reason: kernels.flagReason, count: count() })
         .from(kernels)
-        .where(eq(kernels.sampleId, sampleId))
+        // Only kernels the AI has looked at: unclassified ones aren't "accepted".
+        .where(and(eq(kernels.sampleId, sampleId), isNotNull(kernels.aiClass)))
         .groupBy(kernels.flagReason);
       const flagged: Partial<Record<string, number>> = {};
       let accepted = 0;
@@ -229,7 +231,11 @@ export function sampleRoutes(ctx: AppContext) {
               .where(
                 and(
                   inArray(batches.sampleId, ids),
-                  inArray(batches.status, ["detecting", "classifying"]),
+                  inArray(batches.status, [
+                    "detecting",
+                    "classifying",
+                    "waiting",
+                  ]),
                 ),
               ),
           ])
@@ -522,9 +528,17 @@ export function sampleRoutes(ctx: AppContext) {
         })
         .where(eq(samples.id, id))
         .returning();
-      await withdrawCertificates(
+      const withdrawn = await withdrawCertificates(
         ctx,
         id,
+        "The sample was reopened for changes.",
+      );
+      // Connected systems hear of it too (the central server, the webhook).
+      await notifyWithdrawn(
+        ctx,
+        me.orgId,
+        id,
+        withdrawn,
         "The sample was reopened for changes.",
       );
       await audit(ctx.db, {

@@ -89,6 +89,28 @@ export interface Classifier {
 export class ClassifierError extends Error {}
 
 /**
+ * Model Orchestration couldn't be reached or is overloaded (no internet,
+ * DNS failure, timeout, 5xx, 429): worth trying again later, unlike a
+ * refusal or a bad answer.
+ */
+export class ClassifierUnavailableError extends ClassifierError {}
+
+/** Turns the SDK's network and server errors into ClassifierUnavailableError. */
+function unavailable(err: unknown): never {
+  if (
+    err instanceof Anthropic.APIConnectionError ||
+    (err instanceof Anthropic.APIError &&
+      typeof err.status === "number" &&
+      (err.status >= 500 || err.status === 429))
+  ) {
+    throw new ClassifierUnavailableError(
+      "Model Orchestration can't be reached (no internet connection?)",
+    );
+  }
+  throw err;
+}
+
+/**
  * The answer's schema. Class ids are listed in the field's description rather
  * than enforced: an unknown id becomes "unclear" below, so one bad verdict
  * can't fail a whole sheet of 30 kernels.
@@ -166,7 +188,11 @@ export class ClaudeClassifier implements Classifier {
     });
   }
 
-  async classify(req: ClassifyRequest): Promise<ClassifyResult> {
+  classify(req: ClassifyRequest): Promise<ClassifyResult> {
+    return this.classifyOnline(req).catch(unavailable);
+  }
+
+  private async classifyOnline(req: ClassifyRequest): Promise<ClassifyResult> {
     // Stable per standard and organisation: definitions and reference images go
     // first, marked for caching, so each sheet after the first reads them from cache.
     const prefix: (
@@ -272,7 +298,7 @@ export class ClaudeClassifier implements Classifier {
     };
   }
 
-  async suggestCrop(req: { model: ClaudeModel; name: string }) {
+  private async suggestCropOnline(req: { model: ClaudeModel; name: string }) {
     const message = await this.client.beta.messages.parse({
       model: req.model,
       max_tokens: 8000,
@@ -297,7 +323,15 @@ export class ClaudeClassifier implements Classifier {
     };
   }
 
-  async summarize(req: SummaryRequest) {
+  summarize(req: SummaryRequest) {
+    return this.summarizeOnline(req).catch(unavailable);
+  }
+
+  suggestCrop(req: { model: ClaudeModel; name: string }) {
+    return this.suggestCropOnline(req).catch(unavailable);
+  }
+
+  private async summarizeOnline(req: SummaryRequest) {
     const message = await this.client.beta.messages.create({
       model: req.model,
       max_tokens: 4000,

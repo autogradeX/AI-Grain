@@ -85,6 +85,13 @@
       "when": 1793597353467,
       "tag": "0011_size_without_board",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793635444057,
+      "tag": "0012_station_mode",
+      "breakpoints": true
     }
   ]
 }

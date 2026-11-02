@@ -153,8 +153,8 @@ export async function withdrawCertificates(
   ctx: AppContext,
   sampleId: string,
   reason: string,
-): Promise<void> {
-  await ctx.db
+): Promise<string[]> {
+  const rows = await ctx.db
     .update(certificates)
     .set({
       status: "withdrawn",
@@ -166,7 +166,9 @@ export async function withdrawCertificates(
         eq(certificates.sampleId, sampleId),
         eq(certificates.status, "valid"),
       ),
-    );
+    )
+    .returning({ code: certificates.code });
+  return rows.map((r) => r.code);
 }
 
 export async function currentCertificate(ctx: AppContext, sampleId: string) {

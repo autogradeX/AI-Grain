@@ -8,6 +8,7 @@ import { createDb, DatabaseUnreachableError } from "./db/client.js";
 import { JobRunner } from "./lib/jobs.js";
 import { LogMailer, SmtpMailer } from "./lib/mailer.js";
 import { DiskStorage, GcsStorage } from "./lib/storage.js";
+import { startSweeper } from "./modules/station/sweeper.js";
 
 const config = loadConfig();
 const dbHandle = createDb(config.DATABASE_URL, config.DATA_DIR, {
@@ -33,7 +34,7 @@ try {
 }
 
 let jobs!: JobRunner;
-const { app } = await buildApp(
+const { app, ctx } = await buildApp(
   (log) => {
     jobs = new JobRunner(log);
     return {
@@ -108,3 +109,8 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
 await app.listen({ host: config.HOST, port: config.PORT });
+
+// Work that waits on the internet: photos waiting for Model Orchestration,
+// results waiting to be sent. All state is in the database.
+const stopSweeper = startSweeper(ctx, app.log);
+process.on("beforeExit", stopSweeper);

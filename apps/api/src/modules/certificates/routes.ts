@@ -2,7 +2,7 @@ import { and, asc, eq, gt } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { AppContext } from "../../context.js";
-import { certificates } from "../../db/schema.js";
+import { certificates, remoteCertificates } from "../../db/schema.js";
 import { notFound } from "../../lib/errors.js";
 import { authenticate, authOf } from "../auth/guard.js";
 import { loadSample } from "../samples/service.js";
@@ -41,6 +41,44 @@ export function certificateRoutes(ctx: AppContext) {
  * what the certificate itself contains, plus whether it is still valid.
  */
 export function publicVerifyRoutes(ctx: AppContext) {
+  /** A certificate a mandi station issued and sent here (this is its central server). */
+  async function verifyRemote(code: string) {
+    const [cert] = await ctx.db
+      .select()
+      .from(remoteCertificates)
+      .where(eq(remoteCertificates.code, code));
+    if (!cert) throw notFound("Certificate");
+    const [newer] = await ctx.db
+      .select({
+        code: remoteCertificates.code,
+        version: remoteCertificates.version,
+      })
+      .from(remoteCertificates)
+      .where(
+        and(
+          eq(remoteCertificates.orgId, cert.orgId),
+          eq(remoteCertificates.stationSampleId, cert.stationSampleId),
+          gt(remoteCertificates.version, cert.version),
+        ),
+      )
+      .orderBy(asc(remoteCertificates.version))
+      .limit(1);
+    return {
+      code: cert.code,
+      status: cert.status,
+      payload: cert.payload,
+      payloadHash: cert.payloadHash,
+      intact: hashPayload(cert.payload) === cert.payloadHash,
+      issuedAt: cert.issuedAt,
+      withdrawnAt: cert.withdrawnAt,
+      withdrawnReason: cert.withdrawnReason,
+      newerVersion: newer ?? null,
+      // Issued at a station and received here.
+      station: cert.station,
+      receivedAt: cert.receivedAt,
+    };
+  }
+
   return (app: FastifyInstance) => {
     app.get(
       "/verify/:code",
@@ -53,7 +91,7 @@ export function publicVerifyRoutes(ctx: AppContext) {
           .select()
           .from(certificates)
           .where(eq(certificates.code, normalizeCode(code)));
-        if (!cert) throw notFound("Certificate");
+        if (!cert) return verifyRemote(normalizeCode(code));
         const [newer] = await ctx.db
           .select({ code: certificates.code, version: certificates.version })
           .from(certificates)

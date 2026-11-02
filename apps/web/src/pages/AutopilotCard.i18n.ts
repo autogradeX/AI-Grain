@@ -4,6 +4,16 @@ export const m = defineMessages({
   title: { en: "Autopilot", hi: "ऑटोपायलट" },
   working: { en: "AI is working", hi: "AI काम कर रहा है" },
   needsYou: { en: "Needs you", hi: "आपकी ज़रूरत है" },
+  offline: { en: "Waiting for internet", hi: "इंटरनेट का इंतज़ार" },
+  waitingInternet_one: {
+    en: "{count} photo is counted and waits for internet to be classified: it carries on by itself when the connection is back.",
+    hi: "{count} फ़ोटो गिनी जा चुकी है और वर्गीकरण के लिए इंटरनेट का इंतज़ार कर रही है: कनेक्शन लौटते ही अपने आप आगे बढ़ेगी।",
+  },
+  waitingInternet_other: {
+    en: "{count} photos are counted and wait for internet to be classified: they carry on by themselves when the connection is back.",
+    hi: "{count} फ़ोटो गिनी जा चुकी हैं और वर्गीकरण के लिए इंटरनेट का इंतज़ार कर रही हैं: कनेक्शन लौटते ही अपने आप आगे बढ़ेंगी।",
+  },
+  tryNow: { en: "Try now", hi: "अभी कोशिश करें" },
   done: { en: "Done", hi: "पूरा" },
   waitingPhotos: { en: "Waiting for photos", hi: "फ़ोटो का इंतज़ार" },
   stepPhotos: { en: "Photos", hi: "फ़ोटो" },

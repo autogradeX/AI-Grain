@@ -2827,3 +2827,15 @@ body:has(.app-view) .toast {
   align-items: center;
   gap: 0.35rem;
 }
+
+.station img {
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 6px;
+}
+
+.station ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}

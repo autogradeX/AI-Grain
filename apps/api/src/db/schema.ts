@@ -84,6 +84,13 @@ export interface IntegrationSettings {
   webhookUrl?: string;
   /** Signs each delivery (HMAC-SHA256), so the receiver can check it came from here. */
   webhookSecret?: string;
+  /**
+   * A station's central AI-Grain server (https://…): results and
+   * certificates are sent there, and report QR codes point to it.
+   */
+  centralUrl?: string;
+  /** API key (station scope) issued by the central server. */
+  centralKey?: string;
 }
 
 export const organizations = pgTable("organizations", {
@@ -119,6 +126,8 @@ export const apiKeys = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /** "read": reads results. "station": a mandi station sends its results and certificates. */
+    scope: text("scope").$type<"read" | "station">().notNull().default("read"),
     /** First characters of the key, to tell keys apart in the list. */
     prefix: text("prefix").notNull(),
     keyHash: text("key_hash").notNull(),
@@ -364,6 +373,8 @@ export const batchStatusEnum = pgEnum("batch_status", [
   "classifying",
   "classified",
   "failed",
+  /** Model Orchestration couldn't be reached (no internet): retried by itself. */
+  "waiting",
 ]);
 export type BatchStatus = (typeof batchStatusEnum.enumValues)[number];
 
@@ -405,6 +416,9 @@ export const batches = pgTable("batches", {
   mmPerPx: doublePrecision("mm_per_px"),
   /** Side of the square crop window, shared by every kernel crop in the batch. */
   cropWindowCm: doublePrecision("crop_window_cm"),
+  /** Waiting for Model Orchestration: when to try again, and how often it was tried. */
+  retryAt: timestamp("retry_at", { withTimezone: true }),
+  retries: integer("retries").notNull().default(0),
   /** Set by a device that queued the photo offline, so a retried upload isn't stored twice. */
   clientRef: text("client_ref").unique(),
   error: text("error"),
@@ -647,4 +661,63 @@ export const articles = pgTable(
       .$onUpdate(() => new Date()),
   },
   (t) => [uniqueIndex("articles_org_slug_idx").on(t.orgId, t.slug)],
+);
+
+/**
+ * Results waiting to be sent to connected systems (the webhook, a station's
+ * central server). Kept until delivered and retried with growing pauses, so
+ * nothing is lost while the internet is down.
+ */
+export const outbox = pgTable(
+  "outbox",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    target: text("target").$type<"webhook" | "central">().notNull(),
+    event: text("event").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("outbox_due_idx").on(t.deliveredAt, t.nextAttemptAt)],
+);
+
+/**
+ * Certificates issued by mandi stations and received by this (central)
+ * server, so anyone can verify a station's report here.
+ */
+export const remoteCertificates = pgTable(
+  "remote_certificates",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** The station's name (its organisation) and its sample id. */
+    station: text("station").notNull(),
+    stationSampleId: text("station_sample_id").notNull(),
+    code: text("code").notNull().unique(),
+    version: integer("version").notNull(),
+    payload: jsonb("payload").$type<CertificatePayload>().notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    status: certificateStatusEnum("status").notNull().default("valid"),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull(),
+    withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+    withdrawnReason: text("withdrawn_reason"),
+    /** The full result as the station sent it (ai-grain/assaying-result@1). */
+    result: jsonb("result").$type<Record<string, unknown>>(),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("remote_certificates_sample_idx").on(t.orgId, t.stationSampleId),
+  ],
 );
