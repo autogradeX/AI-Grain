@@ -19,22 +19,34 @@ import {
 /** Training cut off (a restart) is forgotten after this long. */
 const TRAINING_STALE_MS = 30 * 60_000;
 
+/** Marks a crop's training as started, or as ended (with why it failed, if it did). */
 async function setTraining(
   ctx: AppContext,
   orgId: string,
   crop: string,
   on: boolean,
+  error?: string,
 ) {
   const [org] = await ctx.db
     .select({ localModel: organizations.localModel })
     .from(organizations)
     .where(eq(organizations.id, orgId));
   const training = { ...org?.localModel.training };
-  if (on) training[crop] = new Date().toISOString();
-  else delete training[crop];
+  const trainingError = { ...org?.localModel.trainingError };
+  if (on) {
+    training[crop] = new Date().toISOString();
+    delete trainingError[crop];
+  } else {
+    delete training[crop];
+    if (error)
+      trainingError[crop] = {
+        at: new Date().toISOString(),
+        message: error.slice(0, 500),
+      };
+  }
   await ctx.db
     .update(organizations)
-    .set({ localModel: { ...org?.localModel, training } })
+    .set({ localModel: { ...org?.localModel, training, trainingError } })
     .where(eq(organizations.id, orgId));
 }
 
@@ -59,7 +71,11 @@ export function localModelRoutes(ctx: AppContext) {
         started && Date.now() - Date.parse(started) < TRAINING_STALE_MS
           ? started
           : null;
-      return { ...status, training };
+      return {
+        ...status,
+        training,
+        lastError: org?.localModel.trainingError?.[crop] ?? null,
+      };
     });
 
     /** Trains a new version in the background; the page polls GET until it appears. */
@@ -90,6 +106,7 @@ export function localModelRoutes(ctx: AppContext) {
         );
       await setTraining(ctx, me.orgId, crop, true);
       ctx.jobs.run(`train ${crop}`, async () => {
+        let failure: string | undefined;
         try {
           const model = await trainLocalModel(ctx, me.orgId, crop, me.id);
           await audit(ctx.db, {
@@ -103,9 +120,13 @@ export function localModelRoutes(ctx: AppContext) {
             },
           });
         } catch (err) {
+          failure =
+            err instanceof NotEnoughDataError
+              ? err.message
+              : `Training failed: ${err instanceof Error ? err.message : String(err)}`;
           if (!(err instanceof NotEnoughDataError)) throw err;
         } finally {
-          await setTraining(ctx, me.orgId, crop, false);
+          await setTraining(ctx, me.orgId, crop, false, failure);
         }
       });
       reply.code(202);

@@ -18,7 +18,8 @@ import {
 } from "../../imaging/features.js";
 import { mapLimit } from "../../lib/jobs.js";
 import { mix } from "../batches/service.js";
-import { evaluate, train, verdictOf, type Example } from "./model.js";
+import { evaluate, verdictOf, type Example } from "./model.js";
+import { trainOffThread } from "./thread.js";
 
 /** A class needs this many labelled kernels to be learned; fewer are left out. */
 export const MIN_PER_CLASS = 12;
@@ -255,7 +256,7 @@ export async function trainLocalModel(
   const trainSet: Example[] = examples.filter((e) => !isHeld(e));
   let validation: Example[] = examples.filter((e) => isHeld(e) && e.human);
   if (validation.length < 20) validation = examples.filter(isHeld);
-  const weights = train(trainSet, { validation, seed: 7 });
+  const weights = await trainOffThread(trainSet, { validation, seed: 7 });
   const metrics = {
     ...evaluate(weights, validation, SOUND),
     trainedOn: trainSet.length,

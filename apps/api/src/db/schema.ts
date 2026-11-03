@@ -89,6 +89,8 @@ export interface LocalModelSettings {
   mode?: "offline" | "always" | "off";
   /** Training in progress, by crop: when it started (cleared when done). */
   training?: Record<string, string>;
+  /** Why the last training of a crop failed (cleared when a training starts). */
+  trainingError?: Record<string, { at: string; message: string }>;
 }
 
 /** Where completed results are pushed (APMC, eNAM bridge, ERP). */

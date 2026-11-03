@@ -1,6 +1,10 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  lastError: {
+    en: "The last training didn't finish: {message}",
+    hi: "पिछला प्रशिक्षण पूरा नहीं हुआ: {message}",
+  },
   title: { en: "Local model", hi: "स्थानीय मॉडल" },
   intro: {
     en: "Your own model for each crop, trained on your kernels: checked by a person, or settled by Model Orchestration. It runs on this server with no internet, so photos are classified even when Model Orchestration can't be reached. Only its confident verdicts stand; harmful classes and anything it isn't sure about go to a person.",

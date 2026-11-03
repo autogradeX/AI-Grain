@@ -44,6 +44,8 @@ interface Status {
     shortfalls: string[];
   }[];
   training: string | null;
+  /** Why the last training failed, if it did. */
+  lastError: { at: string; message: string } | null;
 }
 
 const pct = (v: number) => Math.round(v * 100);
@@ -126,6 +128,11 @@ export function LocalModelPage() {
             {s.training && (
               <p className="small">
                 <Spinner /> {t("training")}
+              </p>
+            )}
+            {!s.training && s.lastError && (
+              <p className="warn small">
+                {t("lastError", { message: s.lastError.message })}
               </p>
             )}
             <ErrorNote error={trainNow.error} />
