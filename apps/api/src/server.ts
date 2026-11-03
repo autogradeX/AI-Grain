@@ -1,10 +1,12 @@
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Storage as GcsClient } from "@google-cloud/storage";
 import { ClaudeClassifier, UnconfiguredClassifier } from "./ai/classifier.js";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { SchemaMismatchError } from "./db/adopt.js";
 import { createDb, DatabaseUnreachableError } from "./db/client.js";
+import { MobileNetEmbedder } from "./imaging/embedder.js";
 import { JobRunner } from "./lib/jobs.js";
 import { LogMailer, SmtpMailer } from "./lib/mailer.js";
 import { DiskStorage, GcsStorage } from "./lib/storage.js";
@@ -33,6 +35,17 @@ try {
   process.exit(1);
 }
 
+// The local model's image model: in the image, so it works without internet.
+const imageModelPath =
+  config.IMAGE_MODEL_PATH ??
+  fileURLToPath(new URL("../../models/mobilenetv2-12.onnx", import.meta.url));
+const embedder = await MobileNetEmbedder.load(imageModelPath).catch(
+  (err: unknown) => {
+    console.error("The image model couldn't be loaded:", err);
+    return null;
+  },
+);
+
 let jobs!: JobRunner;
 const { app, ctx } = await buildApp(
   (log) => {
@@ -55,6 +68,7 @@ const { app, ctx } = await buildApp(
         ? new ClaudeClassifier({ apiKey: config.ANTHROPIC_API_KEY })
         : new UnconfiguredClassifier(),
       jobs,
+      embedder,
     };
   },
   {
@@ -69,6 +83,11 @@ const { app, ctx } = await buildApp(
 if (!config.ANTHROPIC_API_KEY) {
   app.log.warn(
     "ANTHROPIC_API_KEY is not set: classification and summaries will fail until it is.",
+  );
+}
+if (!embedder) {
+  app.log.warn(
+    `The image model is not installed (${imageModelPath}): the local model uses kernel measurements. Run npm run fetch-model.`,
   );
 }
 if (!config.SMTP_URL) {

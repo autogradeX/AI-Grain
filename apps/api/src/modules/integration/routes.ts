@@ -30,6 +30,11 @@ import {
   notFound,
   unauthorized,
 } from "../../lib/errors.js";
+import {
+  networkModels,
+  receiveTrainingExamples,
+  TrainingExamplesData,
+} from "../localmodel/network.js";
 import { authenticate, authOf, requireRole } from "../auth/guard.js";
 import { loadSample } from "../samples/service.js";
 import {
@@ -338,6 +343,11 @@ const IngestBody = z.discriminatedUnion("event", [
   }),
   z.object({
     id: z.string().max(64),
+    event: z.literal("training.examples"),
+    data: TrainingExamplesData,
+  }),
+  z.object({
+    id: z.string().max(64),
     event: z.literal("test"),
     data: z.unknown(),
   }),
@@ -390,12 +400,17 @@ export function machineRoutes(ctx: AppContext) {
      * station scope). Idempotent: a retried delivery changes nothing. Each
      * certificate's hash is checked against its contents before it is kept.
      */
-    app.post("/ingest", async (request) => {
+    // Checked kernels for the network model carry their crop images.
+    app.post("/ingest", { bodyLimit: 16 * 1024 * 1024 }, async (request) => {
       const key = await requestKey(ctx, request);
       if (key.scope !== "station")
         throw forbidden("This key can't send results: create a station key");
       const body = IngestBody.parse(request.body);
       if (body.event === "test") return { ok: true };
+      if (body.event === "training.examples") {
+        const kept = await receiveTrainingExamples(ctx, key, body.data);
+        return { ok: true, kept };
+      }
       if (body.event === "certificate.withdrawn") {
         if (body.data.codes.length)
           await ctx.db
@@ -448,6 +463,36 @@ export function machineRoutes(ctx: AppContext) {
         })
         .onConflictDoNothing();
       return { ok: true };
+    });
+
+    /** The network's models (trained here on every station's kernels), for stations to download. */
+    app.get("/local-models", async (request) => {
+      const key = await requestKey(ctx, request);
+      if (key.scope !== "station")
+        throw forbidden("Models are for stations: use a station key");
+      const models = await networkModels(ctx, key.orgId);
+      return {
+        items: models.map((m) => ({
+          crop: m.crop,
+          version: m.version,
+          input: m.weights.input ?? "features",
+          createdAt: m.createdAt,
+        })),
+      };
+    });
+
+    app.get("/local-models/:crop", async (request) => {
+      const key = await requestKey(ctx, request);
+      if (key.scope !== "station")
+        throw forbidden("Models are for stations: use a station key");
+      const { crop } = z
+        .object({ crop: z.string().min(1).max(60) })
+        .parse(request.params);
+      const model = (await networkModels(ctx, key.orgId)).find(
+        (m) => m.crop === crop,
+      );
+      if (!model) throw notFound("Model");
+      return model;
     });
 
     /** One result, by sample number or id. */

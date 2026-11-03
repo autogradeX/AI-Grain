@@ -89,6 +89,8 @@ export interface LocalModelSettings {
   mode?: "offline" | "always" | "off";
   /** Training in progress, by crop: when it started (cleared when done). */
   training?: Record<string, string>;
+  /** When this station last asked its central server for newer network models. */
+  networkCheckedAt?: string;
   /** Why the last training of a crop failed (cleared when a training starts). */
   trainingError?: Record<string, { at: string; message: string }>;
 }
@@ -749,6 +751,12 @@ export const remoteCertificates = pgTable(
 
 /** A trained local model's numbers (see modules/localmodel/model.ts). */
 export interface LocalModelWeights {
+  /**
+   * What the model reads: "features" (kernel measurements, the default for
+   * older models) or the image model's name ("mobilenet-v2") followed by
+   * seven size and colour values relative to the photo.
+   */
+  input?: string;
   classes: string[];
   featureMean: number[];
   featureStd: number[];
@@ -772,6 +780,11 @@ export interface LocalModelMetrics {
   validatedOn: number;
   /** Classes with too few examples, left out of the model. */
   leftOut: Record<string, number>;
+  /** Real kernels it trained on (trainedOn counts the altered copies too). */
+  realKernels?: number;
+  /** Of those, kernels sent by stations, and from how many stations. */
+  fromStations?: number;
+  stations?: number;
 }
 
 /**
@@ -790,10 +803,50 @@ export const localModels = pgTable(
     weights: jsonb("weights").$type<LocalModelWeights>().notNull(),
     metrics: jsonb("metrics").$type<LocalModelMetrics>().notNull(),
     active: boolean("active").notNull().default(true),
+    /**
+     * "own": trained here on this organisation's kernels. "network": trained
+     * by the central server on all its stations' kernels, and downloaded.
+     */
+    origin: text("origin").$type<"own" | "network">().notNull().default("own"),
     createdBy: uuid("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
     createdAt: createdAt(),
   },
   (t) => [index("local_models_org_crop_idx").on(t.orgId, t.crop, t.version)],
+);
+
+/**
+ * Checked kernels a station sent to its central server (the network): the
+ * crop image and its class, for training the network's model. Kept per
+ * station key and kernel, so a resent or re-reviewed kernel replaces itself.
+ */
+export const networkExamples = pgTable(
+  "network_examples",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    keyId: uuid("key_id")
+      .notNull()
+      .references(() => apiKeys.id, { onDelete: "cascade" }),
+    station: text("station").notNull(),
+    /** The kernel's id at the station. */
+    ref: text("ref").notNull(),
+    crop: text("crop").notNull(),
+    label: text("label").notNull(),
+    /** 1: checked by a person; less: settled by Model Orchestration. */
+    weight: doublePrecision("weight").notNull(),
+    /** The station's photo, so whole photos are held back for checking. */
+    batchRef: text("batch_ref").notNull(),
+    /** Size and colour relative to its photo (see imaging/features.ts). */
+    rel: jsonb("rel").$type<number[]>().notNull(),
+    imageKey: text("image_key").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("network_examples_ref_idx").on(t.orgId, t.keyId, t.ref),
+    index("network_examples_crop_idx").on(t.orgId, t.crop),
+  ],
 );

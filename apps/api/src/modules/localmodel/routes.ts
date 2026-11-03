@@ -7,12 +7,14 @@ import { audit } from "../../lib/audit.js";
 import { badRequest, conflict } from "../../lib/errors.js";
 import { authenticate, authOf, requireRole } from "../auth/guard.js";
 import { normalizeCropKey } from "../crops/service.js";
+import { pullNetworkModels } from "./network.js";
 import {
   dataset,
   localModelStatus,
   MIN_PER_CLASS,
   MIN_TOTAL,
   NotEnoughDataError,
+  totalOf,
   trainLocalModel,
 } from "./service.js";
 
@@ -93,12 +95,9 @@ export function localModelRoutes(ctx: AppContext) {
         throw conflict("A model for this crop is already being trained");
       // Refuse straight away when there isn't enough to learn from.
       const { counts } = await dataset(ctx, me.orgId, crop);
-      const total = Object.values(counts).reduce(
-        (n, c) => n + c.reviewed + c.settled,
-        0,
-      );
+      const total = Object.values(counts).reduce((n, c) => n + totalOf(c), 0);
       const classes = Object.values(counts).filter(
-        (c) => c.reviewed + c.settled >= MIN_PER_CLASS,
+        (c) => totalOf(c) >= MIN_PER_CLASS,
       ).length;
       if (total < MIN_TOTAL || classes < 2)
         throw badRequest(
@@ -131,6 +130,16 @@ export function localModelRoutes(ctx: AppContext) {
       });
       reply.code(202);
       return { training: true };
+    });
+
+    /** Asks the central server for newer network models now. */
+    app.post("/local-model/network/check", admin, async (request) => {
+      const me = authOf(request);
+      const pulled = await pullNetworkModels(ctx, {
+        orgId: me.orgId,
+        force: true,
+      });
+      return { pulled };
     });
 
     app.put("/local-model/settings", admin, async (request) => {

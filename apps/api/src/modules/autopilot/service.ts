@@ -33,6 +33,7 @@ import {
 } from "../batches/service.js";
 import { issueCertificate } from "../certificates/service.js";
 import { notifyCompleted } from "../integration/service.js";
+import { queueTrainingExamples } from "../localmodel/network.js";
 import { prepareReport } from "../reports/service.js";
 import { ensureCrop } from "../crops/service.js";
 import {
@@ -378,7 +379,11 @@ export async function completeSample(
     },
   });
   // Connected systems (APMC, eNAM bridge, ERP) get the result pushed.
-  ctx.jobs.run(`notify ${sample.id}`, () => notifyCompleted(ctx, sample.id));
+  ctx.jobs.run(`notify ${sample.id}`, async () => {
+    await notifyCompleted(ctx, sample.id);
+    // Its checked kernels teach the network's model on the central server.
+    await queueTrainingExamples(ctx, sample.id);
+  });
   return { row: row!, certificate };
 }
 

@@ -25,11 +25,20 @@ certificate to the central AI-Grain server.
 
 ## The local model
 
-Each organisation can train a small model for each crop from its own reviewed
-samples (**Quality → Local model**). It runs on the station itself, with no
-internet, and classifies kernel crops from measurements made by classic image
-processing (shape, colour, texture, size relative to the photo). Counting and
-corner finding don't change.
+A model for each crop that runs on the station itself, with no internet, and
+classifies kernel crops (**Quality → Local model**). Counting and corner
+finding don't change.
+
+- **What it reads:** each crop is described by a pretrained image model
+  (MobileNetV2 from the ONNX model zoo, Apache-2.0, about 5 ms per kernel on
+  the CPU), plus its size and colour relative to the photo. A small network
+  learns the crop's classes on top. The image model ships in the Docker
+  image (`npm run fetch-model` downloads it at build time and checks its
+  checksum); without it, the model falls back to kernel measurements.
+- **Altered copies:** classes with few real kernels are filled up to about
+  1000 training examples with turned, mirrored and relit copies of their real
+  crops. The quality check below uses real, unaltered crops from photos held
+  back from training, never copies.
 
 - **What it learns from:** kernels a person reviewed (full weight) and
   kernels Model Orchestration settled confidently (half weight). Unclear
@@ -49,7 +58,27 @@ corner finding don't change.
   classified photos skip the second opinion and expert pass; reports say
   **Classified offline**.
 - **Retraining:** train again after more samples are reviewed; each training
-  makes a new version and the previous one is kept for comparison.
+  makes a new version and the previous one is kept for comparison. Training
+  runs on a worker thread, so the station keeps answering meanwhile.
+
+### One model for the whole network
+
+When a station is connected to a central server (below), every completed
+sample also sends its checked kernels there: the crop image, its class,
+and its size and colour relative to the photo. Unchecked sound kernels are
+sampled (at most 40 per photo). They go through the outbox like results, so
+nothing is lost offline, and a resent kernel replaces itself.
+
+1. On the central server, **Local model → Train a new version** trains on its
+   own kernels plus everything its stations sent ("From stations" column).
+2. Each station asks the central server for newer models every half hour
+   (or at once with **Check for a newer one**) and keeps the latest one.
+3. A station classifies with the network's model while it clears the quality
+   bar, and with its own model otherwise. Verdicts in a class the station
+   doesn't use become "unclear" and go to a person.
+
+Stations download models with their station key (`GET /api/v1/local-models`,
+`GET /api/v1/local-models/{crop}`); read keys can't.
 
 ## Hardware
 

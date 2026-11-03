@@ -1,6 +1,49 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  networkTitle: { en: "Network model", hi: "नेटवर्क मॉडल" },
+  networkCurrent: {
+    en: "Network model: version {version}",
+    hi: "नेटवर्क मॉडल: संस्करण {version}",
+  },
+  networkHint: {
+    en: "One model for the whole network: the central server trains it on the checked kernels of every station, and this station downloads it to use offline. It is used instead of this station's own model while it clears the quality bar.",
+    hi: "पूरे नेटवर्क के लिए एक मॉडल: केंद्रीय सर्वर इसे हर स्टेशन के जाँचे दानों पर प्रशिक्षित करता है, और यह स्टेशन इसे ऑफ़लाइन उपयोग के लिए डाउनलोड करता है। जब तक यह गुणवत्ता की शर्त पूरी करता है, इस स्टेशन के अपने मॉडल की जगह इसका उपयोग होता है।",
+  },
+  networkNone: {
+    en: "No network model for this crop yet. Completed samples send their checked kernels to the central server; once it has trained a model, it is downloaded here by itself.",
+    hi: "इस फ़सल के लिए अभी कोई नेटवर्क मॉडल नहीं। पूरे हुए नमूने अपने जाँचे दाने केंद्रीय सर्वर को भेजते हैं; जब वह मॉडल प्रशिक्षित कर लेगा, तो वह यहाँ अपने-आप डाउनलोड हो जाएगा।",
+  },
+  networkCheck: { en: "Check for a newer one", hi: "नया संस्करण देखें" },
+  networkPulled: {
+    en: "Downloaded a newer network model.",
+    hi: "नया नेटवर्क मॉडल डाउनलोड हुआ।",
+  },
+  networkUpToDate: {
+    en: "This station has the latest network model.",
+    hi: "इस स्टेशन पर नवीनतम नेटवर्क मॉडल है।",
+  },
+  otherUsed: {
+    en: "Clears the bar, but the other model is used here.",
+    hi: "शर्त पूरी करता है, पर यहाँ दूसरे मॉडल का उपयोग होता है।",
+  },
+  fromStations: { en: "From stations", hi: "स्टेशनों से" },
+  fromStationsNote: {
+    en: "({count} of them from {stations} stations)",
+    hi: "(इनमें से {count} दाने {stations} स्टेशनों से)",
+  },
+  withCopies: {
+    en: "({count} with turned and mirrored copies)",
+    hi: "({count} घुमाई और उलटी प्रतियों सहित)",
+  },
+  readsImage: {
+    en: "reads the crop image",
+    hi: "दाने की छवि पढ़ता है",
+  },
+  readsFeatures: {
+    en: "reads kernel measurements",
+    hi: "दाने के माप पढ़ता है",
+  },
   lastError: {
     en: "The last training didn't finish: {message}",
     hi: "पिछला प्रशिक्षण पूरा नहीं हुआ: {message}",
@@ -26,8 +69,8 @@ export const m = defineMessages({
   },
   dataTitle: { en: "What it learns from", hi: "यह किससे सीखता है" },
   dataHint: {
-    en: "Each class needs at least {perClass} kernels to be learned, and the model at least {total} in all. Kernels checked by a person count fully; those Model Orchestration settled count half.",
-    hi: "हर वर्ग को सीखने के लिए कम से कम {perClass} दाने चाहिए, और मॉडल को कुल कम से कम {total}। व्यक्ति द्वारा जाँचे दाने पूरे गिने जाते हैं; मॉडल ऑर्केस्ट्रेशन द्वारा तय आधे।",
+    en: "Each class needs at least {perClass} kernels to be learned, and the model at least {total} in all. Kernels checked by a person count fully; those Model Orchestration settled count half. With the image model, classes with few kernels are filled up to about 1000 training examples with turned, mirrored and relit copies; the scores below come from real photos only.",
+    hi: "हर वर्ग को सीखने के लिए कम से कम {perClass} दाने चाहिए, और मॉडल को कुल कम से कम {total}। व्यक्ति द्वारा जाँचे दाने पूरे गिने जाते हैं; मॉडल ऑर्केस्ट्रेशन द्वारा तय आधे। छवि मॉडल के साथ, कम दानों वाले वर्ग घुमाई, उलटी और अलग रोशनी वाली प्रतियों से लगभग 1000 प्रशिक्षण उदाहरणों तक भरे जाते हैं; नीचे के अंक केवल असली फ़ोटो से आते हैं।",
   },
   class: { en: "Class", hi: "वर्ग" },
   reviewed: { en: "Checked by a person", hi: "व्यक्ति द्वारा जाँचे" },

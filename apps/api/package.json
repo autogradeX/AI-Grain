@@ -10,7 +10,8 @@
     "start": "node dist/src/server.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=../../.env src/db/migrate-cli.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "fetch-model": "node scripts/fetch-model.mjs"
   },
   "dependencies": {
     "@ai-grain/core": "*",
@@ -27,6 +28,8 @@
     "fflate": "^0.8.3",
     "jose": "^6.2.14",
     "nodemailer": "^10.3.0",
+    "onnx-proto": "^8.0.1",
+    "onnxruntime-node": "^1.31.1",
     "pdfkit": "^0.20.2",
     "pg": "^8.23.1",
     "pg-connection-string": "^2.14.1",

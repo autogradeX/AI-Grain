@@ -9,3 +9,6 @@ coverage/
 .DS_Store
 *.tsbuildinfo
 data/
+
+# Downloaded at build time (npm run fetch-model)
+apps/api/models/*.onnx

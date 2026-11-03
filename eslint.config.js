@@ -11,6 +11,8 @@ export default tseslint.config(
       "**/coverage",
       "**/node_modules",
       "apps/api/drizzle",
+      // Plain Node build script (downloads the image model), outside the typed projects.
+      "apps/api/scripts",
       "data",
     ],
   },

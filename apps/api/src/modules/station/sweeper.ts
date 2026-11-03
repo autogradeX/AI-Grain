@@ -3,6 +3,7 @@ import type { AppContext } from "../../context.js";
 import { batches } from "../../db/schema.js";
 import { classifyAndTriage } from "../autopilot/service.js";
 import { deliverDue } from "../integration/outbox.js";
+import { pullNetworkModels } from "../localmodel/network.js";
 
 /**
  * Photos waiting for Model Orchestration (no internet) whose retry time has
@@ -45,7 +46,8 @@ export async function resumeWaiting(ctx: AppContext, limit = 10) {
 export async function sweep(ctx: AppContext) {
   const resumed = await resumeWaiting(ctx);
   const delivered = await deliverDue(ctx);
-  return { resumed, delivered };
+  const models = await pullNetworkModels(ctx);
+  return { resumed, delivered, models };
 }
 
 /**

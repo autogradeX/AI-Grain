@@ -169,7 +169,12 @@ export function newApiKey() {
 export async function orgForKey(
   ctx: AppContext,
   key: string,
-): Promise<{ orgId: string; scope: "read" | "station"; name: string } | null> {
+): Promise<{
+  id: string;
+  orgId: string;
+  scope: "read" | "station";
+  name: string;
+} | null> {
   if (!key.startsWith(KEY_PREFIX)) return null;
   const [row] = await ctx.db
     .select({
@@ -185,7 +190,7 @@ export async function orgForKey(
     .update(apiKeys)
     .set({ lastUsedAt: new Date() })
     .where(eq(apiKeys.id, row.id));
-  return { orgId: row.orgId, scope: row.scope, name: row.name };
+  return { id: row.id, orgId: row.orgId, scope: row.scope, name: row.name };
 }
 
 // --- Webhooks -------------------------------------------------------------

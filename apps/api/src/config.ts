@@ -44,6 +44,11 @@ const EnvSchema = z.object({
   /** Folder inside the bucket, e.g. "production". */
   STORAGE_PREFIX: z.string().default(""),
   DATA_DIR: z.string().default("./data"),
+  /**
+   * The pretrained image model for the local model (MobileNetV2, ONNX).
+   * Defaults to apps/api/models/mobilenetv2-12.onnx (npm run fetch-model).
+   */
+  IMAGE_MODEL_PATH: z.string().optional(),
   /** At least 32 characters. Signs access tokens. */
   JWT_SECRET: z.string().min(32),
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),

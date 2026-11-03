@@ -238,13 +238,14 @@ describe("a station sending results to its central server", () => {
       "GET",
       "/api/integration",
     );
-    expect(status.body.outbox.waiting).toBe(1);
+    // The result, and its checked kernels for the network's model.
+    expect(status.body.outbox.waiting).toBe(2);
 
     // Connection back: the next sweep delivers it.
     station.webhooks.offline = false;
     const { outbox } = await import("../src/db/schema.js");
     await station.ctx.db.update(outbox).set({ nextAttemptAt: new Date(0) });
-    expect((await sweep(station.ctx)).delivered).toBe(1);
+    expect((await sweep(station.ctx)).delivered).toBe(2);
     const ok = (await verify()).json<{
       status: string;
       intact: boolean;
