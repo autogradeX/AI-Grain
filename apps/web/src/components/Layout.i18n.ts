@@ -17,6 +17,7 @@ export const m = defineMessages({
   users: { en: "Users and invites", hi: "उपयोगकर्ता और आमंत्रण" },
   website: { en: "Website", hi: "वेबसाइट" },
   integrations: { en: "Integrations", hi: "एकीकरण" },
+  localModel: { en: "Local model", hi: "स्थानीय मॉडल" },
   settings: { en: "Settings", hi: "सेटिंग्स" },
   publicSite: { en: "Public site", hi: "सार्वजनिक साइट" },
   signOut: { en: "Sign out", hi: "साइन आउट" },

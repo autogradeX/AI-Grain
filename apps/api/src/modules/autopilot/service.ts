@@ -184,6 +184,7 @@ export async function triageBatch(
       aiConfidence2: kernels.aiConfidence2,
       expertClass: kernels.expertClass,
       expertConfidence: kernels.expertConfidence,
+      aiSource: kernels.aiSource,
       flagReason: kernels.flagReason,
       reviewStatus: kernels.reviewStatus,
     })
@@ -245,7 +246,14 @@ export async function classifyAndTriage(
   const classified = await classifyBatch(ctx, batchId, false);
   const c = await batchContext(ctx, batchId);
   if (!c) return;
-  if (classified && c.policy.enabled) {
+  // Kernels the local model classified (offline) get no further looks:
+  // those need Model Orchestration. Triage decides on its verdicts alone.
+  const [local] = await ctx.db
+    .select({ id: kernels.id })
+    .from(kernels)
+    .where(and(eq(kernels.batchId, batchId), eq(kernels.aiSource, "local")))
+    .limit(1);
+  if (classified && c.policy.enabled && !local) {
     // Without internet the later looks wait too (rather than sending their
     // kernels to a person); kernels already looked at keep their verdicts.
     const second = await secondOpinion(ctx, batchId);

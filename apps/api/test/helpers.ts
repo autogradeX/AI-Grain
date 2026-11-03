@@ -352,3 +352,52 @@ export async function kernelsOnPaper(
     ${coinPx ? `<circle cx="450" cy="950" r="${coinPx / 2}" fill="#b08d57"/>` : ""}</svg>`;
   return sharp(Buffer.from(svg)).jpeg({ quality: 90 }).toBuffer();
 }
+
+/** How each kind of kernel looks on `kindsBoard`. */
+const KIND_LOOK: Record<string, { rx: number; ry: number; fill: string }> = {
+  sound: { rx: 0.35, ry: 0.18, fill: "#d8b46a" },
+  broken: { rx: 0.17, ry: 0.14, fill: "#d8b46a" },
+  heat_damaged: { rx: 0.35, ry: 0.18, fill: "#5c3a1e" },
+};
+
+/**
+ * A board whose kernels look like their kind (sound, broken, heat-damaged),
+ * one per kind in `kinds`, numbered in reading order like detection does.
+ * A little variation in size and colour per kernel keeps it realistic.
+ */
+export async function kindsBoard(kinds: string[], seed = 1) {
+  const pxPerCm = 60;
+  const margin = 150;
+  const bw = 20 * pxPerCm;
+  const bh = 28 * pxPerCm;
+  let s = seed;
+  const rand = () => {
+    s = (s * 1103515245 + 12345) % 2147483648;
+    return s / 2147483648;
+  };
+  const lines: string[] = [];
+  for (let c = 0; c <= 20; c++) {
+    const x = margin + c * pxPerCm;
+    lines.push(
+      `<line x1="${x}" y1="${margin}" x2="${x}" y2="${margin + bh}" stroke="#555" stroke-width="1"/>`,
+    );
+  }
+  for (let r = 0; r <= 28; r++) {
+    const y = margin + r * pxPerCm;
+    lines.push(
+      `<line x1="${margin}" y1="${y}" x2="${margin + bw}" y2="${y}" stroke="#555" stroke-width="1"/>`,
+    );
+  }
+  const shapes = kinds.map((kind, i) => {
+    const look = KIND_LOOK[kind]!;
+    const cx = margin + (1.2 + (i % 9) * 2.1) * pxPerCm;
+    const cy = margin + (1.2 + Math.floor(i / 9) * 2.0) * pxPerCm;
+    const k = 0.9 + rand() * 0.2;
+    return `<ellipse cx="${cx}" cy="${cy}" rx="${look.rx * pxPerCm * k}" ry="${look.ry * pxPerCm * k}" fill="${look.fill}" opacity="${0.92 + rand() * 0.08}" transform="rotate(${Math.round(rand() * 40 - 20)} ${cx} ${cy})"/>`;
+  });
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${bw + margin * 2}" height="${bh + margin * 2}">
+    <rect width="100%" height="100%" fill="#bdb6a8"/>
+    <rect x="${margin}" y="${margin}" width="${bw}" height="${bh}" fill="#1b1b1d"/>
+    ${lines.join("")}${shapes.join("")}</svg>`;
+  return sharp(Buffer.from(svg)).jpeg({ quality: 90 }).toBuffer();
+}

@@ -70,6 +70,10 @@ const IntegrationsPage = page(
   () => import("./pages/IntegrationsPage"),
   "IntegrationsPage",
 );
+const LocalModelPage = page(
+  () => import("./pages/LocalModelPage"),
+  "LocalModelPage",
+);
 const OfflineSamplePage = page(
   () => import("./pages/OfflineSamplePage"),
   "OfflineSamplePage",
@@ -140,6 +144,7 @@ export function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="website" element={<WebsitePage />} />
             <Route path="integrations" element={<IntegrationsPage />} />
+            <Route path="local-model" element={<LocalModelPage />} />
             <Route path="offline/:ref" element={<OfflineSamplePage />} />
             {/* The phone "More" page became the drawer. */}
             <Route path="more" element={<Navigate to="/app" replace />} />

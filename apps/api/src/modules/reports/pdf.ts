@@ -30,6 +30,7 @@ export interface ReportData {
     total: number;
     flagged: number;
     reviewed: number;
+    classifiedLocally?: number;
     byClass: Record<string, number>;
   };
   boards: { side: string; image: Buffer }[];
@@ -219,6 +220,12 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     `${data.kernels.total} (${data.kernels.flagged} flagged, ${data.kernels.reviewed} checked by the operator)`,
   );
   line("Model Orchestration", modelTier(data.model));
+  if (data.kernels.classifiedLocally) {
+    line(
+      "Classified offline",
+      `${data.kernels.classifiedLocally} kernels by the organisation's local model (no internet)`,
+    );
+  }
   const dims = data.dimensions;
   if (dims && show(layout.showDimensions)) {
     line(

@@ -145,6 +145,8 @@ export interface KernelSummary {
   flagged: number;
   pendingReview: number;
   reviewed: number;
+  /** Kernels classified offline by the organisation's local model. */
+  classifiedLocally?: number;
 }
 
 export interface Sample {

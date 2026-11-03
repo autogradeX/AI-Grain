@@ -14,6 +14,14 @@ export const m = defineMessages({
     hi: "{count} फ़ोटो गिनी जा चुकी हैं और वर्गीकरण के लिए इंटरनेट का इंतज़ार कर रही हैं: कनेक्शन लौटते ही अपने आप आगे बढ़ेंगी।",
   },
   tryNow: { en: "Try now", hi: "अभी कोशिश करें" },
+  classifiedLocally_one: {
+    en: "{count} kernel was classified offline by your local model; only its confident verdicts stand, a person checks the rest.",
+    hi: "{count} दाना आपके स्थानीय मॉडल ने ऑफ़लाइन वर्गीकृत किया; केवल उसके पक्के फ़ैसले माने गए, बाकी व्यक्ति जाँचता है।",
+  },
+  classifiedLocally_other: {
+    en: "{count} kernels were classified offline by your local model; only its confident verdicts stand, a person checks the rest.",
+    hi: "{count} दाने आपके स्थानीय मॉडल ने ऑफ़लाइन वर्गीकृत किए; केवल उसके पक्के फ़ैसले माने गए, बाकी व्यक्ति जाँचता है।",
+  },
   done: { en: "Done", hi: "पूरा" },
   waitingPhotos: { en: "Waiting for photos", hi: "फ़ोटो का इंतज़ार" },
   stepPhotos: { en: "Photos", hi: "फ़ोटो" },

@@ -16,12 +16,40 @@ certificate to the central AI-Grain server.
 
 ## What works without internet
 
-| Works offline                                                   | Waits for internet                                                                                                                                                          |
-| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Photos, finding the board, counting, splitting touching kernels | Classification by Model Orchestration: photos show **Waiting for internet** and carry on by themselves when it is back (the assayer can classify kernels by hand meanwhile) |
-| Kernel size, the photo estimate, weighing, grading              | The plain-language summary                                                                                                                                                  |
-| Review, PDF reports, 80 mm slips, printing, the scale           | Sending results to the central server and the webhook (kept in the outbox until delivered)                                                                                  |
-| Certificates (verifiable on the central site once sent)         | Email (only if set up)                                                                                                                                                      |
+| Works offline                                                   | Waits for internet                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Photos, finding the board, counting, splitting touching kernels | Classification by Model Orchestration: photos are classified by the **local model** when it has passed its checks (see below), otherwise they show **Waiting for internet** and carry on by themselves when it is back (the assayer can classify kernels by hand meanwhile) |
+| Kernel size, the photo estimate, weighing, grading              | The plain-language summary                                                                                                                                                                                                                                                  |
+| Review, PDF reports, 80 mm slips, printing, the scale           | Sending results to the central server and the webhook (kept in the outbox until delivered)                                                                                                                                                                                  |
+| Certificates (verifiable on the central site once sent)         | Email (only if set up)                                                                                                                                                                                                                                                      |
+
+## The local model
+
+Each organisation can train a small model for each crop from its own reviewed
+samples (**Quality → Local model**). It runs on the station itself, with no
+internet, and classifies kernel crops from measurements made by classic image
+processing (shape, colour, texture, size relative to the photo). Counting and
+corner finding don't change.
+
+- **What it learns from:** kernels a person reviewed (full weight) and
+  kernels Model Orchestration settled confidently (half weight). Unclear
+  kernels and clusters are left out. Each class needs at least 12 examples
+  and the crop at least 100; classes with fewer are left out of the model.
+- **Checked before use:** about a fifth of the photos are held back from
+  training. The model is used only if, on those, it catches at least 80% of
+  defects, its confident verdicts are at least 95% right, and at least 20
+  kernels were checked. The page shows these numbers, per-class precision and
+  recall, and what is missing when it isn't used yet.
+- **Modes:** _Only when offline_ (default: used when Model Orchestration
+  can't be reached), _Always_ (never calls Model Orchestration for that
+  crop), _Off_ (photos wait for internet).
+- **Who reviews what:** only high-confidence verdicts on non-harmful
+  kernels stand. Harmful classes, medium- and low-confidence verdicts,
+  clusters, unclear kernels and spot checks go to a person. Locally
+  classified photos skip the second opinion and expert pass; reports say
+  **Classified offline**.
+- **Retraining:** train again after more samples are reviewed; each training
+  makes a new version and the previous one is kept for comparison.
 
 ## Hardware
 
@@ -112,9 +140,10 @@ and unpack `files.tar.gz` into the `files` volume.
 
 ## When something looks wrong
 
-| You see                                         | Do                                                                                                                              |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Photos stay **Waiting for internet**            | Check the router's internet line. They carry on by themselves; **Try now** on the sample retries at once.                       |
-| **Sending results** keeps growing               | Same; then check the central address and key with **Send a test**. An HTTP 401 means the key was revoked on the central server. |
-| Phones can't open the station                   | The phone is on another Wi-Fi, or the station's address changed (reserve it on the router).                                     |
-| The station doesn't come back after a power cut | `sudo systemctl enable docker`, then `sudo docker compose up -d`.                                                               |
+| You see                                         | Do                                                                                                                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Local model** says **Not used yet**           | It needs more reviewed samples of that crop, or it doesn't separate the classes well enough yet. Review more samples and train again. |
+| Photos stay **Waiting for internet**            | Check the router's internet line. They carry on by themselves; **Try now** on the sample retries at once.                             |
+| **Sending results** keeps growing               | Same; then check the central address and key with **Send a test**. An HTTP 401 means the key was revoked on the central server.       |
+| Phones can't open the station                   | The phone is on another Wi-Fi, or the station's address changed (reserve it on the router).                                           |
+| The station doesn't come back after a power cut | `sudo systemctl enable docker`, then `sudo docker compose up -d`.                                                                     |

@@ -27,6 +27,7 @@ import {
   integrationRoutes,
   machineRoutes,
 } from "./modules/integration/routes.js";
+import { localModelRoutes } from "./modules/localmodel/routes.js";
 import { stationRoutes } from "./modules/station/routes.js";
 import { validationRoutes } from "./modules/validation/routes.js";
 
@@ -129,6 +130,7 @@ export async function buildApp(
       await api.register(siteAdminRoutes(ctx));
       await api.register(integrationRoutes(ctx));
       await api.register(stationRoutes(ctx));
+      await api.register(localModelRoutes(ctx));
       await api.register(machineRoutes(ctx), { prefix: "/v1" });
     },
     { prefix: "/api" },

@@ -32,6 +32,8 @@ export interface TriageKernel {
   aiConfidence2: Confidence | null;
   expertClass?: string | null;
   expertConfidence?: Confidence | null;
+  /** "local": the verdict came from the organisation's local model (offline). */
+  aiSource?: "orchestration" | "local" | null;
   /** 0–1, stable per kernel: decides spot checks. */
   draw: number;
 }
@@ -113,6 +115,17 @@ export function flagFor(
     if (k.aiClass === UNCLEAR) return "unclear";
     if (k.aiConfidence === "low") return "low_confidence";
     return k.aiClass === SOUND ? null : "defect";
+  }
+  // The local model (offline): no second look or expert pass to settle
+  // doubts, so only its confident verdicts stand; harmful ones never do.
+  if (k.aiSource === "local") {
+    if (k.isCluster) return "cluster";
+    if (k.aiClass === UNCLEAR) return "unclear";
+    if (isHarmful(classes, k.aiClass)) return "harmful";
+    if (k.aiConfidence === "low") return "low_confidence";
+    if (k.aiConfidence === "medium")
+      return k.aiClass === SOUND ? "medium_confidence" : "defect";
+    return k.draw * 100 < policy.spotCheckPct ? "spot_check" : null;
   }
   const reason = firstLooks(k, classes);
   if (reason === "harmful") return reason;

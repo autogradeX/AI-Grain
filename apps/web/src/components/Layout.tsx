@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Globe,
   Plug,
+  BrainCircuit,
   Images,
   LogOut,
   Menu,
@@ -78,6 +79,11 @@ const SECTIONS: { key: Key; items: Item[] }[] = [
     key: "quality",
     items: [
       { to: "/app/validation", key: "validation", icon: BadgeCheck },
+      {
+        to: "/app/local-model",
+        key: "localModel",
+        icon: BrainCircuit,
+      },
       { to: "/app/dataset", key: "dataset", icon: Database, show: "admin" },
       { to: "/app/prompt", key: "prompt", icon: MessageSquareText },
     ],
@@ -108,6 +114,7 @@ const ROUTES: [RegExp, Key, string?][] = [
   [/^\/app\/standards/, "standards"],
   [/^\/app\/references/, "references"],
   [/^\/app\/validation/, "validation"],
+  [/^\/app\/local-model/, "localModel"],
   [/^\/app\/dataset/, "dataset"],
   [/^\/app\/prompt/, "prompt"],
   [/^\/app\/users/, "users"],

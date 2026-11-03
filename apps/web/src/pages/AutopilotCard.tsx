@@ -196,6 +196,11 @@ export function AutopilotCard({ sample }: { sample: Sample }) {
       )}
 
       {failed && !completed && <p className="warn small">{t("failedPhoto")}</p>}
+      {(k.classifiedLocally ?? 0) > 0 && (
+        <p className="muted small">
+          {t.n("classifiedLocally", k.classifiedLocally ?? 0)}
+        </p>
+      )}
       {waiting.length > 0 && !completed && (
         <div className="row wrap small">
           <span className="warn">{t.n("waitingInternet", waiting.length)}</span>

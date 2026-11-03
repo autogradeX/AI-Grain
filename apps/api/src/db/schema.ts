@@ -79,6 +79,18 @@ export interface MeasurementSettings {
   referenceMm?: number;
 }
 
+/** When the organisation's own local model classifies kernels. */
+export interface LocalModelSettings {
+  /**
+   * "offline": when Model Orchestration can't be reached (default).
+   * "always": the local model only, Model Orchestration is never asked.
+   * "off": never; photos wait for internet.
+   */
+  mode?: "offline" | "always" | "off";
+  /** Training in progress, by crop: when it started (cleared when done). */
+  training?: Record<string, string>;
+}
+
 /** Where completed results are pushed (APMC, eNAM bridge, ERP). */
 export interface IntegrationSettings {
   webhookUrl?: string;
@@ -103,6 +115,10 @@ export const organizations = pgTable("organizations", {
     .notNull()
     .default({}),
   report: jsonb("report").$type<ReportSettings>().notNull().default({}),
+  localModel: jsonb("local_model")
+    .$type<LocalModelSettings>()
+    .notNull()
+    .default({}),
   measurement: jsonb("measurement")
     .$type<MeasurementSettings>()
     .notNull()
@@ -479,6 +495,13 @@ export const kernels = pgTable(
     aiClass: text("ai_class"),
     aiConfidence: text("ai_confidence").$type<"high" | "medium" | "low">(),
     aiReason: text("ai_reason"),
+    /** Who gave aiClass: Model Orchestration (online), or the local model (offline). */
+    aiSource: text("ai_source").$type<"orchestration" | "local">(),
+    /**
+     * Colour, texture and shape measurements of the kernel's crop, for the
+     * local model (see imaging/features.ts). Null for kernels detected before.
+     */
+    features: jsonb("features").$type<number[]>(),
     /** Second, independent verdict (Autopilot), on a sheet with different neighbours. */
     aiClass2: text("ai_class2"),
     aiConfidence2: text("ai_confidence2").$type<"high" | "medium" | "low">(),
@@ -523,7 +546,7 @@ export const analysisRuns = pgTable("analysis_runs", {
     onDelete: "cascade",
   }),
   kind: text("kind")
-    .$type<"classify" | "second_opinion" | "expert" | "summary">()
+    .$type<"classify" | "second_opinion" | "expert" | "summary" | "local">()
     .notNull(),
   model: text("model").notNull(),
   requests: integer("requests").notNull().default(0),
@@ -720,4 +743,55 @@ export const remoteCertificates = pgTable(
   (t) => [
     index("remote_certificates_sample_idx").on(t.orgId, t.stationSampleId),
   ],
+);
+
+/** A trained local model's numbers (see modules/localmodel/model.ts). */
+export interface LocalModelWeights {
+  classes: string[];
+  featureMean: number[];
+  featureStd: number[];
+  w1: number[][];
+  b1: number[];
+  w2: number[][];
+  b2: number[];
+}
+
+/** How a local model did on kernels held back from training. */
+export interface LocalModelMetrics {
+  accuracy: number;
+  /** Share of defective kernels it called defective (any defect class). */
+  defectRecall: number;
+  /** Accuracy on its confident (high) verdicts, and their share. */
+  highAccuracy: number;
+  highShare: number;
+  perClass: Record<string, { n: number; precision: number; recall: number }>;
+  confusion: { classes: string[]; counts: number[][] };
+  trainedOn: number;
+  validatedOn: number;
+  /** Classes with too few examples, left out of the model. */
+  leftOut: Record<string, number>;
+}
+
+/**
+ * The organisation's own model for a crop, trained on its reviewed kernels:
+ * classifies on the station's CPU when Model Orchestration can't be reached.
+ */
+export const localModels = pgTable(
+  "local_models",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    crop: text("crop").notNull(),
+    version: integer("version").notNull(),
+    weights: jsonb("weights").$type<LocalModelWeights>().notNull(),
+    metrics: jsonb("metrics").$type<LocalModelMetrics>().notNull(),
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("local_models_org_crop_idx").on(t.orgId, t.crop, t.version)],
 );

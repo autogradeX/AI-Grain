@@ -92,6 +92,13 @@
       "when": 1793635444057,
       "tag": "0012_station_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793694405833,
+      "tag": "0013_local_model",
+      "breakpoints": true
     }
   ]
 }

@@ -35,6 +35,7 @@ import {
 import { photoCorners, straightenBoard } from "../../imaging/board.js";
 import { findGridCorners } from "../../imaging/corners.js";
 import { detectKernels } from "../../imaging/detect.js";
+import { cropFeatures } from "../../imaging/features.js";
 import { boardContrast, measureKernel } from "../../imaging/measure.js";
 import {
   boardPreview,
@@ -44,6 +45,7 @@ import {
   KERNELS_PER_SHEET,
 } from "../../imaging/sheets.js";
 import { mapLimit } from "../../lib/jobs.js";
+import { classifyLocally, localModelSettings } from "../localmodel/service.js";
 import { classesWithDefinitions, ensureCrop } from "../crops/service.js";
 import { MAX_REFERENCES_PER_REQUEST } from "../references/routes.js";
 
@@ -188,6 +190,11 @@ export async function processBatch(
     );
     // Length and breadth at full resolution; touching kernels aren't measured.
     const gray = await boardContrast(board);
+    // Colour, texture and shape of each crop, for the local model.
+    const features = new Map<number, number[]>();
+    await mapLimit(detection.kernels, 8, async (k) => {
+      features.set(k.number, await cropFeatures(crops.get(k.number)!));
+    });
     const rows: (typeof kernels.$inferInsert)[] = [];
     for (const k of detection.kernels) {
       const cropKey = `${prefix}/kernels/${k.number}.jpg`;
@@ -210,6 +217,7 @@ export async function processBatch(
         lengthMm: size?.lengthMm ?? null,
         widthMm: size?.widthMm ?? null,
         cropKey,
+        features: features.get(k.number) ?? null,
       });
     }
     await ctx.db.transaction(async (tx) => {
@@ -506,11 +514,30 @@ export async function classifyBatch(
     .from(kernels)
     .where(and(eq(kernels.batchId, batchId), isNull(kernels.aiClass)))
     .orderBy(asc(kernels.number));
+  // The organisation's local model: always, or when Model Orchestration
+  // can't be reached (when it has a model for the crop).
+  const [owner] = await ctx.db
+    .select({ orgId: batches.orgId })
+    .from(batches)
+    .where(eq(batches.id, batchId));
+  const { mode } = await localModelSettings(ctx, owner!.orgId);
+  if (mode === "always" && (await classifyLocally(ctx, batchId))) {
+    if (done) await setBatch(ctx, batchId, { status: "classified" });
+    return true;
+  }
   const failure = await classifyKernels(ctx, batchId, todo, {
     kind: "classify",
     save: (verdicts) => saveVerdicts(ctx, batchId, verdicts),
   });
   if (failure?.unavailable) {
+    if (mode !== "off" && (await classifyLocally(ctx, batchId))) {
+      await setBatch(ctx, batchId, {
+        status: done ? "classified" : "classifying",
+        error:
+          "Classified offline by the local model (Model Orchestration couldn't be reached).",
+      });
+      return true;
+    }
     await waitForInternet(ctx, batchId);
     return false;
   }
@@ -542,6 +569,7 @@ async function saveVerdicts(
           aiClass: v.cls,
           aiConfidence: v.confidence,
           aiReason: v.reason.slice(0, 500),
+          aiSource: "orchestration",
         })
         .where(and(eq(kernels.batchId, batchId), eq(kernels.number, v.number)));
     }
@@ -569,6 +597,7 @@ export async function kernelSummary(
       flagged: sql<number>`count(*) filter (where ${needsReview})::int`,
       pendingReview: sql<number>`count(*) filter (where ${needsReview} and ${kernels.reviewStatus} = 'pending')::int`,
       reviewed: sql<number>`count(*) filter (where ${kernels.reviewStatus} <> 'pending')::int`,
+      classifiedLocally: sql<number>`count(*) filter (where ${kernels.aiSource} = 'local')::int`,
     })
     .from(kernels)
     .where(filter);

@@ -272,6 +272,7 @@ export function batchRoutes(ctx: AppContext) {
             expertClass: null,
             expertConfidence: null,
             expertReason: null,
+            aiSource: null,
           })
           .where(eq(kernels.batchId, id));
       }
