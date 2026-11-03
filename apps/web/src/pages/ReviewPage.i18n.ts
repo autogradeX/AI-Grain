@@ -1,6 +1,34 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  acceptAllTitle: {
+    en: "No time to check each kernel?",
+    hi: "हर दाना जाँचने का समय नहीं?",
+  },
+  acceptAllHint: {
+    en: "Accept Model Orchestration's verdict for every kernel still waiting, and the sample can finish. Kernels it couldn't judge are left out of the result. Harmful kernels and suspected fake grains are not included: they are listed first, check those one by one.",
+    hi: "बाकी सभी दानों के लिए मॉडल ऑर्केस्ट्रेशन का फ़ैसला स्वीकार करें, ताकि नमूना पूरा हो सके। जिन दानों को वह नहीं परख सका, वे परिणाम से बाहर रहेंगे। हानिकारक दाने और संदिग्ध नकली दाने इसमें शामिल नहीं हैं: वे सबसे पहले दिखाए गए हैं, उन्हें एक-एक करके जाँचें।",
+  },
+  acceptAll: {
+    en: "Accept all AI verdicts ({count})",
+    hi: "सभी AI फ़ैसले स्वीकार करें ({count})",
+  },
+  acceptAllConfirm: {
+    en: "Accept Model Orchestration's verdict for {count} kernels? You take responsibility for them as if you had checked each one.",
+    hi: "{count} दानों के लिए मॉडल ऑर्केस्ट्रेशन का फ़ैसला स्वीकार करें? आप इनकी ज़िम्मेदारी ऐसे लेते हैं जैसे आपने हर दाना जाँचा हो।",
+  },
+  acceptedAll: {
+    en: "Accepted {accepted} verdicts; {unclear} kernels the AI couldn't judge are left out of the result.",
+    hi: "{accepted} फ़ैसले स्वीकार किए; {unclear} दाने जिन्हें AI नहीं परख सका, परिणाम से बाहर रखे गए।",
+  },
+  harmfulLeft_one: {
+    en: "{count} harmful or suspected fake kernel still needs you.",
+    hi: "{count} हानिकारक या संदिग्ध नकली दाना अभी भी आपकी जाँच का इंतज़ार कर रहा है।",
+  },
+  harmfulLeft_other: {
+    en: "{count} harmful or suspected fake kernels still need you.",
+    hi: "{count} हानिकारक या संदिग्ध नकली दाने अभी भी आपकी जाँच का इंतज़ार कर रहे हैं।",
+  },
   backToSample: { en: "← Sample {number}", hi: "← नमूना {number}" },
   title: { en: "Check flagged kernels", hi: "चिह्नित दाने जाँचें" },
   intro: {

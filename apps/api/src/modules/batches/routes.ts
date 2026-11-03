@@ -1,4 +1,4 @@
-import { kernelClassIds } from "@ai-grain/core";
+import { kernelClassIds, UNCLEAR } from "@ai-grain/core";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -16,6 +16,7 @@ import {
   BOARD_WIDTH,
   normalizeUpload,
 } from "../../imaging/board.js";
+import { audit } from "../../lib/audit.js";
 import { badRequest, conflict, notFound } from "../../lib/errors.js";
 import {
   authenticate,
@@ -316,17 +317,24 @@ export function batchRoutes(ctx: AppContext) {
       const { sampleId } = z
         .object({ sampleId: z.uuid() })
         .parse(request.params);
-      const { scope } = z
+      const { scope, limit, offset } = z
         .object({
           scope: z.enum(["pending", "flagged", "all"]).default("pending"),
+          // With a limit, one page: { items, total }. Without, the whole list.
+          limit: z.coerce.number().int().min(1).max(200).optional(),
+          offset: z.coerce.number().int().min(0).default(0),
         })
         .parse(request.query);
-      await loadSample(ctx, me.orgId, sampleId);
+      const sample = await loadSample(ctx, me.orgId, sampleId);
+      const crop = await ensureCrop(ctx, me.orgId, sample.crop);
+      const harmful = crop.classes
+        .filter((c) => c.group === "harmful")
+        .map((c) => c.id);
       const conditions = [eq(kernels.sampleId, sampleId)];
       if (scope !== "all") conditions.push(needsReview);
       if (scope === "pending")
         conditions.push(eq(kernels.reviewStatus, "pending"));
-      return ctx.db
+      const query = ctx.db
         .select({
           id: kernels.id,
           batchId: kernels.batchId,
@@ -349,7 +357,115 @@ export function batchRoutes(ctx: AppContext) {
         .from(kernels)
         .innerJoin(batches, eq(batches.id, kernels.batchId))
         .where(and(...conditions))
-        .orderBy(asc(batches.createdAt), asc(kernels.number));
+        // Harmful kernels (fake grains among them) first: they always need a person.
+        .orderBy(
+          harmful.length
+            ? sql`case when ${aiVerdict} in (${sql.join(
+                harmful.map((h) => sql`${h}`),
+                sql`, `,
+              )}) then 0 else 1 end`
+            : sql`1`,
+          asc(batches.createdAt),
+          asc(kernels.number),
+        );
+      if (limit === undefined) return query;
+      const isHarmful = harmful.length
+        ? sql`${aiVerdict} in (${sql.join(
+            harmful.map((h) => sql`${h}`),
+            sql`, `,
+          )})`
+        : sql`false`;
+      const [items, [counted]] = await Promise.all([
+        query.limit(limit).offset(offset),
+        ctx.db
+          .select({
+            total: sql<number>`count(*)::int`,
+            harmful: sql<number>`count(*) filter (where ${isHarmful})::int`,
+          })
+          .from(kernels)
+          .where(and(...conditions)),
+      ]);
+      return {
+        items,
+        total: counted?.total ?? 0,
+        /** Of those, harmful by the AI's verdict: never accepted in bulk. */
+        harmful: counted?.harmful ?? 0,
+        limit,
+        offset,
+      };
+    });
+
+    /**
+     * Accepts the AI's verdict for every kernel still waiting for a person,
+     * in one go: the operator vouches for them all. Kernels the AI couldn't
+     * judge ("unclear", or no verdict) are left out of the result. Harmful
+     * kernels (fake grains among them) are not included: a person looks at
+     * each of those.
+     */
+    app.post("/samples/:sampleId/review/accept-ai", write, async (request) => {
+      const me = authOf(request);
+      const { sampleId } = z
+        .object({ sampleId: z.uuid() })
+        .parse(request.params);
+      const sample = await assertEditable(ctx, me.orgId, sampleId);
+      const crop = await ensureCrop(ctx, me.orgId, sample.crop);
+      const harmful = new Set(
+        crop.classes.filter((c) => c.group === "harmful").map((c) => c.id),
+      );
+      const pending = await ctx.db
+        .select({ id: kernels.id, aiClass: aiVerdict })
+        .from(kernels)
+        .where(
+          and(
+            eq(kernels.orgId, me.orgId),
+            eq(kernels.sampleId, sampleId),
+            needsReview,
+            eq(kernels.reviewStatus, "pending"),
+          ),
+        );
+      const known = new Set(kernelClassIds(crop.classes));
+      const accept = pending.filter((k) => !harmful.has(k.aiClass ?? ""));
+      // One update per resulting class, not one per kernel.
+      const byClass = new Map<string, { ids: string[]; same: boolean }>();
+      let unclear = 0;
+      for (const k of accept) {
+        const judged =
+          !!k.aiClass && k.aiClass !== UNCLEAR && known.has(k.aiClass);
+        if (!judged) unclear++;
+        const cls = judged ? k.aiClass! : UNCLEAR;
+        const key = `${cls}|${cls === k.aiClass}`;
+        const group = byClass.get(key) ?? { ids: [], same: cls === k.aiClass };
+        group.ids.push(k.id);
+        byClass.set(key, group);
+      }
+      const now = new Date();
+      await ctx.db.transaction(async (tx) => {
+        for (const [key, { ids, same }] of byClass) {
+          await tx
+            .update(kernels)
+            .set({
+              finalClass: key.split("|")[0]!,
+              reviewStatus: same ? "confirmed" : "corrected",
+              reviewedBy: me.id,
+              reviewedAt: now,
+            })
+            .where(and(eq(kernels.orgId, me.orgId), inArray(kernels.id, ids)));
+        }
+      });
+      await audit(ctx.db, {
+        orgId: me.orgId,
+        userId: me.id,
+        action: "kernels.accepted_ai",
+        detail: { sampleId, accepted: accept.length, unclear },
+      });
+      ctx.jobs.run(`finish ${sampleId}`, async () => {
+        await finishIfReady(ctx, sampleId);
+      });
+      return {
+        accepted: accept.length - unclear,
+        unclear,
+        harmfulLeft: pending.length - accept.length,
+      };
     });
 
     /**

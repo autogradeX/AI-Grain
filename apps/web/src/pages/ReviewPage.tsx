@@ -1,12 +1,18 @@
 import type { ClassDef } from "@ai-grain/core";
 import { CircleCheck } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { ReviewKernel } from "../api/types";
+import type { Page, ReviewKernel } from "../api/types";
 import { useCan } from "../auth/AuthContext";
 import { ClassPicker } from "../components/ClassPicker";
+import { Pager, usePage } from "../components/Pager";
 import {
   AuthImage,
   Badge,
@@ -22,37 +28,72 @@ import { FlagReasonBadge } from "../components/FlagReason";
 import { m } from "./ReviewPage.i18n";
 import { useSample } from "./SamplePage";
 
+/** Kernels per page of the review list. */
+const REVIEW_PAGE = 24;
+
 export function ReviewPage() {
   const { id = "" } = useParams();
   const qc = useQueryClient();
   const can = useCan();
   const sample = useSample(id);
   const [scope, setScope] = useState<"pending" | "flagged">("pending");
+  const [page, setPage] = usePage();
   const t = useT(m);
+  const key = ["review", id, scope, page];
   const list = useQuery({
-    queryKey: ["review", id, scope],
+    queryKey: key,
+    placeholderData: keepPreviousData,
     queryFn: () =>
-      api.get<ReviewKernel[]>(`/samples/${id}/review?scope=${scope}`),
+      api.get<Page<ReviewKernel> & { harmful: number }>(
+        `/samples/${id}/review?scope=${scope}&limit=${REVIEW_PAGE}&offset=${page * REVIEW_PAGE}`,
+      ),
   });
+  // Past the last page (kernels were checked): go to the last one there is.
+  const total = list.data?.total ?? 0;
+  const lastPage = Math.max(0, Math.ceil(total / REVIEW_PAGE) - 1);
+  useEffect(() => {
+    if (list.data && page > lastPage) setPage(lastPage);
+  }, [list.data, page, lastPage, setPage]);
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["review", id] });
+    void qc.invalidateQueries({ queryKey: ["sample", id] });
+  };
   const decide = useMutation({
     mutationFn: (d: { kernelId: string; finalClass: string }) =>
       api.post("/kernels/review", { decisions: [d] }),
     onMutate: (d) => {
       // Update the list at once so the operator can move straight to the next kernel.
-      qc.setQueryData<ReviewKernel[]>(["review", id, scope], (old) =>
-        scope === "pending"
-          ? old?.filter((k) => k.id !== d.kernelId)
-          : old?.map((k) =>
-              k.id === d.kernelId ? { ...k, finalClass: d.finalClass } : k,
-            ),
+      qc.setQueryData<Page<ReviewKernel>>(
+        key,
+        (old) =>
+          old && {
+            ...old,
+            items:
+              scope === "pending"
+                ? old.items.filter((k) => k.id !== d.kernelId)
+                : old.items.map((k) =>
+                    k.id === d.kernelId
+                      ? { ...k, finalClass: d.finalClass }
+                      : k,
+                  ),
+          },
       );
     },
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ["review", id] });
-      void qc.invalidateQueries({ queryKey: ["sample", id] });
-    },
+    onSettled: refresh,
+  });
+  const acceptAll = useMutation({
+    mutationFn: () =>
+      api.post<{ accepted: number; unclear: number; harmfulLeft: number }>(
+        `/samples/${id}/review/accept-ai`,
+        {},
+      ),
+    onSuccess: () => setPage(0),
+    onSettled: refresh,
   });
   const editable = can.write && sample.data?.status === "in_progress";
+  // What "accept all" covers: kernels waiting, less the harmful ones.
+  const acceptable =
+    scope === "pending" && list.data ? total - list.data.harmful : 0;
 
   return (
     <div className="stack">
@@ -68,22 +109,63 @@ export function ReviewPage() {
       <div className="segmented">
         <button
           className={scope === "pending" ? "active" : ""}
-          onClick={() => setScope("pending")}
+          onClick={() => {
+            setScope("pending");
+            setPage(0);
+          }}
         >
           {t("toCheck")}
           {sample.data ? ` (${sample.data.kernels.pendingReview})` : ""}
         </button>
         <button
           className={scope === "flagged" ? "active" : ""}
-          onClick={() => setScope("flagged")}
+          onClick={() => {
+            setScope("flagged");
+            setPage(0);
+          }}
         >
           {t("allFlagged")}
           {sample.data ? ` (${sample.data.kernels.flagged})` : ""}
         </button>
       </div>
-      <ErrorNote error={list.error ?? decide.error} />
+      {editable && acceptable > 0 && (
+        <Card>
+          <div className="stack-sm">
+            <strong>{t("acceptAllTitle")}</strong>
+            <span className="muted small">{t("acceptAllHint")}</span>
+            <div>
+              <button
+                className="primary"
+                disabled={acceptAll.isPending}
+                onClick={() => {
+                  if (
+                    window.confirm(t("acceptAllConfirm", { count: acceptable }))
+                  )
+                    acceptAll.mutate();
+                }}
+              >
+                {t("acceptAll", { count: acceptable })}
+              </button>
+            </div>
+          </div>
+        </Card>
+      )}
+      {acceptAll.data && (
+        <p className="small">
+          {t("acceptedAll", {
+            accepted: acceptAll.data.accepted,
+            unclear: acceptAll.data.unclear,
+          })}{" "}
+          {acceptAll.data.harmfulLeft > 0 && (
+            <strong className="warn">
+              {t.n("harmfulLeft", acceptAll.data.harmfulLeft)}
+            </strong>
+          )}
+        </p>
+      )}
+      <ErrorNote error={list.error ?? decide.error ?? acceptAll.error} />
       {list.isPending && <Spinner />}
-      {list.data?.length === 0 && (
+      {list.data?.items.length === 0 && (
         <EmptyState
           icon={CircleCheck}
           title={scope === "pending" ? t("allChecked") : t("noFlagged")}
@@ -95,7 +177,7 @@ export function ReviewPage() {
         />
       )}
       <div className="review-grid">
-        {list.data?.map((k) => (
+        {list.data?.items.map((k) => (
           <ReviewCard
             key={k.id}
             kernel={k}
@@ -105,6 +187,7 @@ export function ReviewPage() {
           />
         ))}
       </div>
+      <Pager total={total} limit={REVIEW_PAGE} page={page} onPage={setPage} />
     </div>
   );
 }
