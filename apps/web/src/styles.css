@@ -566,6 +566,16 @@ button.link:hover:not(:disabled) {
   padding: 1.25rem 1rem 3rem;
 }
 
+.fake-alert {
+  border: 1px solid var(--bad);
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
+.fake-alert p {
+  margin: 0.35rem 0;
+}
+
 .banner {
   background: var(--warn-bg);
   color: var(--warn);

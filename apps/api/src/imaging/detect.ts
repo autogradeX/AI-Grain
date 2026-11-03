@@ -167,9 +167,11 @@ export async function detectKernels(
     }
   }
   // Larger regions are kept when they could be a heap of touching kernels
-  // (up to about 80): the splitter separates them. Bigger is not kernels.
+  // (up to about 400, a dense pile on paper): the splitter separates them.
+  // Bigger is not kernels.
+  const heapMax = medianArea * 400;
   const found = inside.filter(
-    (b) => b !== coinBlob && (b.area <= maxArea || b.area <= medianArea * 80),
+    (b) => b !== coinBlob && (b.area <= maxArea || b.area <= heapMax),
   );
   const enough = areas.length >= 5;
   const isLarge = (b: Blob) => enough && b.area > medianArea * 2.2;
@@ -177,16 +179,30 @@ export async function detectKernels(
   // Touching kernels: separate them where they meet, so each is counted,
   // classified and weighed on its own. Two touching kernels are only about
   // twice a kernel's area, so anything clearly larger than one is tried.
+  // A heap comes apart in steps: each piece still holding several kernels
+  // is split again at its own levels.
+  const split = (b: Blob, depth: number): Blob[] => {
+    if (!enough || b.area <= medianArea * 1.5) return [b];
+    const parts = splitTouching(
+      labels,
+      width,
+      b,
+      medianArea,
+      minArea,
+      contrast,
+      ids,
+    );
+    if (!parts) return [b];
+    if (depth >= 6) return parts;
+    return parts.flatMap((p) => split(p, depth + 1));
+  };
+  let nextId = all.reduce((m, b) => Math.max(m, b.id), 0) + 1;
+  const ids = { next: () => nextId++ };
   const blobs = found
-    .flatMap((b) =>
-      enough && b.area > medianArea * 1.5
-        ? (splitTouching(labels, width, b, medianArea, minArea, contrast) ?? [
-            b,
-          ])
-        : [b],
-    )
-    // A large region that didn't come apart isn't a kernel.
-    .filter((b) => b.area <= maxArea);
+    .flatMap((b) => split(b, 0))
+    // A large region that didn't come apart isn't a kernel, unless it came
+    // from a heap: then it is counted by its area, and a person checks it.
+    .filter((b) => b.area <= maxArea || (enough && b.area <= heapMax));
 
   const kernels = blobs
     .map((b) => {
@@ -312,8 +328,14 @@ function fitBackground(rgb: Buffer, width: number, height: number): number[][] {
     sorted[Math.floor(sorted.length * 0.75)]! -
     sorted[Math.floor(sorted.length * 0.25)]!;
   let use = lum.map((l) => Math.abs(l - mid) <= Math.max(12, spread));
+  // On light paper objects are darker or warmer than the paper, never
+  // brighter and bluer: a pixel on that side of the surface is paper, and
+  // only differences the other way mark kernels. Without this a dense heap
+  // of kernels pulls the surface towards its own colour, and white kernels
+  // (only a little darker and less blue than the paper) vanish into it.
+  const light = mid >= 128;
   let coef: number[][] = [];
-  for (let round = 0; round < 4; round++) {
+  for (let round = 0; round < (light ? 6 : 4); round++) {
     coef = [0, 1, 2].map((ch) => {
       const k = 10;
       const ata = Array.from({ length: k }, () => new Array<number>(k).fill(0));
@@ -328,11 +350,20 @@ function fitBackground(rgb: Buffer, width: number, height: number): number[][] {
       return solve(ata, atb);
     });
     const resid = pts.map((p) => {
-      let d = 0;
-      for (let ch = 0; ch < 3; ch++) {
-        const fit = coef[ch]!.reduce((s, c, i) => s + c * p.t[i]!, 0);
-        d += (p.c[ch]! - fit) ** 2;
+      const f = [0, 1, 2].map((ch) =>
+        coef[ch]!.reduce((s, c, i) => s + c * p.t[i]!, 0),
+      );
+      if (light) {
+        const [r, g, b] = p.c;
+        const dl =
+          0.299 * (r - f[0]!) + 0.587 * (g - f[1]!) + 0.114 * (b - f[2]!);
+        const da = r - g - (f[0]! - f[1]!);
+        const dy = (r + g) / 2 - b - ((f[0]! + f[1]!) / 2 - f[2]!);
+        // Darker, warmer or redder than the surface (or greener: a stain).
+        return Math.sqrt(Math.min(0, dl) ** 2 + Math.max(0, dy) ** 2 + da * da);
       }
+      let d = 0;
+      for (let ch = 0; ch < 3; ch++) d += (p.c[ch]! - f[ch]!) ** 2;
       return Math.sqrt(d);
     });
     const r = [...resid].sort((a, b) => a - b);
@@ -612,6 +643,8 @@ export function splitTouching(
   minArea: number,
   /** The contrast map at the same resolution: lower where kernels meet. */
   contrast?: Uint8Array,
+  /** When given, each part gets a new id, written into `labels`, so it can be split again. */
+  ids?: { next: () => number },
 ): Blob[] | null {
   const bw = blob.maxX - blob.minX + 1;
   const bh = blob.maxY - blob.minY + 1;
@@ -675,9 +708,17 @@ export function splitTouching(
   for (const c of candidates) {
     // Far more pieces than the area holds: cut through kernels, not between.
     if (c.count > Math.round(expected) + 1) continue;
-    const parts = growParts(c.seeds, c.count, sub, bw, bh, blob);
-    if (parts.every((p) => p.area >= Math.max(minArea, medianArea * 0.3)))
-      return parts;
+    const { parts, owner } = growParts(c.seeds, c.count, sub, bw, bh, blob);
+    if (!parts.every((p) => p.area >= Math.max(minArea, medianArea * 0.3)))
+      continue;
+    if (!ids) return parts;
+    const newIds = parts.map(() => ids.next());
+    for (let y = 0; y < bh; y++)
+      for (let x = 0; x < bw; x++) {
+        const n = owner[y * bw + x]!;
+        if (n) labels[(blob.minY + y) * width + blob.minX + x] = newIds[n - 1]!;
+      }
+    return parts.map((p, i) => ({ ...p, id: newIds[i]! }));
   }
   return null;
 }
@@ -690,7 +731,7 @@ function growParts(
   bw: number,
   bh: number,
   blob: Blob,
-): Blob[] {
+): { parts: Blob[]; owner: Int32Array } {
   const owner = Int32Array.from(seeds);
   let frontier: number[] = [];
   for (let i = 0; i < owner.length; i++) if (owner[i]) frontier.push(i);
@@ -731,12 +772,15 @@ function growParts(
     if (y < p.minY) p.minY = y;
     if (y > p.maxY) p.maxY = y;
   }
-  return parts.map((p) => ({
-    id: blob.id,
-    area: p.area,
-    minX: blob.minX + p.minX,
-    minY: blob.minY + p.minY,
-    maxX: blob.minX + p.maxX,
-    maxY: blob.minY + p.maxY,
-  }));
+  return {
+    owner,
+    parts: parts.map((p) => ({
+      id: blob.id,
+      area: p.area,
+      minX: blob.minX + p.minX,
+      minY: blob.minY + p.minY,
+      maxX: blob.minX + p.maxX,
+      maxY: blob.minY + p.maxY,
+    })),
+  };
 }

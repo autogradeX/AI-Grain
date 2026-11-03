@@ -26,6 +26,7 @@ import { common, useGrainLabels } from "../i18n/common";
 import { MODEL_TIERS, useModelLabel } from "../i18n/models";
 import { StandardSuggestionNote } from "../components/StandardSuggestion";
 import { AutopilotCard } from "./AutopilotCard";
+import { FakeGrainAlert } from "../components/FakeGrainAlert";
 import { KernelSizeCard, OutputButtons, RepeatCard } from "./SampleExtras";
 import { ScaleButton } from "../components/ScaleButton";
 import { m } from "./SamplePage.i18n";
@@ -100,6 +101,7 @@ export function SamplePage() {
         )}
       </div>
 
+      <FakeGrainAlert sample={s} />
       <DetailsCard sample={s} editable={editable} />
       {autopilot ? (
         <>

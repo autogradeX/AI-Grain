@@ -11,7 +11,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import { summarizeDimensions } from "@ai-grain/core";
+import { ARTIFICIAL_CLASS_ID, summarizeDimensions } from "@ai-grain/core";
 import {
   ClassifierUnavailableError,
   type ClassifierError,
@@ -598,6 +598,9 @@ export async function kernelSummary(
       pendingReview: sql<number>`count(*) filter (where ${needsReview} and ${kernels.reviewStatus} = 'pending')::int`,
       reviewed: sql<number>`count(*) filter (where ${kernels.reviewStatus} <> 'pending')::int`,
       classifiedLocally: sql<number>`count(*) filter (where ${kernels.aiSource} = 'local')::int`,
+      // Fake grains: suspected by a look not yet checked, and confirmed by a person.
+      artificialSuspected: sql<number>`count(*) filter (where ${effectiveClass} = ${ARTIFICIAL_CLASS_ID} and ${kernels.reviewStatus} = 'pending')::int`,
+      artificialConfirmed: sql<number>`count(*) filter (where ${effectiveClass} = ${ARTIFICIAL_CLASS_ID} and ${kernels.reviewStatus} <> 'pending')::int`,
     })
     .from(kernels)
     .where(filter);

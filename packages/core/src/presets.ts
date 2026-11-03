@@ -374,7 +374,7 @@ const pulse = (crop: string, others: string): ClassDef[] => [
   mouldy,
 ];
 
-export const CROP_PRESETS: Record<string, CropProfile> = {
+const PRESET_BASE: Record<string, CropProfile> = {
   wheat: {
     key: "wheat",
     label: "Wheat",
@@ -505,6 +505,37 @@ export const CROP_PRESETS: Record<string, CropProfile> = {
   },
 };
 
+/** Id of the class for imitation (fake) grains, in every preset crop. */
+export const ARTIFICIAL_CLASS_ID = "artificial";
+
+/**
+ * Imitation grains: plastic or synthetic "rice", moulded or pressed kernels,
+ * and real kernels coloured or coated to pass for better ones (dyed or
+ * polished pulses). Harmful: a person always confirms them, and a physical
+ * test (float, burn, hot water) settles it, not the photo alone.
+ */
+export const ARTIFICIAL_CLASS: ClassDef = {
+  id: ARTIFICIAL_CLASS_ID,
+  label: "Suspected artificial / fake grain",
+  group: "harmful",
+  description:
+    "Looks manufactured rather than grown: plastic or synthetic kernels, moulded imitations, or kernels dyed, coated or polished to look better. Signs: glassy, waxy or uniformly glossy surface; identical size and perfectly smooth outline with no natural variation; no germ, embryo, hilum or ridge marks; even colour throughout or colour that looks painted on or rubs off; an unnaturally bright yellow, green or orange tint.",
+};
+
+/** Adds the artificial-grain class to a class list that doesn't have it. */
+export function withArtificialClass(classes: ClassDef[]): ClassDef[] {
+  return classes.some((c) => c.id === ARTIFICIAL_CLASS_ID)
+    ? classes
+    : [...classes, { ...ARTIFICIAL_CLASS }];
+}
+
+export const CROP_PRESETS: Record<string, CropProfile> = Object.fromEntries(
+  Object.entries(PRESET_BASE).map(([key, p]) => [
+    key,
+    { ...p, classes: withArtificialClass(p.classes) },
+  ]),
+);
+
 /** Local names that mean a preset crop, e.g. "dhan" is paddy. */
 const PRESET_ALIASES: Record<string, string> = {
   dhan: "paddy",
@@ -555,6 +586,6 @@ export function presetFor(key: string, label?: string): CropProfile {
     key,
     label:
       label ?? (key.charAt(0).toUpperCase() + key.slice(1)).replace(/_/g, " "),
-    classes: cereal(`Kernels of other cereals in ${key}.`),
+    classes: withArtificialClass(cereal(`Kernels of other cereals in ${key}.`)),
   };
 }

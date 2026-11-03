@@ -147,6 +147,10 @@ export interface KernelSummary {
   reviewed: number;
   /** Kernels classified offline by the organisation's local model. */
   classifiedLocally?: number;
+  /** Kernels suspected to be artificial (fake), not yet checked by a person. */
+  artificialSuspected?: number;
+  /** Kernels a person confirmed as artificial. */
+  artificialConfirmed?: number;
 }
 
 export interface Sample {

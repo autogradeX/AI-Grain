@@ -75,7 +75,12 @@ anything the receiver missed (it was down, or a delivery failed three times).
       "unit": ""
     }
   ],
-  "kernels": { "analysed": 412, "checkedByPerson": 31 },
+  "kernels": {
+    "analysed": 412,
+    "checkedByPerson": 31,
+    "artificialSuspected": 0,
+    "artificialConfirmed": 0
+  },
   "repeatOf": null,
   "certificate": {
     "code": "BQDC-G5RV-T9Q7",

@@ -31,6 +31,8 @@ export interface ReportData {
     flagged: number;
     reviewed: number;
     classifiedLocally?: number;
+    artificialSuspected?: number;
+    artificialConfirmed?: number;
     byClass: Record<string, number>;
   };
   boards: { side: string; image: Buffer }[];
@@ -75,6 +77,24 @@ function limitText(f: LimitFailure, classes: readonly ClassDef[]): string {
   const name = limitName(f, classes);
   const value = f.value === null ? "not measured" : fmt(f.value);
   return `${name}: ${value} (${f.kind === "max" ? "max" : "min"} ${fmt(f.allowed)})`;
+}
+
+/** What the report says about suspected or confirmed artificial (fake) grains, or null. */
+function fakeGrainNote(k: {
+  artificialSuspected?: number;
+  artificialConfirmed?: number;
+}): string | null {
+  const parts = [
+    k.artificialConfirmed
+      ? `${k.artificialConfirmed} confirmed by a person`
+      : "",
+    k.artificialSuspected
+      ? `${k.artificialSuspected} suspected, not yet checked`
+      : "",
+  ].filter(Boolean);
+  return parts.length
+    ? `${parts.join(", ")}. Confirm with a physical test (water, flame, wet cloth).`
+    : null;
 }
 
 export function renderReport(data: ReportData): Promise<Buffer> {
@@ -220,6 +240,8 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     `${data.kernels.total} (${data.kernels.flagged} flagged, ${data.kernels.reviewed} checked by the operator)`,
   );
   line("Model Orchestration", modelTier(data.model));
+  const fake = fakeGrainNote(data.kernels);
+  if (fake) line("Fake grains", fake);
   if (data.kernels.classifiedLocally) {
     line(
       "Classified offline",
@@ -623,6 +645,11 @@ export function renderSlip(data: ReportData): Promise<Buffer> {
     pair("L/B", fmt(data.dimensions.meanLb));
   }
   pair("Kernels", String(data.kernels.total));
+  const fake = fakeGrainNote(data.kernels);
+  if (fake) {
+    rule();
+    doc.font("Helvetica-Bold").fontSize(8).text(`FAKE GRAINS: ${fake}`, center);
+  }
   const cert = data.certificate;
   if (cert) {
     rule();

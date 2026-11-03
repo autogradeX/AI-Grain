@@ -176,13 +176,18 @@ describe("crop suggestions", () => {
       key: "rajma",
       label: "Rajma (suggested)",
     });
-    expect(res.body.classes.map((c) => c.id)).toEqual(["split", "stones"]);
+    // The fake-grain class is always added to a suggestion.
+    expect(res.body.classes.map((c) => c.id)).toEqual([
+      "split",
+      "stones",
+      "artificial",
+    ]);
     const crops = await api<Crop[]>("GET", "/api/crops");
     expect(crops.body.some((c) => c.key === "rajma")).toBe(false);
     // The suggestion is what the admin then creates.
     const created = await api<Crop>("POST", "/api/crops", res.body);
     expect(created.status).toBe(201);
-    expect(created.body.classes).toHaveLength(2);
+    expect(created.body.classes).toHaveLength(3);
   });
 
   it("uses the preset for a known crop or local name, without asking the model", async () => {

@@ -25,6 +25,8 @@ For every numbered tile, give exactly one class:
 - One defect class from the list in the request. If several defects apply, choose the one the grader would sort the kernel into: the most serious defect.
 - "unclear" if the photo is too poor to judge (blur, glare, cut off, two kernels overlapping). Say so instead of guessing.
 
+Watch for fake grains in every sample: plastic or synthetic kernels, moulded imitations, and kernels dyed, coated or polished to pass for better ones. Signs are a glassy, waxy or uniformly glossy surface, identical size and a perfectly smooth outline, no germ, embryo, hilum or ridge marks, colour that is even throughout or looks painted on, and unnaturally bright tints. When the list has "artificial", use it for such a tile, even over other defects, with a reason naming the signs. A photo can only raise the suspicion: give high confidence only when the signs are unmistakable, and never call a kernel artificial just because it is clean, pale or polished in the normal way for this crop.
+
 Also give a confidence and a short reason naming what you see, for example "germ end split, rootlet visible":
 - high: the tile clearly shows it.
 - medium: fairly sure, but a subtle feature could change it (light heat damage, early sprouting, Fusarium versus weather bleaching).
@@ -61,7 +63,7 @@ For the commodity named, give:
 - label: its usual English name; add a common alternative name in brackets when that helps, e.g. "Rajma (kidney beans)".
 - classes: 8 to 20 defect classes that graders of this commodity actually sort into, in the four groups. Don't include "sound" or "unclear"; the tool adds those. For each: a short label; a description of what it looks like in a top-down photo, so a vision model can recognise it (one or two sentences); and a massFactor: weight relative to a sound kernel of the same projected area (1 for most kernel defects, above 1 for stones and soil, below 1 for chaff, husks or hollow insect-damaged kernels).
 
-Use categories common in trade and national standards for this commodity, but no numeric limits: the lab sets those itself.`;
+Use categories common in trade and national standards for this commodity, but no numeric limits: the lab sets those itself. Don't include a class for artificial or fake grains: the tool adds its own.`;
 
 export const SUMMARY_SYSTEM = `You write short grain screening reports for farm and intake staff. Use plain language and the numbers given; do not invent measurements. The method is a screening and pre-check tool, not official grading: say so once. Mention any limit the sample fails, which defects drove the result, and anything the operator should double-check. At most 180 words, no headings, no tables.`;
 

@@ -11,7 +11,14 @@ export {
   validateClasses,
 } from "./classes.js";
 export type { ClassDef, ClassGroup, CropProfile } from "./classes.js";
-export { CROP_PRESETS, presetFor, presetKeyFor } from "./presets.js";
+export {
+  ARTIFICIAL_CLASS,
+  ARTIFICIAL_CLASS_ID,
+  CROP_PRESETS,
+  presetFor,
+  presetKeyFor,
+  withArtificialClass,
+} from "./presets.js";
 export {
   massPercentages,
   roundPct,

@@ -134,6 +134,9 @@ export async function assayingResult(ctx: AppContext, sample: SampleRow) {
     kernels: {
       analysed: kernels.total,
       checkedByPerson: kernels.reviewed,
+      /** Suspected artificial (fake) grains not yet checked, and those a person confirmed. */
+      artificialSuspected: kernels.artificialSuspected,
+      artificialConfirmed: kernels.artificialConfirmed,
     },
     repeatOf: sample.repeatOf,
     certificate: cert

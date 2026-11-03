@@ -3,6 +3,7 @@ import {
   presetFor,
   presetKeyFor,
   validateClasses,
+  withArtificialClass,
   type ClassDef,
 } from "@ai-grain/core";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
@@ -147,7 +148,13 @@ export function cropRoutes(ctx: AppContext) {
           model,
           name,
         });
-        return { key: normalizeCropKey(name), ...suggestion };
+        // Fake grains are a risk in every crop: the suggestion always has
+        // the class (the admin can still remove it before saving).
+        return {
+          key: normalizeCropKey(name),
+          ...suggestion,
+          classes: withArtificialClass(suggestion.classes),
+        };
       } catch (err) {
         throw badRequest(
           `Model Orchestration could not suggest classes: ${err instanceof Error ? err.message : String(err)}`,
