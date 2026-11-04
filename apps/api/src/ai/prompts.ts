@@ -102,7 +102,7 @@ For each grade the standard defines, give:
 - grade: its name as the standard writes it (for example "Grade A", "FAQ", "1").
 - limits: the maximum mass % for each listed class the standard limits. Use the class ids given. Where the standard limits something the tool has no class for, put it in unmatched instead.
 - groupLimits: maximum mass % per group (admixture, broken_defective, impurity, harmful), only where the standard sets one for the whole group.
-- maxTotalDefectsPct, maxMoisturePct, minTestWeightKgPerHl: only when the standard sets them; otherwise null.
+- maxTotalDefectsPct, maxMoisturePct, minTestWeightKgPerHl, minProteinPct, minOilPct: only when the standard sets them; otherwise null.
 
 Also give:
 - definitions: for classes the standard defines in its own words, its definition (short), keyed by class id.

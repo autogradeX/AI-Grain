@@ -19,6 +19,15 @@ anything the receiver missed (it was down, or a delivery failed three times).
   "sampleId": "6f0c…",
   "sampleNumber": 128,
   "lot": "Lot 42 / truck CG04 AB 1234",
+  "enam": {
+    "lotId": "CG-RAI-2026-004512",
+    "gateEntryNo": "GE/1187",
+    "farmer": {
+      "name": "Ramesh Sahu",
+      "id": "F-77821",
+      "mobile": "+91 98xxxxxx21"
+    }
+  },
   "organisation": "Krishi Upaj Mandi Samiti Raipur",
   "commodity": { "key": "paddy", "name": "Paddy" },
   "status": "completed",
@@ -61,6 +70,13 @@ anything the receiver missed (it was down, or a delivery failed three times).
       "unit": "%"
     },
     {
+      "code": "protein",
+      "name": "Protein",
+      "kind": "measurement",
+      "value": null,
+      "unit": "%"
+    },
+    {
       "code": "length",
       "name": "Mean kernel length",
       "kind": "measurement",
@@ -94,6 +110,12 @@ anything the receiver missed (it was down, or a delivery failed three times).
 - **`parameters`:** one entry per defect group, per defect class of the
   commodity (as set up under **Crops and classes**), and per measurement.
   `code` is stable: map it once to the receiving system's parameter names.
+- **`enam`:** the e-NAM lot ID, gate entry number and farmer entered on the
+  sample (each `null` when not given). Only connected systems with an API key
+  or the webhook secret see the farmer's mobile; the public certificate shows
+  the lot, the farmer's name and the last 4 characters of the farmer's ID.
+- **`protein`, `oil`:** from an NIR analyser export or typed in; `null` when
+  not measured. The camera doesn't measure them.
 - **`resultSource`:** says whether mass percentages come from weighing the
   cups (`weighed`) or from kernel areas in the photos (`estimate`).
 - **`certificate.verifyUrl`:** a public page that confirms the result, the

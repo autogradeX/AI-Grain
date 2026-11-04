@@ -42,10 +42,18 @@ interface Verification {
       byGroupPct: Record<string, number>;
       byClassPct: { id: string; label: string; group: string; pct: number }[];
     };
+    lot?: {
+      enamLotId: string | null;
+      gateEntryNo: string | null;
+      farmerName: string | null;
+      farmerIdLast4: string | null;
+    };
     measurements: {
       sampleMassG: number | null;
       moisturePct: number | null;
       testWeightKgPerHl: number | null;
+      proteinPct?: number;
+      oilPct?: number;
     };
     kernels: { total: number; flagged: number; reviewed: number };
     model: string;
@@ -166,6 +174,30 @@ function Result({ v }: { v: Verification }) {
             #{p.sample.number} · {cropLabel(p.sample.crop)}
             {p.sample.source && ` · ${p.sample.source}`}
           </dd>
+          {p.lot?.enamLotId && (
+            <>
+              <dt>{t("enamLot")}</dt>
+              <dd>
+                {p.lot.enamLotId}
+                {p.lot.gateEntryNo &&
+                  ` · ${t("gateEntry", { no: p.lot.gateEntryNo })}`}
+              </dd>
+            </>
+          )}
+          {(p.lot?.farmerName || p.lot?.farmerIdLast4) && (
+            <>
+              <dt>{t("farmer")}</dt>
+              <dd>
+                {[
+                  p.lot.farmerName,
+                  p.lot.farmerIdLast4 &&
+                    t("farmerId", { last4: p.lot.farmerIdLast4 }),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </dd>
+            </>
+          )}
           <dt>{t("standard")}</dt>
           <dd>{p.sample.standard ?? t("none")}</dd>
           <dt>{t("grade")}</dt>
@@ -197,6 +229,18 @@ function Result({ v }: { v: Verification }) {
             <>
               <dt>{t("moisture")}</dt>
               <dd>{pct(p.measurements.moisturePct, 1)}</dd>
+            </>
+          )}
+          {p.measurements.proteinPct !== undefined && (
+            <>
+              <dt>{t("protein")}</dt>
+              <dd>{pct(p.measurements.proteinPct, 1)}</dd>
+            </>
+          )}
+          {p.measurements.oilPct !== undefined && (
+            <>
+              <dt>{t("oil")}</dt>
+              <dd>{pct(p.measurements.oilPct, 1)}</dd>
             </>
           )}
           <dt>{t("fingerprint")}</dt>

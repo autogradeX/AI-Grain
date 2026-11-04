@@ -52,3 +52,11 @@ export {
   type RunBreakdown,
   type RunComparison,
 } from "./repeatability.js";
+export {
+  cellNumber,
+  headerKey,
+  parseTable,
+  readMeasurements,
+  type MeasurementField,
+  type MeasurementRow,
+} from "./table.js";

@@ -40,6 +40,28 @@ export function canonicalJson(value: unknown): string {
   return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
 }
 
+/** The lot part of a certificate, or null when the sample names no lot or farmer. */
+export function lotOf(sample: {
+  enamLotId: string | null;
+  gateEntryNo: string | null;
+  farmerName: string | null;
+  farmerId: string | null;
+}): CertificatePayload["lot"] | null {
+  if (
+    !sample.enamLotId &&
+    !sample.gateEntryNo &&
+    !sample.farmerName &&
+    !sample.farmerId
+  )
+    return null;
+  return {
+    enamLotId: sample.enamLotId,
+    gateEntryNo: sample.gateEntryNo,
+    farmerName: sample.farmerName,
+    farmerIdLast4: sample.farmerId ? sample.farmerId.slice(-4) : null,
+  };
+}
+
 export function hashPayload(payload: CertificatePayload): string {
   return createHash("sha256").update(canonicalJson(payload)).digest("hex");
 }
@@ -111,10 +133,13 @@ export async function issueCertificate(
         pct: r3(pct.byClass[c.id] ?? 0),
       })),
     },
+    ...(lotOf(sample) && { lot: lotOf(sample)! }),
     measurements: {
       sampleMassG: sample.sampleMassG,
       moisturePct: sample.moisturePct,
       testWeightKgPerHl: sample.testWeightKgPerHl,
+      ...(sample.proteinPct !== null && { proteinPct: sample.proteinPct }),
+      ...(sample.oilPct !== null && { oilPct: sample.oilPct }),
     },
     kernels: {
       total: kernels.total,

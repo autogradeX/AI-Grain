@@ -125,6 +125,8 @@ describe("ClaudeClassifier", () => {
                 maxTotalDefectsPct: null,
                 maxMoisturePct: 14,
                 minTestWeightKgPerHl: null,
+                minProteinPct: null,
+                minOilPct: null,
               },
             ],
             definitions: [],

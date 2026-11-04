@@ -4,6 +4,12 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, download } from "../api/client";
 import { useCrops } from "../api/crops";
+import {
+  emptyLot,
+  LotFields,
+  lotBody,
+  type Lot,
+} from "../components/LotFields";
 import { CropSelect } from "../components/CropSelect";
 import { Pager, useDebounced, usePage } from "../components/Pager";
 import type { SampleListItem, Standard } from "../api/types";
@@ -21,6 +27,8 @@ import {
 import { useT } from "../i18n";
 import { common, useGrainLabels } from "../i18n/common";
 import { m } from "./SamplesPage.i18n";
+import { MeasurementImport } from "./MeasurementImport";
+import { m as importMessages } from "./MeasurementImport.i18n";
 import { enqueue, newRef } from "../offline/queue";
 import { isNetworkError } from "../offline/sync";
 import {
@@ -37,6 +45,8 @@ export function SamplesPage() {
   const { cropLabel } = useGrainLabels();
   const [status, setStatus] = useState<"" | "in_progress" | "completed">("");
   const [search, setSearch] = useState("");
+  const [importing, setImporting] = useState(false);
+  const tm = useT(importMessages);
   const [page, setPage] = usePage();
   const term = useDebounced(search.trim());
   // The form's state is in the URL (?new=1): the + button and the app
@@ -77,6 +87,11 @@ export function SamplesPage() {
             {t("exportCsv")}
           </button>
           {can.write && (
+            <button onClick={() => setImporting(!importing)}>
+              {tm("open")}
+            </button>
+          )}
+          {can.write && (
             <button className="primary" onClick={() => setCreating(true)}>
               {t("newSample")}
             </button>
@@ -84,6 +99,7 @@ export function SamplesPage() {
         </div>
       </div>
 
+      {importing && <MeasurementImport onClose={() => setImporting(false)} />}
       {creating && <NewSampleForm onCancel={() => setCreating(false)} />}
 
       <div className="row wrap">
@@ -146,6 +162,12 @@ export function SamplesPage() {
                   )}
                 </strong>
                 {s.source && <span className="muted"> · {s.source}</span>}
+                {s.enamLotId && (
+                  <span className="muted"> · e-NAM {s.enamLotId}</span>
+                )}
+                {s.farmerName && (
+                  <span className="muted"> · {s.farmerName}</span>
+                )}
                 <div className="muted small">
                   {s.standardName ?? t("noStandard")} ·{" "}
                   {formatDate(s.createdAt)}
@@ -203,6 +225,7 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
   const standardId = picked ?? suggestion.data?.standard.id ?? "";
   const setStandardId = (id: string) => setPicked(id);
   const [source, setSource] = useState("");
+  const [lot, setLot] = useState<Lot>(emptyLot);
   const [mass, setMass] = useState("");
   // Without a connection the sample is saved on the device and uploaded later.
   const saveOffline = async () => {
@@ -211,7 +234,12 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
       kind: "sample",
       ref,
       createdAt: new Date().toISOString(),
-      data: { crop, source: source || null, standardId: standardId || null },
+      data: {
+        crop,
+        source: source || null,
+        standardId: standardId || null,
+        ...lotBody(lot),
+      },
     });
     return { offline: ref };
   };
@@ -224,6 +252,7 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
           standardId: standardId || null,
           source: source || null,
           sampleMassG: mass ? Number(mass) : null,
+          ...lotBody(lot),
         });
       } catch (err) {
         if (isNetworkError(err)) return saveOffline();
@@ -279,6 +308,7 @@ function NewSampleForm({ onCancel }: { onCancel: () => void }) {
         <Field label={t("source")}>
           <input value={source} onChange={(e) => setSource(e.target.value)} />
         </Field>
+        <LotFields value={lot} onChange={setLot} />
         <Field label={t("mass")} hint={t("massHint")}>
           <input
             type="number"

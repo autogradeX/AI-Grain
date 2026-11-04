@@ -47,7 +47,7 @@ export function measurementOf(sample: SampleRow): Measurement | null {
   };
 }
 
-/** The grade for these percentages under the standard's grades, with moisture and test weight from the sample. */
+/** The grade for these percentages under the standard's grades, with moisture, test weight, protein and oil from the sample. */
 export function gradeFor(
   percentages: MassPercentages,
   sample: SampleRow,
@@ -59,6 +59,8 @@ export function gradeFor(
           percentages,
           moisturePct: sample.moisturePct ?? undefined,
           testWeightKgPerHl: sample.testWeightKgPerHl ?? undefined,
+          proteinPct: sample.proteinPct ?? undefined,
+          oilPct: sample.oilPct ?? undefined,
         },
         grades,
       )

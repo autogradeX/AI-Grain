@@ -15,10 +15,14 @@ export interface GradeSpec {
   maxTotalDefectsPct?: number | undefined;
   maxMoisturePct?: number | undefined;
   minTestWeightKgPerHl?: number | undefined;
+  /** Minimum protein %, from an NIR analyser or a lab. */
+  minProteinPct?: number | undefined;
+  /** Minimum oil content %, for oilseeds (NIR or lab). */
+  minOilPct?: number | undefined;
 }
 
 export type LimitScope =
-  "class" | "group" | "total" | "moisture" | "testWeight";
+  "class" | "group" | "total" | "moisture" | "testWeight" | "protein" | "oil";
 
 export interface LimitFailure {
   scope: LimitScope;
@@ -34,6 +38,8 @@ export interface GradeInput {
   percentages: MassPercentages;
   moisturePct?: number | undefined;
   testWeightKgPerHl?: number | undefined;
+  proteinPct?: number | undefined;
+  oilPct?: number | undefined;
 }
 
 export interface GradeResult {
@@ -44,8 +50,9 @@ export interface GradeResult {
 }
 
 /**
- * Limits on moisture or test weight need a measured value. A missing value
- * fails the limit, so a sample is never graded on data it doesn't have.
+ * Limits on moisture, test weight, protein or oil need a measured value. A
+ * missing value fails the limit, so a sample is never graded on data it
+ * doesn't have.
  */
 export function failedLimits(
   input: GradeInput,
@@ -107,6 +114,23 @@ export function failedLimits(
       });
     }
   }
+  const minimum = (
+    scope: "protein" | "oil",
+    allowed: number | undefined,
+    value: number | undefined,
+  ) => {
+    if (allowed === undefined) return;
+    if (value === undefined || value < allowed)
+      failed.push({
+        scope,
+        limit: scope,
+        value: value ?? null,
+        allowed,
+        kind: "min",
+      });
+  };
+  minimum("protein", spec.minProteinPct, input.proteinPct);
+  minimum("oil", spec.minOilPct, input.oilPct);
   return failed;
 }
 

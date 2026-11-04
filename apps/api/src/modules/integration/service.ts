@@ -93,6 +93,20 @@ export async function assayingResult(ctx: AppContext, sample: SampleRow) {
       unit: "kg/hl",
     },
     {
+      code: "protein",
+      name: "Protein",
+      kind: "measurement",
+      value: sample.proteinPct,
+      unit: "%",
+    },
+    {
+      code: "oil",
+      name: "Oil content",
+      kind: "measurement",
+      value: sample.oilPct,
+      unit: "%",
+    },
+    {
       code: "length",
       name: "Mean kernel length",
       kind: "measurement",
@@ -119,6 +133,16 @@ export async function assayingResult(ctx: AppContext, sample: SampleRow) {
     sampleId: sample.id,
     sampleNumber: sample.number,
     lot: sample.source,
+    /** The e-NAM lot and its farmer (null when not given). */
+    enam: {
+      lotId: sample.enamLotId,
+      gateEntryNo: sample.gateEntryNo,
+      farmer: {
+        name: sample.farmerName,
+        id: sample.farmerId,
+        mobile: sample.farmerMobile,
+      },
+    },
     organisation: org?.name ?? null,
     commodity: { key: crop.key, name: crop.label },
     status: sample.status,

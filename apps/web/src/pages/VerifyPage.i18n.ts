@@ -1,6 +1,12 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  enamLot: { en: "e-NAM lot", hi: "ई-नाम लॉट" },
+  gateEntry: { en: "gate entry {no}", hi: "गेट एंट्री {no}" },
+  farmer: { en: "Farmer", hi: "किसान" },
+  farmerId: { en: "ID …{last4}", hi: "आईडी …{last4}" },
+  protein: { en: "Protein", hi: "प्रोटीन" },
+  oil: { en: "Oil content", hi: "तेल की मात्रा" },
   codeLabel: { en: "Certificate code", hi: "प्रमाणपत्र कोड" },
   check: { en: "Check", hi: "जाँचें" },
   title: { en: "Verify a grain report", hi: "अनाज रिपोर्ट सत्यापित करें" },

@@ -21,6 +21,8 @@ describe("drafting a standard with Model Orchestration", () => {
             maxTotalDefectsPct: null,
             maxMoisturePct: 14,
             minTestWeightKgPerHl: -3,
+            minProteinPct: null,
+            minOilPct: null,
           },
           {
             grade: "FAQ",
@@ -29,6 +31,8 @@ describe("drafting a standard with Model Orchestration", () => {
             maxTotalDefectsPct: null,
             maxMoisturePct: null,
             minTestWeightKgPerHl: null,
+            minProteinPct: null,
+            minOilPct: null,
           },
         ],
         definitions: [

@@ -105,6 +105,8 @@ interface GradeForm {
   maxTotalDefectsPct: string;
   maxMoisturePct: string;
   minTestWeightKgPerHl: string;
+  minProteinPct: string;
+  minOilPct: string;
 }
 
 const s = (v: number | undefined) => (v === undefined ? "" : String(v));
@@ -123,6 +125,8 @@ function toForm(g: GradeSpec): GradeForm {
     maxTotalDefectsPct: s(g.maxTotalDefectsPct),
     maxMoisturePct: s(g.maxMoisturePct),
     minTestWeightKgPerHl: s(g.minTestWeightKgPerHl),
+    minProteinPct: s(g.minProteinPct),
+    minOilPct: s(g.minOilPct),
   };
 }
 
@@ -148,6 +152,10 @@ function fromForm(g: GradeForm, classIds: readonly string[]): GradeSpec {
   if (total !== undefined) spec.maxTotalDefectsPct = total;
   if (moisture !== undefined) spec.maxMoisturePct = moisture;
   if (tw !== undefined) spec.minTestWeightKgPerHl = tw;
+  const protein = n(g.minProteinPct);
+  const oil = n(g.minOilPct);
+  if (protein !== undefined) spec.minProteinPct = protein;
+  if (oil !== undefined) spec.minOilPct = oil;
   return spec;
 }
 
@@ -520,6 +528,30 @@ function StandardForm({ standard }: { standard: Standard | null }) {
                       g.minTestWeightKgPerHl,
                       (v) => setGrade(i, { minTestWeightKgPerHl: v }),
                       t("testWeightAria", { grade: g.grade }),
+                    )}
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td>{t("minProtein")}</td>
+                {grades.map((g, i) => (
+                  <td key={i}>
+                    {limitInput(
+                      g.minProteinPct,
+                      (v) => setGrade(i, { minProteinPct: v }),
+                      t("minProteinAria", { grade: g.grade }),
+                    )}
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td>{t("minOil")}</td>
+                {grades.map((g, i) => (
+                  <td key={i}>
+                    {limitInput(
+                      g.minOilPct,
+                      (v) => setGrade(i, { minOilPct: v }),
+                      t("minOilAria", { grade: g.grade }),
                     )}
                   </td>
                 ))}

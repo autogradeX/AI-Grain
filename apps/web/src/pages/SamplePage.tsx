@@ -27,6 +27,8 @@ import { MODEL_TIERS, useModelLabel } from "../i18n/models";
 import { StandardSuggestionNote } from "../components/StandardSuggestion";
 import { AutopilotCard } from "./AutopilotCard";
 import { FakeGrainAlert } from "../components/FakeGrainAlert";
+import { LotFields, lotBody, lotOf, type Lot } from "../components/LotFields";
+import { m as lotMessages } from "../components/LotFields.i18n";
 import { KernelSizeCard, OutputButtons, RepeatCard } from "./SampleExtras";
 import { ScaleButton } from "../components/ScaleButton";
 import { m } from "./SamplePage.i18n";
@@ -180,6 +182,7 @@ function DetailsCard({
   const t = useT(m);
   const modelLabel = useModelLabel();
   const tc = useT(common);
+  const tl = useT(lotMessages);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     standardId: sample.standardId ?? "",
@@ -187,6 +190,7 @@ function DetailsCard({
     notes: sample.notes ?? "",
     model: sample.model ?? "",
   });
+  const [lot, setLot] = useState<Lot>(lotOf(sample));
   const save = useMutation({
     mutationFn: () =>
       api.patch<Sample>(`/samples/${sample.id}`, {
@@ -194,6 +198,7 @@ function DetailsCard({
         source: form.source || null,
         notes: form.notes || null,
         model: form.model || null,
+        ...lotBody(lot),
       }),
     onSuccess: (data) => {
       update(data);
@@ -234,6 +239,26 @@ function DetailsCard({
               />
             )}
           </dd>
+          {sample.enamLotId && (
+            <>
+              <dt>{tl("enamLotId")}</dt>
+              <dd>
+                {sample.enamLotId}
+                {sample.gateEntryNo &&
+                  ` · ${tl("gateEntryNo")} ${sample.gateEntryNo}`}
+              </dd>
+            </>
+          )}
+          {(sample.farmerName || sample.farmerId || sample.farmerMobile) && (
+            <>
+              <dt>{tl("farmerName")}</dt>
+              <dd>
+                {[sample.farmerName, sample.farmerId, sample.farmerMobile]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </dd>
+            </>
+          )}
           <dt>{t("aiModel")}</dt>
           <dd>{modelLabel(sample.effectiveModel)}</dd>
           {sample.notes && (
@@ -289,6 +314,7 @@ function DetailsCard({
             onChange={(e) => setForm({ ...form, source: e.target.value })}
           />
         </Field>
+        <LotFields value={lot} onChange={setLot} />
         <Field label={t("notes")}>
           <textarea
             rows={2}
@@ -318,6 +344,8 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
     sampleMassG: str(sample.sampleMassG),
     moisturePct: str(sample.moisturePct),
     testWeightKgPerHl: str(sample.testWeightKgPerHl),
+    proteinPct: str(sample.proteinPct),
+    oilPct: str(sample.oilPct),
   });
   const save = useMutation({
     mutationFn: () =>
@@ -325,13 +353,29 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
         sampleMassG: num(form.sampleMassG),
         moisturePct: num(form.moisturePct),
         testWeightKgPerHl: num(form.testWeightKgPerHl),
+        proteinPct: num(form.proteinPct),
+        oilPct: num(form.oilPct),
       }),
     onSuccess: update,
   });
   const dirty =
     form.sampleMassG !== str(sample.sampleMassG) ||
     form.moisturePct !== str(sample.moisturePct) ||
-    form.testWeightKgPerHl !== str(sample.testWeightKgPerHl);
+    form.testWeightKgPerHl !== str(sample.testWeightKgPerHl) ||
+    form.proteinPct !== str(sample.proteinPct) ||
+    form.oilPct !== str(sample.oilPct);
+  const pctInput = (key: "proteinPct" | "oilPct") => (
+    <input
+      type="number"
+      inputMode="decimal"
+      step="0.01"
+      min="0"
+      max="100"
+      disabled={!editable}
+      value={form[key]}
+      onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+    />
+  );
 
   return (
     <Card title={t("weighTitle")}>
@@ -386,6 +430,12 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
               setForm({ ...form, testWeightKgPerHl: e.target.value })
             }
           />
+        </Field>
+        <Field label={t("protein")} hint={t("nirHint")}>
+          {pctInput("proteinPct")}
+        </Field>
+        <Field label={t("oil")} hint={t("nirHint")}>
+          {pctInput("oilPct")}
         </Field>
         <ErrorNote error={save.error} />
         {editable && dirty && (
@@ -702,6 +752,8 @@ function limitName(
   if (f.scope === "group") return labels.groupLabel(f.limit as ClassGroup);
   if (f.scope === "total") return t("totalDefects");
   if (f.scope === "moisture") return t("limitMoisture");
+  if (f.scope === "protein") return t("protein");
+  if (f.scope === "oil") return t("oil");
   return t("limitTestWeight");
 }
 

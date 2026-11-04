@@ -14,7 +14,17 @@ export interface QueuedSample {
   kind: "sample";
   ref: string;
   createdAt: string;
-  data: { crop: string; source: string | null; standardId: string | null };
+  data: {
+    crop: string;
+    source: string | null;
+    standardId: string | null;
+    /** The e-NAM lot and farmer, when typed in (older queued items have none). */
+    enamLotId?: string | null;
+    gateEntryNo?: string | null;
+    farmerName?: string | null;
+    farmerId?: string | null;
+    farmerMobile?: string | null;
+  };
   /** Set once the server has it. */
   sampleId?: string;
   sampleNumber?: number;

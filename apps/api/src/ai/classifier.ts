@@ -479,6 +479,8 @@ const standardSchema = z.object({
       maxTotalDefectsPct: z.number().nullable(),
       maxMoisturePct: z.number().nullable(),
       minTestWeightKgPerHl: z.number().nullable(),
+      minProteinPct: z.number().nullable(),
+      minOilPct: z.number().nullable(),
     }),
   ),
   definitions: z.array(
@@ -536,6 +538,10 @@ export function cleanStandardDraft(
     if (total !== undefined) spec.maxTotalDefectsPct = total;
     if (moisture !== undefined) spec.maxMoisturePct = moisture;
     if (tw !== undefined) spec.minTestWeightKgPerHl = tw;
+    const protein = pct(g.minProteinPct);
+    const oil = pct(g.minOilPct);
+    if (protein !== undefined) spec.minProteinPct = protein;
+    if (oil !== undefined) spec.minOilPct = oil;
     grades.push(spec);
   }
   const definitions: Record<string, string> = {};

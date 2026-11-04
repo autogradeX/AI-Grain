@@ -320,12 +320,20 @@ export interface SampleResult {
 }
 
 /** Results from a certified grader for the same sample, used to validate this method. */
+/** The same sample graded by a certified grader or reference lab, for validation. */
 export interface ReferenceResult {
   byClassPct: Partial<Record<string, number>>;
   grade: string | null;
   graderName?: string | undefined;
   gradedOn?: string | undefined;
   notes?: string | undefined;
+  /** The lab and its report number, for the validation report. */
+  lab?: string | undefined;
+  reportNo?: string | undefined;
+  /** The lab's own measurements, compared with this sample's. */
+  moisturePct?: number | undefined;
+  proteinPct?: number | undefined;
+  oilPct?: number | undefined;
 }
 
 export const samples = pgTable(
@@ -341,6 +349,13 @@ export const samples = pgTable(
       onDelete: "set null",
     }),
     source: text("source"),
+    /** The e-NAM lot this sample was drawn from, and its gate entry. */
+    enamLotId: text("enam_lot_id"),
+    gateEntryNo: text("gate_entry_no"),
+    /** The farmer who brought the lot. The mobile number is never public. */
+    farmerName: text("farmer_name"),
+    farmerId: text("farmer_id"),
+    farmerMobile: text("farmer_mobile"),
     notes: text("notes"),
     status: sampleStatusEnum("status").notNull().default("in_progress"),
     /** All photos are taken: Autopilot finishes the sample once nothing waits on a person. */
@@ -349,6 +364,9 @@ export const samples = pgTable(
     sampleMassG: doublePrecision("sample_mass_g"),
     moisturePct: doublePrecision("moisture_pct"),
     testWeightKgPerHl: doublePrecision("test_weight_kg_per_hl"),
+    /** From an NIR analyser (imported or typed in) or a lab. */
+    proteinPct: doublePrecision("protein_pct"),
+    oilPct: doublePrecision("oil_pct"),
     cupMassG: jsonb("cup_mass_g")
       .$type<Partial<Record<string, number>>>()
       .notNull()
@@ -383,6 +401,7 @@ export const samples = pgTable(
     uniqueIndex("samples_org_number_idx").on(t.orgId, t.number),
     index("samples_org_created_idx").on(t.orgId, t.createdAt),
     uniqueIndex("samples_org_client_ref_idx").on(t.orgId, t.clientRef),
+    index("samples_org_enam_lot_idx").on(t.orgId, t.enamLotId),
   ],
 );
 
@@ -587,10 +606,24 @@ export interface CertificatePayload {
     byGroupPct: Record<string, number>;
     byClassPct: { id: string; label: string; group: string; pct: number }[];
   };
+  /**
+   * The e-NAM lot and its farmer, when given. Public with the certificate:
+   * the farmer's ID shows only its last characters, and the mobile number
+   * is never included.
+   */
+  lot?: {
+    enamLotId: string | null;
+    gateEntryNo: string | null;
+    farmerName: string | null;
+    farmerIdLast4: string | null;
+  };
   measurements: {
     sampleMassG: number | null;
     moisturePct: number | null;
     testWeightKgPerHl: number | null;
+    /** Only when measured (NIR or lab). */
+    proteinPct?: number;
+    oilPct?: number;
   };
   kernels: { total: number; flagged: number; reviewed: number };
   model: string;

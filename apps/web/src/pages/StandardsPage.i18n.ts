@@ -1,6 +1,16 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  minProtein: { en: "Protein min %", hi: "प्रोटीन न्यूनतम %" },
+  minProteinAria: {
+    en: "Minimum protein % for grade {grade}",
+    hi: "ग्रेड {grade} के लिए न्यूनतम प्रोटीन %",
+  },
+  minOil: { en: "Oil content min %", hi: "तेल की मात्रा न्यूनतम %" },
+  minOilAria: {
+    en: "Minimum oil content % for grade {grade}",
+    hi: "ग्रेड {grade} के लिए न्यूनतम तेल %",
+  },
   draftTitle: {
     en: "Draft with Model Orchestration",
     hi: "मॉडल ऑर्केस्ट्रेशन से मसौदा बनाएँ",

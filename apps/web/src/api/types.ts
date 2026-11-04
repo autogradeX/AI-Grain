@@ -97,6 +97,8 @@ export interface SampleListItem {
   number: number;
   crop: string;
   source: string | null;
+  enamLotId: string | null;
+  farmerName: string | null;
   status: "in_progress" | "completed";
   grade: string | null;
   totalDefectsPct: number | null;
@@ -166,6 +168,15 @@ export interface Sample {
   sampleMassG: number | null;
   moisturePct: number | null;
   testWeightKgPerHl: number | null;
+  /** From an NIR analyser or a lab; null when not measured. */
+  proteinPct: number | null;
+  oilPct: number | null;
+  /** The e-NAM lot and its farmer. */
+  enamLotId: string | null;
+  gateEntryNo: string | null;
+  farmerName: string | null;
+  farmerId: string | null;
+  farmerMobile: string | null;
   cupMassG: Partial<Record<string, number>>;
   result: SampleResult | null;
   reference: ReferenceResult | null;

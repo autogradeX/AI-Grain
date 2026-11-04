@@ -70,6 +70,8 @@ export function limitName(
   if (f.scope === "group") return GROUP_LABELS[f.limit as ClassGroup];
   if (f.scope === "total") return "Total defects";
   if (f.scope === "moisture") return "Moisture";
+  if (f.scope === "protein") return "Protein";
+  if (f.scope === "oil") return "Oil content";
   return "Test weight";
 }
 
@@ -210,6 +212,15 @@ export function renderReport(data: ReportData): Promise<Buffer> {
   };
   line("Crop", data.cropLabel);
   line("Standard", standard?.name ?? "none selected");
+  if (sample.enamLotId) line("e-NAM lot", sample.enamLotId);
+  if (sample.gateEntryNo) line("Gate entry", sample.gateEntryNo);
+  if (sample.farmerName || sample.farmerId)
+    line(
+      "Farmer",
+      [sample.farmerName, sample.farmerId && `ID ${sample.farmerId}`]
+        .filter(Boolean)
+        .join(", "),
+    );
   line(
     "Sample mass",
     sample.sampleMassG === null
@@ -228,6 +239,10 @@ export function renderReport(data: ReportData): Promise<Buffer> {
       ? "not measured"
       : `${fmt(sample.testWeightKgPerHl, 1)} kg/hl`,
   );
+  if (sample.proteinPct !== null)
+    line("Protein", `${fmt(sample.proteinPct, 1)} % (NIR or lab)`);
+  if (sample.oilPct !== null)
+    line("Oil content", `${fmt(sample.oilPct, 1)} % (NIR or lab)`);
   line(
     "Operator",
     [data.createdByName, data.completedByName]
@@ -582,6 +597,9 @@ export function renderSlip(data: ReportData): Promise<Buffer> {
   pair("Sample", `#${sample.number}`);
   pair("Crop", data.cropLabel);
   if (sample.source) pair("Lot", sample.source);
+  if (sample.enamLotId) pair("e-NAM lot", sample.enamLotId);
+  if (sample.gateEntryNo) pair("Gate entry", sample.gateEntryNo);
+  if (sample.farmerName) pair("Farmer", sample.farmerName);
   pair(
     "Date",
     (sample.completedAt ?? sample.createdAt)
@@ -639,6 +657,9 @@ export function renderSlip(data: ReportData): Promise<Buffer> {
     pair("Moisture", `${fmt(sample.moisturePct, 1)} %`);
   if (sample.testWeightKgPerHl !== null)
     pair("Test weight", `${fmt(sample.testWeightKgPerHl, 1)} kg/hl`);
+  if (sample.proteinPct !== null)
+    pair("Protein", `${fmt(sample.proteinPct, 1)} %`);
+  if (sample.oilPct !== null) pair("Oil", `${fmt(sample.oilPct, 1)} %`);
   if (data.dimensions) {
     pair("Length", `${fmt(data.dimensions.meanLengthMm)} mm`);
     pair("Breadth", `${fmt(data.dimensions.meanBreadthMm)} mm`);

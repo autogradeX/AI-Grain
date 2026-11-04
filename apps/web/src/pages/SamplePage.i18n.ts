@@ -41,6 +41,12 @@ export const m = defineMessages({
     hi: "वैकल्पिक, नमी मीटर से",
   },
   testWeight: { en: "Test weight (kg/hl)", hi: "टेस्ट वेट (kg/hl)" },
+  protein: { en: "Protein (%)", hi: "प्रोटीन (%)" },
+  oil: { en: "Oil content (%)", hi: "तेल की मात्रा (%)" },
+  nirHint: {
+    en: "Optional, from an NIR analyser or a lab (imported or typed in)",
+    hi: "वैकल्पिक, NIR विश्लेषक या लैब से (आयात करें या लिखें)",
+  },
   optional: { en: "Optional", hi: "वैकल्पिक" },
 
   // 2. Photos

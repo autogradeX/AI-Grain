@@ -21,6 +21,8 @@ export const GradeSpecSchema = z.object({
   maxTotalDefectsPct: Pct.optional(),
   maxMoisturePct: Pct.optional(),
   minTestWeightKgPerHl: z.number().positive().optional(),
+  minProteinPct: Pct.optional(),
+  minOilPct: Pct.optional(),
 });
 
 const StandardBody = z.object({

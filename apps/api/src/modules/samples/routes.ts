@@ -1,5 +1,6 @@
 import {
   compareRuns,
+  readMeasurements,
   summarizePercentages,
   validateMeasurement,
 } from "@ai-grain/core";
@@ -74,7 +75,20 @@ const SampleFields = z.object({
   sampleMassG: Mass.nullable().optional(),
   moisturePct: Pct.nullable().optional(),
   testWeightKgPerHl: z.number().positive().max(200).nullable().optional(),
+  proteinPct: Pct.nullable().optional(),
+  oilPct: Pct.nullable().optional(),
   model: z.enum(CLAUDE_MODELS).nullable().optional(),
+  // The e-NAM lot and the farmer who brought it.
+  enamLotId: z.string().trim().max(60).nullable().optional(),
+  gateEntryNo: z.string().trim().max(60).nullable().optional(),
+  farmerName: z.string().trim().max(120).nullable().optional(),
+  farmerId: z.string().trim().max(60).nullable().optional(),
+  farmerMobile: z
+    .string()
+    .trim()
+    .regex(/^\+?[0-9 -]{6,20}$/, "A phone number: digits, spaces, + or -")
+    .nullable()
+    .optional(),
 });
 
 function defined<T extends object>(obj: T): Partial<T> {
@@ -158,6 +172,92 @@ export function sampleRoutes(ctx: AppContext) {
       return sample;
     }
 
+    /**
+     * Protein, oil and moisture from an instrument's export (NIR analyser,
+     * moisture meter): each row names a sample by number or e-NAM lot ID.
+     * Without `apply` nothing changes: the answer is a preview. Only open
+     * samples take values; a completed one is reopened first.
+     */
+    app.post("/samples/measurements/import", write, async (request) => {
+      const me = authOf(request);
+      const body = z
+        .object({
+          csv: z.string().min(1).max(900_000),
+          apply: z.boolean().default(false),
+        })
+        .parse(request.body);
+      let table: ReturnType<typeof readMeasurements>;
+      try {
+        table = readMeasurements(body.csv);
+      } catch (err) {
+        throw badRequest(err instanceof Error ? err.message : String(err));
+      }
+      if (table.rows.length > 2000)
+        throw badRequest("At most 2000 rows at a time");
+      const out = [];
+      let applied = 0;
+      for (const row of table.rows) {
+        const result = {
+          line: row.line,
+          sampleNumber: row.sampleNumber,
+          lotId: row.lotId,
+          values: row.values,
+          sampleId: null as string | null,
+          error: row.error ?? null,
+        };
+        if (!result.error) {
+          const found = await ctx.db
+            .select({
+              id: samples.id,
+              number: samples.number,
+              status: samples.status,
+            })
+            .from(samples)
+            .where(
+              and(
+                eq(samples.orgId, me.orgId),
+                row.sampleNumber !== null
+                  ? eq(samples.number, row.sampleNumber)
+                  : eq(samples.enamLotId, row.lotId!),
+              ),
+            )
+            .orderBy(desc(samples.createdAt));
+          const open = found.filter((f) => f.status === "in_progress");
+          if (!found.length) result.error = "No such sample";
+          else if (open.length > 1)
+            result.error = `Several open samples for this lot (#${open.map((o) => o.number).join(", #")})`;
+          else if (!open.length)
+            result.error = `Sample #${found[0]!.number} is completed: reopen it to change its values`;
+          else {
+            result.sampleId = open[0]!.id;
+            result.sampleNumber = open[0]!.number;
+          }
+        }
+        if (body.apply && result.sampleId) {
+          const v = row.values;
+          await ctx.db
+            .update(samples)
+            .set({
+              ...(v.protein !== undefined && { proteinPct: v.protein }),
+              ...(v.oil !== undefined && { oilPct: v.oil }),
+              ...(v.moisture !== undefined && { moisturePct: v.moisture }),
+            })
+            .where(eq(samples.id, result.sampleId));
+          await refreshResult(ctx, result.sampleId);
+          applied++;
+        }
+        out.push(result);
+      }
+      if (body.apply && applied)
+        await audit(ctx.db, {
+          orgId: me.orgId,
+          userId: me.id,
+          action: "samples.measurements_imported",
+          detail: { applied, rows: table.rows.length },
+        });
+      return { columns: table.columns, rows: out, applied };
+    });
+
     app.get("/samples", async (request) => {
       const me = authOf(request);
       const q = z
@@ -177,6 +277,9 @@ export function sampleRoutes(ctx: AppContext) {
           or(
             ilike(samples.crop, like),
             ilike(samples.source, like),
+            ilike(samples.enamLotId, like),
+            ilike(samples.gateEntryNo, like),
+            ilike(samples.farmerName, like),
             ...(Number.isInteger(asNumber)
               ? [eq(samples.number, asNumber)]
               : []),
@@ -191,6 +294,8 @@ export function sampleRoutes(ctx: AppContext) {
             number: samples.number,
             crop: samples.crop,
             source: samples.source,
+            enamLotId: samples.enamLotId,
+            farmerName: samples.farmerName,
             status: samples.status,
             grade: sql<string | null>`${samples.result}->'grade'->>'grade'`,
             totalDefectsPct: sql<
@@ -582,6 +687,11 @@ export function sampleRoutes(ctx: AppContext) {
           graderName: z.string().trim().max(120).optional(),
           gradedOn: z.iso.date().optional(),
           notes: z.string().max(2000).optional(),
+          lab: z.string().trim().max(120).optional(),
+          reportNo: z.string().trim().max(60).optional(),
+          moisturePct: Pct.optional(),
+          proteinPct: Pct.optional(),
+          oilPct: Pct.optional(),
         })
         .nullable()
         .parse(request.body);
