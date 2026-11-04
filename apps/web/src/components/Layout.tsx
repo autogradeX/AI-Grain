@@ -459,6 +459,11 @@ export function Layout() {
       <div className="app-main">
         <OfflineBanner />
         <OfflineQueueBanner />
+        {user?.verifyUrlProblem && (
+          <div className="banner" role="alert">
+            {t("verifyUrlProblem", { url: user.verifyUrlProblem })}
+          </div>
+        )}
         {user && user.emailEnabled && !user.emailVerified && (
           <div className="banner">
             {t("confirmEmail", { email: user.email })}

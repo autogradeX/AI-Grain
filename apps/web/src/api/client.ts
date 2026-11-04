@@ -47,6 +47,11 @@ export interface CurrentUser {
   emailVerified: boolean;
   /** The server can send email; without it, nobody is asked to confirm theirs. */
   emailEnabled: boolean;
+  /**
+   * For admins: the server's address when QR codes on reports would point
+   * to the server's own computer (APP_URL not set); null when fine.
+   */
+  verifyUrlProblem?: string | null;
   org: { id: string; name: string };
 }
 

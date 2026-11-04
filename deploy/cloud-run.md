@@ -89,12 +89,14 @@ gcloud run deploy ai-grain --image=$IMAGE:latest --region=$REGION \
   --min-instances=0 --max-instances=5 --timeout=300
 ```
 
-`--allow-unauthenticated` lets phones reach the app; the app does its own sign-in. After the first deploy, set the public URL used in emailed links:
+`--allow-unauthenticated` lets phones reach the app; the app does its own sign-in. After the first deploy, set the public URL. The QR code and verification link on every report point to it, and so do emailed links. Until it is set they point to `http://localhost:5173`, the server warns in its log and admins see a banner in the app:
 
 ```sh
 URL=$(gcloud run services describe ai-grain --region=$REGION --format='value(status.url)')
 gcloud run services update ai-grain --region=$REGION --update-env-vars=APP_URL=$URL
 ```
+
+Reports already made are rebuilt with the new address the next time they are opened (the certificates themselves don't change: the same code verifies at the new address).
 
 `APP_URL` is also the address search engines see: canonical URLs, `sitemap.xml`, `robots.txt` and link previews use it. When you move to your own domain, update it to that `https://` address, then submit `https://<your domain>/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
 

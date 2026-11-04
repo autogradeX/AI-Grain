@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { appUrlIsLocal } from "../../config.js";
 import type { AppContext } from "../../context.js";
 import {
   authTokens,
@@ -56,13 +57,28 @@ export async function publicUser(ctx: AppContext, userId: string) {
       emailVerified: sql<boolean>`${users.emailVerifiedAt} is not null`,
       createdAt: users.createdAt,
       org: { id: organizations.id, name: organizations.name },
+      centralUrl: sql<
+        string | null
+      >`${organizations.integration} ->> 'centralUrl'`,
     })
     .from(users)
     .innerJoin(organizations, eq(organizations.id, users.orgId))
     .where(eq(users.id, userId));
-  // Without a mail server no confirmation email can arrive, so the app
-  // doesn't ask for one.
-  return row && { ...row, emailEnabled: Boolean(ctx.config.SMTP_URL) };
+  if (!row) return row;
+  const { centralUrl, ...user } = row;
+  return {
+    ...user,
+    // Without a mail server no confirmation email can arrive, so the app
+    // doesn't ask for one.
+    emailEnabled: Boolean(ctx.config.SMTP_URL),
+    // QR codes would point to this server's own computer (APP_URL not set):
+    // admins are told, with the address, so it gets fixed before printing.
+    // A station's links point to its central server instead.
+    verifyUrlProblem:
+      user.role === "admin" && !centralUrl && appUrlIsLocal(ctx.config)
+        ? ctx.config.APP_URL
+        : null,
+  };
 }
 
 /** Starts a new session: a new refresh-token family in a cookie, and an access token in the body. */

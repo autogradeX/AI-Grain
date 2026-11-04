@@ -94,3 +94,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   return parsed.data;
 }
+
+/**
+ * In production, an APP_URL on this computer only (localhost): QR codes and
+ * verification links printed on reports would lead nowhere for anyone else.
+ */
+export function appUrlIsLocal(config: Pick<Config, "APP_URL" | "NODE_ENV">) {
+  if (config.NODE_ENV !== "production") return false;
+  const host = new URL(config.APP_URL).hostname;
+  return (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "0.0.0.0" ||
+    host === "[::1]" ||
+    host.startsWith("127.")
+  );
+}

@@ -38,19 +38,23 @@ const samplePrefix = (s: { orgId: string; id: string }) =>
 /**
  * Where a completed sample's report is kept. The key changes with anything
  * the report shows that can change after completion (a new certificate on
- * re-completion, a rewritten summary), so a stored report is never stale.
+ * re-completion, a rewritten summary, the site's address in the QR code),
+ * so a stored report is never stale.
  */
 function cacheKey(
   sample: SampleRow,
   cert: { code: string; version: number },
   format: ReportFormat,
   layout: ReportSettings,
+  /** Where the QR code points: a changed site address gives a new report. */
+  verifyUrl: string,
 ): string {
   const hash = createHash("sha256")
     .update(
       JSON.stringify([
         cert.code,
         cert.version,
+        verifyUrl,
         sample.aiSummary,
         sample.updatedAt.toISOString(),
         sample.completedAt?.toISOString() ?? null,
@@ -85,7 +89,13 @@ export async function reportPdf(
       ? await currentCertificate(ctx, sample.id)
       : null;
   if (!cert) return buildReport(ctx, sample, null, format, org);
-  const key = cacheKey(sample, cert, format, layout);
+  const key = cacheKey(
+    sample,
+    cert,
+    format,
+    layout,
+    await verifyBase(ctx, sample.orgId),
+  );
   try {
     return await ctx.storage.get(key);
   } catch {

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { Storage as GcsClient } from "@google-cloud/storage";
 import { ClaudeClassifier, UnconfiguredClassifier } from "./ai/classifier.js";
 import { buildApp } from "./app.js";
-import { loadConfig } from "./config.js";
+import { appUrlIsLocal, loadConfig } from "./config.js";
 import { SchemaMismatchError } from "./db/adopt.js";
 import { createDb, DatabaseUnreachableError } from "./db/client.js";
 import { MobileNetEmbedder } from "./imaging/embedder.js";
@@ -88,6 +88,11 @@ if (!config.ANTHROPIC_API_KEY) {
 if (!embedder) {
   app.log.warn(
     `The image model is not installed (${imageModelPath}): the local model uses kernel measurements. Run npm run fetch-model.`,
+  );
+}
+if (appUrlIsLocal(config)) {
+  app.log.warn(
+    `APP_URL is ${config.APP_URL}: QR codes and verification links on reports point to this computer only. Set APP_URL to the site's public address (see deploy/cloud-run.md).`,
   );
 }
 if (!config.SMTP_URL) {

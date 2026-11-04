@@ -26,6 +26,10 @@ export const m = defineMessages({
   openMenu: { en: "Open menu", hi: "मेनू खोलें" },
   closeMenu: { en: "Close menu", hi: "मेनू बंद करें" },
   account: { en: "Account", hi: "खाता" },
+  verifyUrlProblem: {
+    en: "QR codes and verification links on reports point to {url}, which works only on the server's own computer. Ask whoever runs the server to set APP_URL to this site's public address; reports are rebuilt with it.",
+    hi: "रिपोर्ट पर QR कोड और सत्यापन लिंक {url} की ओर जाते हैं, जो केवल सर्वर के अपने कंप्यूटर पर काम करता है। सर्वर चलाने वाले से APP_URL को इस साइट के सार्वजनिक पते पर सेट करवाएँ; रिपोर्ट उसी से फिर बनेंगी।",
+  },
   confirmEmail: {
     en: "Check your inbox to confirm your email address ({email}).",
     hi: "अपना ईमेल पता ({email}) पक्का करने के लिए अपना इनबॉक्स देखें।",
