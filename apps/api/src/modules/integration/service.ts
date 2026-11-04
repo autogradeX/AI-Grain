@@ -21,6 +21,40 @@ import { getStandard } from "../standards/routes.js";
 
 /** Version of the result format, so receivers can tell changes apart. */
 export const RESULT_SCHEMA = "ai-grain/assaying-result@1";
+/** The lot-centred format sent to the e-NAM connection. */
+export const ENAM_SCHEMA = "ai-grain/enam-assaying@1";
+
+/**
+ * A result as the e-NAM connection receives it: keyed by the e-NAM lot, with
+ * the farmer, every parameter and the certificate. The receiving bridge maps
+ * the parameter codes to e-NAM's own (see docs/integration.md).
+ */
+export function enamResult(result: Awaited<ReturnType<typeof assayingResult>>) {
+  return {
+    schema: ENAM_SCHEMA,
+    lotId: result.enam.lotId,
+    gateEntryNo: result.enam.gateEntryNo,
+    farmer: { name: result.enam.farmer.name, id: result.enam.farmer.id },
+    commodity: result.commodity,
+    assayedAt: result.assayedAt,
+    assayer: result.organisation,
+    sampleNumber: result.sampleNumber,
+    standard: result.standard,
+    grade: result.grade,
+    resultSource: result.resultSource,
+    purityPct: result.purityPct,
+    totalDefectsPct: result.totalDefectsPct,
+    parameters: result.parameters
+      .filter((p) => p.kind !== "class" || (p.value ?? 0) > 0)
+      .map((p) => ({
+        code: p.code,
+        name: p.name,
+        value: p.value,
+        unit: p.unit,
+      })),
+    certificate: result.certificate,
+  };
+}
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -316,6 +350,8 @@ export async function notifyCompleted(
     ...(cert && {
       central: { result, certificate: certificateForCentral(cert) },
     }),
+    // e-NAM gets results of its own lots only.
+    ...(sample.enamLotId && { enam: enamResult(result) }),
   });
 }
 
@@ -329,8 +365,15 @@ export async function notifyWithdrawn(
 ): Promise<void> {
   if (!codes.length) return;
   const data = { sampleId, codes, reason };
+  const [sample] = await ctx.db
+    .select({ enamLotId: samples.enamLotId })
+    .from(samples)
+    .where(eq(samples.id, sampleId));
   await enqueue(ctx, orgId, "certificate.withdrawn", {
     webhook: data,
     central: data,
+    ...(sample?.enamLotId && {
+      enam: { schema: ENAM_SCHEMA, lotId: sample.enamLotId, codes, reason },
+    }),
   });
 }

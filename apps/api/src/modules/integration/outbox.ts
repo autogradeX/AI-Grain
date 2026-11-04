@@ -24,7 +24,7 @@ import { signBody } from "./service.js";
  * out, in order, when the connection is back.
  */
 
-type Target = "webhook" | "central";
+type Target = "webhook" | "central" | "enam";
 
 /** After a failed try: 1, 2, 4 … minutes, at most an hour. */
 export function outboxDelayMs(attempts: number): number {
@@ -42,6 +42,7 @@ async function settingsOf(ctx: AppContext, orgId: string) {
 const targetsOf = (s: IntegrationSettings): Target[] => [
   ...(s.webhookUrl && s.webhookSecret ? (["webhook"] as const) : []),
   ...(s.centralUrl && s.centralKey ? (["central"] as const) : []),
+  ...(s.enamUrl && s.enamHeaderValue ? (["enam"] as const) : []),
 ];
 
 /**
@@ -96,6 +97,15 @@ async function sendOnce(
       return { error: "The webhook is no longer set up", network: false };
     url = settings.webhookUrl;
     headers["x-aigrain-signature"] = signBody(settings.webhookSecret, body);
+  } else if (row.target === "enam") {
+    if (!settings.enamUrl || !settings.enamHeaderValue)
+      return {
+        error: "The e-NAM connection is no longer set up",
+        network: false,
+      };
+    url = settings.enamUrl;
+    headers[(settings.enamHeaderName || "authorization").toLowerCase()] =
+      settings.enamHeaderValue;
   } else {
     if (!settings.centralUrl || !settings.centralKey)
       return {

@@ -85,6 +85,8 @@ Stations download models with their station key (`GET /api/v1/local-models`,
 - Mini PC or laptop: 4 cores, 8–16 GB RAM, 256 GB SSD, Linux (Ubuntu 24.04 LTS) or Windows with Docker Desktop.
 - Wi-Fi router for the mandi (it doesn't need internet; plug its WAN port into the internet line when there is one).
 - Optional: 80 mm thermal printer (USB), lab balance with USB/RS-232 (read in Chrome or Edge on the station itself), UPS.
+- Optional: grain moisture meter with a USB or RS-232 output. The drop button beside **Moisture** waits for the meter's next result (press its print or test key); most layouts are understood ("MOISTURE: 13.4 %", "13.4% T=27.1C", "Wheat,13.4,27.1"). The balance and the meter each remember their own port.
+- Optional: NIR analyser for protein and oil. Export its results as CSV and use **Samples → Import NIR results**: rows are matched by sample number or e-NAM lot ID, previewed, and only change samples still in progress.
 
 Give the station a fixed address on the router (DHCP reservation), for example `192.168.1.20`.
 

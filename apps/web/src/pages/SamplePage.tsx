@@ -30,6 +30,7 @@ import { FakeGrainAlert } from "../components/FakeGrainAlert";
 import { LotFields, lotBody, lotOf, type Lot } from "../components/LotFields";
 import { m as lotMessages } from "../components/LotFields.i18n";
 import { KernelSizeCard, OutputButtons, RepeatCard } from "./SampleExtras";
+import { MoistureButton } from "../components/MoistureButton";
 import { ScaleButton } from "../components/ScaleButton";
 import { m } from "./SamplePage.i18n";
 
@@ -251,7 +252,7 @@ function DetailsCard({
           )}
           {(sample.farmerName || sample.farmerId || sample.farmerMobile) && (
             <>
-              <dt>{tl("farmerName")}</dt>
+              <dt>{tl("farmer")}</dt>
               <dd>
                 {[sample.farmerName, sample.farmerId, sample.farmerMobile]
                   .filter(Boolean)
@@ -407,16 +408,24 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
           </span>
         </Field>
         <Field label={t("moisture")} hint={t("moistureHint")}>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.1"
-            min="0"
-            max="100"
-            disabled={!editable}
-            value={form.moisturePct}
-            onChange={(e) => setForm({ ...form, moisturePct: e.target.value })}
-          />
+          <span className="input-with-button">
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              max="100"
+              disabled={!editable}
+              value={form.moisturePct}
+              onChange={(e) =>
+                setForm({ ...form, moisturePct: e.target.value })
+              }
+            />
+            <MoistureButton
+              disabled={!editable}
+              onMoisture={(v) => setForm({ ...form, moisturePct: String(v) })}
+            />
+          </span>
         </Field>
         <Field label={t("testWeight")} hint={t("optional")}>
           <input
@@ -1133,6 +1142,11 @@ function ReferenceCard({ sample }: { sample: Sample }) {
     grade: ref?.grade ?? "",
     graderName: ref?.graderName ?? "",
     gradedOn: ref?.gradedOn ?? "",
+    lab: ref?.lab ?? "",
+    reportNo: ref?.reportNo ?? "",
+    moisturePct: str(ref?.moisturePct),
+    proteinPct: str(ref?.proteinPct),
+    oilPct: str(ref?.oilPct),
     pct: Object.fromEntries(
       sample.cropProfile.classes.map((c) => [c.id, str(ref?.byClassPct[c.id])]),
     ),
@@ -1143,6 +1157,13 @@ function ReferenceCard({ sample }: { sample: Sample }) {
         grade: form.grade || null,
         ...(form.graderName && { graderName: form.graderName }),
         ...(form.gradedOn && { gradedOn: form.gradedOn }),
+        ...(form.lab.trim() && { lab: form.lab.trim() }),
+        ...(form.reportNo.trim() && { reportNo: form.reportNo.trim() }),
+        ...(form.moisturePct.trim() && {
+          moisturePct: Number(form.moisturePct),
+        }),
+        ...(form.proteinPct.trim() && { proteinPct: Number(form.proteinPct) }),
+        ...(form.oilPct.trim() && { oilPct: Number(form.oilPct) }),
         byClassPct: Object.fromEntries(
           sample.cropProfile.classes.flatMap(({ id: c }) =>
             form.pct[c]?.trim() ? [[c, Number(form.pct[c])]] : [],
@@ -1206,6 +1227,37 @@ function ReferenceCard({ sample }: { sample: Sample }) {
                 onChange={(e) => setForm({ ...form, gradedOn: e.target.value })}
               />
             </Field>
+            <Field label={t("refLab")}>
+              <input
+                value={form.lab}
+                onChange={(e) => setForm({ ...form, lab: e.target.value })}
+              />
+            </Field>
+            <Field label={t("refReportNo")}>
+              <input
+                value={form.reportNo}
+                onChange={(e) => setForm({ ...form, reportNo: e.target.value })}
+              />
+            </Field>
+            {(
+              [
+                ["moisturePct", t("moisture")],
+                ["proteinPct", t("protein")],
+                ["oilPct", t("oil")],
+              ] as const
+            ).map(([key, label]) => (
+              <Field key={key} label={label}>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={form[key]}
+                  onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                />
+              </Field>
+            ))}
           </div>
           <div className="grid-3">
             {sample.cropProfile.classes.map(({ id: c }) => (

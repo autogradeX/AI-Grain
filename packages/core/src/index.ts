@@ -34,10 +34,17 @@ export type {
   LimitFailure,
   LimitScope,
 } from "./grading.js";
-export { summarizeValidation } from "./validation.js";
+export {
+  DEFAULT_TOLERANCES,
+  LAB_MEASUREMENTS,
+  summarizeValidation,
+} from "./validation.js";
 export type {
   ClassAgreement,
   ComparisonPair,
+  LabMeasurement,
+  MeasurementAgreement,
+  Tolerances,
   ValidationSummary,
 } from "./validation.js";
 export { apply as applyHomography, homography } from "./homography.js";

@@ -221,3 +221,124 @@ describe("e-NAM lots, farmers and NIR values", () => {
     expect(pdf.statusCode).toBe(200);
   }, 120000);
 });
+
+describe("the e-NAM connection", () => {
+  let t: TestApp;
+  let token: string;
+  const api = <T = Record<string, unknown>>(
+    method: "GET" | "POST" | "PATCH" | "PUT",
+    url: string,
+    payload?: object,
+  ) =>
+    t.app
+      .inject({
+        method,
+        url,
+        headers: bearer(token),
+        ...(payload && { payload }),
+      })
+      .then((r) => ({ status: r.statusCode, body: r.json<T>() }));
+  const sent: { url: string; headers: Record<string, string>; body: string }[] =
+    [];
+
+  beforeAll(async () => {
+    t = await createTestApp();
+    ({ token } = await register(t, "enam2@mandi.test", "Mandi", {
+      autopilot: true,
+    }));
+    await api("PATCH", "/api/org", { autopilot: { spotCheckPct: 0 } });
+    t.webhooks.handler = (url, init) => {
+      sent.push({
+        url,
+        headers: init.headers as Record<string, string>,
+        body: init.body as string,
+      });
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    };
+  }, 60000);
+  afterAll(() => t.close());
+
+  async function completed(extra: object) {
+    const sample = await api<{ id: string }>("POST", "/api/samples", {
+      crop: "wheat",
+      ...extra,
+    });
+    const form = multipart(
+      { finish: "true" },
+      {
+        name: "photo",
+        data: await kindsBoard(Array<string>(20).fill("sound"), 3),
+      },
+    );
+    await t.app.inject({
+      method: "POST",
+      url: `/api/samples/${sample.body.id}/batches`,
+      headers: { ...bearer(token), ...form.headers },
+      payload: form.payload,
+    });
+    await t.jobs.idle();
+    await api("POST", `/api/samples/${sample.body.id}/review/accept-ai`, {});
+    await t.jobs.idle();
+    return sample.body.id;
+  }
+
+  it("sends results of e-NAM lots, authenticated, and keeps the key secret", async () => {
+    const missingKey = await api("PUT", "/api/integration/enam", {
+      url: "https://enam.test/assaying",
+    });
+    expect(missingKey.status).toBe(400);
+    const saved = await api("PUT", "/api/integration/enam", {
+      url: "https://enam.test/assaying",
+      headerName: "X-Api-Key",
+      headerValue: "enam-secret-123",
+    });
+    expect(saved.status).toBe(200);
+    const status = await api("GET", "/api/integration");
+    expect(JSON.stringify(status.body)).not.toContain("enam-secret-123");
+    expect(status.body).toMatchObject({
+      enamUrl: "https://enam.test/assaying",
+      enamHeaderName: "X-Api-Key",
+      enamHeaderValueSet: true,
+    });
+    const test = await api<{ ok: boolean }>(
+      "POST",
+      "/api/integration/enam/test",
+    );
+    expect(test.body.ok).toBe(true);
+    sent.length = 0;
+
+    await completed({});
+    expect(
+      sent.filter((s) => s.url === "https://enam.test/assaying"),
+    ).toHaveLength(0);
+
+    await completed({
+      enamLotId: "CG-RAI-9",
+      farmerName: "Sita",
+      farmerMobile: "9876543210",
+    });
+    const toEnam = sent.filter((s) => s.url === "https://enam.test/assaying");
+    expect(toEnam).toHaveLength(1);
+    expect(toEnam[0]!.headers["x-api-key"]).toBe("enam-secret-123");
+    const body = JSON.parse(toEnam[0]!.body) as {
+      event: string;
+      data: {
+        schema: string;
+        lotId: string;
+        farmer: Record<string, unknown>;
+        parameters: { code: string }[];
+        certificate: { code: string } | null;
+      };
+    };
+    expect(body.event).toBe("sample.completed");
+    expect(body.data).toMatchObject({
+      schema: "ai-grain/enam-assaying@1",
+      lotId: "CG-RAI-9",
+      farmer: { name: "Sita", id: null },
+    });
+    // The bridge gets no mobile number: it isn't an assaying result.
+    expect(JSON.stringify(body)).not.toContain("9876543210");
+    expect(body.data.parameters.some((p) => p.code === "moisture")).toBe(true);
+    expect(body.data.certificate?.code).toBeTruthy();
+  }, 180000);
+});

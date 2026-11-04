@@ -1,6 +1,26 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  downloadReport: {
+    en: "Download the validation report (CSV)",
+    hi: "सत्यापन रिपोर्ट डाउनलोड करें (CSV)",
+  },
+  within: { en: "Within ±{tol}", hi: "±{tol} के भीतर" },
+  withinPlain: { en: "Within tolerance", hi: "सहनशीलता के भीतर" },
+  measurements: {
+    en: "Moisture, protein and oil against the lab",
+    hi: "लैब की तुलना में नमी, प्रोटीन और तेल",
+  },
+  measurement: { en: "Measurement", hi: "माप" },
+  moisture: { en: "Moisture", hi: "नमी" },
+  protein: { en: "Protein", hi: "प्रोटीन" },
+  oil: { en: "Oil", hi: "तेल" },
+  tolerances: { en: "Tolerances", hi: "सहनशीलता" },
+  tolerancesHint: {
+    en: "How close, in percentage points, counts as agreeing with the reference. Use the figures your tender or standard states; empty boxes use the defaults shown.",
+    hi: "संदर्भ से कितना पास (प्रतिशत अंकों में) सहमति माना जाए। अपने टेंडर या मानक में दिए अंक डालें; खाली बॉक्स दिखाए गए डिफ़ॉल्ट लेते हैं।",
+  },
+  tolClass: { en: "Each class", hi: "हर वर्ग" },
   title: { en: "Validation", hi: "सत्यापन" },
   intro: {
     en: "Model Orchestration runs general-purpose AI, not trained on your grain, so its accuracy is unknown until tested. Grade 30–50 samples both ways (a certified grader and this method), enter the grader's result on each sample, and compare per class here before relying on the results.",

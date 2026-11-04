@@ -121,6 +121,59 @@ anything the receiver missed (it was down, or a delivery failed three times).
 - **`certificate.verifyUrl`:** a public page that confirms the result, the
   same one the QR code on the printed report opens.
 
+## e-NAM connection
+
+Under **Integrations → e-NAM connection**, enter the address and key you get
+from your state's e-NAM cell or e-NAM bridge, and the header the key goes in
+(`Authorization` by default, e.g. `Bearer abc…`, or `X-Api-Key`). From then
+on every completed sample **with an e-NAM lot ID** is POSTed there, in the
+same envelope as the webhook (`id`, `event`, `createdAt`, `data`), and
+retried by the outbox until it is accepted. Samples without a lot ID aren't
+sent. Reopening a sample sends `certificate.withdrawn` with its lot ID.
+
+The `data` of `sample.completed` is lot-centred:
+
+```json
+{
+  "schema": "ai-grain/enam-assaying@1",
+  "lotId": "CG-RAI-2026-004512",
+  "gateEntryNo": "GE/1187",
+  "farmer": { "name": "Ramesh Sahu", "id": "F-77821" },
+  "commodity": { "key": "paddy", "name": "Paddy" },
+  "assayedAt": "2026-11-23T05:41:09.000Z",
+  "assayer": "Krishi Upaj Mandi Samiti Raipur",
+  "sampleNumber": 128,
+  "standard": "Paddy FAQ (Mandi)",
+  "grade": "FAQ",
+  "resultSource": "weighed",
+  "purityPct": 96.4,
+  "totalDefectsPct": 3.6,
+  "parameters": [
+    {
+      "code": "impurity",
+      "name": "Impurities & foreign material",
+      "value": 0.6,
+      "unit": "%"
+    },
+    { "code": "moisture", "name": "Moisture", "value": 16.5, "unit": "%" }
+  ],
+  "certificate": {
+    "code": "BQDC-G5RV-T9Q7",
+    "version": 1,
+    "sha256": "9a3f…",
+    "verifyUrl": "https://…"
+  }
+}
+```
+
+`parameters` holds every group and measurement, and the classes with a
+non-zero value. Their `code`s are stable: the bridge maps them once to
+e-NAM's own assaying parameter codes for each commodity. That mapping, and
+e-NAM's exact endpoint and authentication, come from e-NAM (SFAC / the
+state's e-NAM cell); this connection is built to carry them, and changes to
+the format will be versioned (`@2`). The farmer's mobile number is not sent
+here; connected systems that need it read it from the full result.
+
 ## Webhook
 
 Each delivery is a `POST` with a JSON body:

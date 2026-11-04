@@ -107,6 +107,14 @@ export interface IntegrationSettings {
   centralUrl?: string;
   /** API key (station scope) issued by the central server. */
   centralKey?: string;
+  /**
+   * The e-NAM connection (the state's e-NAM bridge or assaying API): each
+   * completed sample with an e-NAM lot ID is sent there, with this header
+   * for authentication. The header's value is a secret, never returned.
+   */
+  enamUrl?: string;
+  enamHeaderName?: string;
+  enamHeaderValue?: string;
 }
 
 export const organizations = pgTable("organizations", {
@@ -735,7 +743,7 @@ export const outbox = pgTable(
     orgId: uuid("org_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    target: text("target").$type<"webhook" | "central">().notNull(),
+    target: text("target").$type<"webhook" | "central" | "enam">().notNull(),
     event: text("event").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
     attempts: integer("attempts").notNull().default(0),

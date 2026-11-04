@@ -1,3 +1,10 @@
+import {
+  deviceBaud,
+  readUntil,
+  serialSupported,
+  setDeviceBaud,
+} from "./serial";
+
 /*
  * Reading a lab balance over USB/RS-232 with the Web Serial API (Chrome and
  * Edge on desktop). Most balances send a line per reading, e.g.
@@ -39,92 +46,24 @@ export function parseScaleLine(line: string): ScaleReading | null {
   };
 }
 
-// Minimal Web Serial types (not in TypeScript's DOM library yet).
-interface SerialPortLike {
-  open(options: { baudRate: number }): Promise<void>;
-  close(): Promise<void>;
-  readable: ReadableStream<Uint8Array> | null;
-  writable: WritableStream<Uint8Array> | null;
-}
-interface SerialLike {
-  requestPort(): Promise<SerialPortLike>;
-  getPorts(): Promise<SerialPortLike[]>;
-}
-
-const serial = (): SerialLike | null =>
-  typeof navigator !== "undefined" && "serial" in navigator
-    ? (navigator as unknown as { serial: SerialLike }).serial
-    : null;
-
 /** This browser can talk to a balance over a serial cable. */
-export const scaleSupported = () => serial() !== null;
+export const scaleSupported = serialSupported;
 
-const BAUD_KEY = "ai-grain.scale.baud";
-export function scaleBaud(): number {
-  try {
-    return Number(localStorage.getItem(BAUD_KEY)) || 9600;
-  } catch {
-    return 9600;
-  }
-}
-export function setScaleBaud(baud: number) {
-  try {
-    localStorage.setItem(BAUD_KEY, String(baud));
-  } catch {
-    // Not remembered; 9600 next time.
-  }
-}
-
-let port: SerialPortLike | null = null;
-
-async function openPort(): Promise<SerialPortLike> {
-  if (port?.readable) return port;
-  const s = serial();
-  if (!s) throw new Error("This browser can't connect to a scale");
-  // A port allowed before is reused without asking again.
-  const known = await s.getPorts();
-  const p = known[0] ?? (await s.requestPort());
-  await p.open({ baudRate: scaleBaud() });
-  port = p;
-  return p;
-}
+export const scaleBaud = () => deviceBaud("scale");
+export const setScaleBaud = (baud: number) => setDeviceBaud("scale", baud);
 
 /**
  * Reads a stable weight from the balance, in grams. Asks the balance to
- * print ("P" / "SI") in case it only sends on request, and waits up to
+ * print ("SI") in case it only sends on request, and waits up to
  * `timeoutMs` for a stable line.
  */
-export async function readScale(timeoutMs = 8000): Promise<number> {
-  const p = await openPort();
-  const writer = p.writable?.getWriter();
-  if (writer) {
-    try {
-      await writer.write(new TextEncoder().encode("SI\r\n"));
-    } catch {
-      // Balances that stream continuously don't need the request.
-    } finally {
-      writer.releaseLock();
-    }
-  }
-  const reader = p.readable!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  const timer = setTimeout(() => void reader.cancel(), timeoutMs);
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split(/\r?\n|\r/);
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const reading = parseScaleLine(line);
-        if (reading?.stable) return reading.grams;
-      }
-    }
-  } finally {
-    clearTimeout(timer);
-    reader.releaseLock();
-  }
-  throw new Error("No stable reading from the scale");
+export function readScale(timeoutMs = 8000): Promise<number> {
+  return readUntil(
+    "scale",
+    (line) => {
+      const reading = parseScaleLine(line);
+      return reading?.stable ? reading.grams : null;
+    },
+    { request: "SI\r\n", timeoutMs },
+  );
 }

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CloudUpload, KeyRound, Server, Webhook } from "lucide-react";
+import { CloudUpload, KeyRound, Landmark, Server, Webhook } from "lucide-react";
 import { useState } from "react";
 import { api } from "../api/client";
 import {
@@ -26,6 +26,9 @@ interface Integration {
   webhookSecret: string | null;
   centralUrl: string | null;
   centralKeySet: boolean;
+  enamUrl: string | null;
+  enamHeaderName: string | null;
+  enamHeaderValueSet: boolean;
   outbox: OutboxStatus;
   schema: string;
 }
@@ -38,7 +41,7 @@ interface OutboxStatus {
   lastSentAt: string | null;
   recent: {
     id: string;
-    target: "webhook" | "central";
+    target: "webhook" | "central" | "enam";
     event: string;
     attempts: number;
     lastError: string | null;
@@ -151,6 +154,128 @@ function CentralCard({ data }: { data: Integration }) {
   );
 }
 
+/** The e-NAM connection: results of samples with an e-NAM lot ID go there. */
+function EnamCard({ data }: { data: Integration }) {
+  const t = useT(m);
+  const qc = useQueryClient();
+  const [url, setUrl] = useState(data.enamUrl ?? "");
+  const [headerName, setHeaderName] = useState(
+    data.enamHeaderName ?? "Authorization",
+  );
+  const [value, setValue] = useState("");
+  const save = useMutation({
+    mutationFn: (body: {
+      url: string | null;
+      headerName?: string;
+      headerValue?: string;
+    }) => api.put("/integration/enam", body),
+    onSuccess: () => {
+      setValue("");
+      void qc.invalidateQueries({ queryKey: ["integration"] });
+    },
+  });
+  const test = useMutation({
+    mutationFn: () =>
+      api.post<{ ok: boolean; status: number | null; error?: string }>(
+        "/integration/enam/test",
+      ),
+  });
+  return (
+    <Card
+      title={
+        <span className="row">
+          <Landmark size={18} aria-hidden /> {t("enam")}
+        </span>
+      }
+    >
+      <p className="muted small">{t("enamHint")}</p>
+      <form
+        className="stack-sm"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate({
+            url: url.trim() || null,
+            headerName: headerName.trim() || "Authorization",
+            ...(value.trim() && { headerValue: value.trim() }),
+          });
+        }}
+      >
+        <div className="grid-3">
+          <Field label={t("enamUrl")}>
+            <input
+              type="url"
+              placeholder="https://enam-bridge.example.gov.in/assaying"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+          </Field>
+          <Field label={t("enamHeaderName")}>
+            <input
+              className="mono"
+              value={headerName}
+              onChange={(e) => setHeaderName(e.target.value)}
+            />
+          </Field>
+          <Field
+            label={t("enamHeaderValue")}
+            hint={
+              data.enamHeaderValueSet
+                ? t("enamHeaderValueSet")
+                : t("enamHeaderValueHint")
+            }
+          >
+            <input
+              className="mono"
+              type="password"
+              autoComplete="off"
+              placeholder="Bearer …"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </Field>
+        </div>
+        <ErrorNote error={save.error ?? test.error} />
+        {test.data && (
+          <p className={test.data.ok ? "good small" : "error small"}>
+            {test.data.ok
+              ? t("enamOk")
+              : t("testFailed", {
+                  reason: test.data.error ?? `HTTP ${test.data.status}`,
+                })}
+          </p>
+        )}
+        <div className="row wrap">
+          <button className="primary" disabled={save.isPending}>
+            {t("saveEnam")}
+          </button>
+          {data.enamUrl && (
+            <>
+              <button
+                type="button"
+                disabled={test.isPending}
+                onClick={() => test.mutate()}
+              >
+                {t("test")}
+              </button>
+              <button
+                type="button"
+                className="danger"
+                disabled={save.isPending}
+                onClick={() => {
+                  setUrl("");
+                  save.mutate({ url: null });
+                }}
+              >
+                {t("removeWebhook")}
+              </button>
+            </>
+          )}
+        </div>
+      </form>
+    </Card>
+  );
+}
+
 /** Results waiting to go out, and what went out lately. */
 function OutboxCard({ data }: { data: Integration }) {
   const t = useT(m);
@@ -160,7 +285,12 @@ function OutboxCard({ data }: { data: Integration }) {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["integration"] }),
   });
   const o = data.outbox;
-  if (!data.webhookUrl && !data.centralUrl && o.recent.length === 0)
+  if (
+    !data.webhookUrl &&
+    !data.centralUrl &&
+    !data.enamUrl &&
+    o.recent.length === 0
+  )
     return null;
   return (
     <Card
@@ -207,7 +337,11 @@ function OutboxCard({ data }: { data: Integration }) {
                     {r.event}
                   </td>
                   <td>
-                    {r.target === "central" ? t("central") : t("webhook")}
+                    {r.target === "central"
+                      ? t("central")
+                      : r.target === "enam"
+                        ? t("enam")
+                        : t("webhook")}
                   </td>
                   <td>
                     {r.deliveredAt ? (
@@ -454,6 +588,7 @@ export function IntegrationsPage() {
       {data.data && (
         <>
           <OutboxCard data={data.data} />
+          <EnamCard key={data.data.enamUrl ?? ""} data={data.data} />
           <CentralCard key={data.data.centralUrl ?? ""} data={data.data} />
           <WebhookCard key={data.data.webhookUrl ?? ""} data={data.data} />
           <KeysCard data={data.data} />

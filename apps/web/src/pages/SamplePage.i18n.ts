@@ -37,11 +37,13 @@ export const m = defineMessages({
   sampleMass: { en: "Sample mass (g)", hi: "नमूने का वज़न (g)" },
   moisture: { en: "Moisture (%)", hi: "नमी (%)" },
   moistureHint: {
-    en: "Optional, from a moisture meter",
-    hi: "वैकल्पिक, नमी मीटर से",
+    en: "Optional, from a moisture meter (the drop button reads one on a cable)",
+    hi: "वैकल्पिक, नमी मीटर से (बूंद वाला बटन केबल से जुड़े मीटर को पढ़ता है)",
   },
   testWeight: { en: "Test weight (kg/hl)", hi: "टेस्ट वेट (kg/hl)" },
   protein: { en: "Protein (%)", hi: "प्रोटीन (%)" },
+  refLab: { en: "Lab", hi: "लैब" },
+  refReportNo: { en: "Lab report no.", hi: "लैब रिपोर्ट नंबर" },
   oil: { en: "Oil content (%)", hi: "तेल की मात्रा (%)" },
   nirHint: {
     en: "Optional, from an NIR analyser or a lab (imported or typed in)",

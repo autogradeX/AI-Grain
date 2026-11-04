@@ -5,6 +5,7 @@ export const m = defineMessages({
   enamLotId: { en: "e-NAM lot ID", hi: "ई-नाम लॉट आईडी" },
   gateEntryNo: { en: "Gate entry no.", hi: "गेट एंट्री नंबर" },
   farmerName: { en: "Farmer's name", hi: "किसान का नाम" },
+  farmer: { en: "Farmer", hi: "किसान" },
   farmerId: { en: "Farmer ID", hi: "किसान आईडी" },
   farmerMobile: { en: "Farmer's mobile", hi: "किसान का मोबाइल" },
   mobileHint: {

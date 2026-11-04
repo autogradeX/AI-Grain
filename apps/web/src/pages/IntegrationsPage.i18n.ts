@@ -1,6 +1,27 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  enam: { en: "e-NAM connection", hi: "ई-नाम कनेक्शन" },
+  enamHint: {
+    en: "Results of samples with an e-NAM lot ID are sent here when they complete, with the lot, farmer, every parameter and the certificate (format ai-grain/enam-assaying@1), and retried until accepted. Enter the address and key from your state's e-NAM cell or bridge; the field mapping to e-NAM's parameter codes is agreed with them.",
+    hi: "ई-नाम लॉट आईडी वाले नमूनों के परिणाम पूरे होते ही यहाँ भेजे जाते हैं, लॉट, किसान, हर पैरामीटर और प्रमाणपत्र के साथ (प्रारूप ai-grain/enam-assaying@1), और स्वीकार होने तक दोबारा भेजे जाते हैं। अपने राज्य के ई-नाम प्रकोष्ठ या ब्रिज से मिला पता और कुंजी डालें; ई-नाम के पैरामीटर कोड से मिलान उनके साथ तय होता है।",
+  },
+  enamUrl: { en: "Address (https://…)", hi: "पता (https://…)" },
+  enamHeaderName: { en: "Header for the key", hi: "कुंजी का हेडर" },
+  enamHeaderValue: { en: "Key or token", hi: "कुंजी या टोकन" },
+  enamHeaderValueSet: {
+    en: "Saved. Leave empty to keep it.",
+    hi: "सहेजा गया। रखने के लिए खाली छोड़ें।",
+  },
+  enamHeaderValueHint: {
+    en: "From the e-NAM cell or bridge, e.g. Bearer abc…",
+    hi: "ई-नाम प्रकोष्ठ या ब्रिज से, जैसे Bearer abc…",
+  },
+  enamOk: {
+    en: "The e-NAM connection accepted the test.",
+    hi: "ई-नाम कनेक्शन ने परीक्षण स्वीकार किया।",
+  },
+  saveEnam: { en: "Save e-NAM connection", hi: "ई-नाम कनेक्शन सहेजें" },
   title: { en: "Integrations", hi: "एकीकरण" },
   intro: {
     en: "Connect APMC, eNAM bridge and ERP systems. They receive each completed result (every quality parameter, grade, kernel size and the certificate code) by webhook, or read results with an API key.",

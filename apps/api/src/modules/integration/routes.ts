@@ -42,6 +42,7 @@ import {
   newApiKey,
   newWebhookSecret,
   orgForKey,
+  ENAM_SCHEMA,
   RESULT_SCHEMA,
   sendWebhook,
 } from "./service.js";
@@ -88,6 +89,9 @@ export function integrationRoutes(ctx: AppContext) {
         webhookSecret: org?.integration.webhookSecret ?? null,
         centralUrl: org?.integration.centralUrl ?? null,
         centralKeySet: Boolean(org?.integration.centralKey),
+        enamUrl: org?.integration.enamUrl ?? null,
+        enamHeaderName: org?.integration.enamHeaderName ?? null,
+        enamHeaderValueSet: Boolean(org?.integration.enamHeaderValue),
         outbox: await outboxStatus(ctx, me.orgId),
         schema: RESULT_SCHEMA,
       };
@@ -266,6 +270,113 @@ export function integrationRoutes(ctx: AppContext) {
             authorization: `Bearer ${centralKey}`,
           },
           body: JSON.stringify({ id: "test", event: "test", data: {} }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        return { ok: res.ok, status: res.status };
+      } catch (err) {
+        return {
+          ok: false,
+          status: null,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    });
+
+    /**
+     * The e-NAM connection: where results of samples with an e-NAM lot ID go
+     * (the state's e-NAM bridge or assaying API), and the header that
+     * authenticates them. The value is kept when only the address or
+     * header name changes, and is never returned; null clears it all.
+     */
+    app.put("/integration/enam", admin, async (request) => {
+      const me = authOf(request);
+      const body = z
+        .object({
+          url: z
+            .url({ protocol: /^https?$/ })
+            .max(300)
+            .nullable(),
+          headerName: z
+            .string()
+            .trim()
+            .regex(/^[A-Za-z0-9-]{1,60}$/, "A header name: letters, digits, -")
+            .optional(),
+          headerValue: z.string().trim().min(1).max(500).optional(),
+        })
+        .parse(request.body);
+      if (
+        body.url &&
+        ctx.config.NODE_ENV === "production" &&
+        !body.url.startsWith("https://")
+      )
+        throw badRequest("The e-NAM address must use https");
+      const [org] = await ctx.db
+        .select({ integration: organizations.integration })
+        .from(organizations)
+        .where(eq(organizations.id, me.orgId));
+      const current = org?.integration ?? {};
+      const {
+        enamUrl: _u,
+        enamHeaderName: _n,
+        enamHeaderValue: _v,
+        ...rest
+      } = current;
+      const value = body.headerValue ?? current.enamHeaderValue;
+      if (body.url && !value)
+        throw badRequest("Enter the key or token e-NAM gave you");
+      const headerName =
+        body.headerName ?? current.enamHeaderName ?? "Authorization";
+      await ctx.db
+        .update(organizations)
+        .set({
+          integration: body.url
+            ? {
+                ...rest,
+                enamUrl: body.url,
+                enamHeaderName: headerName,
+                enamHeaderValue: value!,
+              }
+            : rest,
+        })
+        .where(eq(organizations.id, me.orgId));
+      await audit(ctx.db, {
+        orgId: me.orgId,
+        userId: me.id,
+        action: "integration.enam_updated",
+        detail: { url: body.url, headerName },
+      });
+      return {
+        enamUrl: body.url,
+        enamHeaderName: body.url ? headerName : null,
+        enamHeaderValueSet: Boolean(body.url),
+      };
+    });
+
+    /** Sends a test event to the e-NAM connection. */
+    app.post("/integration/enam/test", admin, async (request) => {
+      const me = authOf(request);
+      const [org] = await ctx.db
+        .select({ integration: organizations.integration })
+        .from(organizations)
+        .where(eq(organizations.id, me.orgId));
+      const { enamUrl, enamHeaderName, enamHeaderValue } =
+        org?.integration ?? {};
+      if (!enamUrl || !enamHeaderValue)
+        return { ok: false, status: null, error: "No e-NAM connection set up" };
+      try {
+        const res = await (ctx.fetch ?? fetch)(enamUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-aigrain-event": "test",
+            [(enamHeaderName || "authorization").toLowerCase()]:
+              enamHeaderValue,
+          },
+          body: JSON.stringify({
+            id: "test",
+            event: "test",
+            data: { schema: ENAM_SCHEMA, message: "Test event from AI-Grain" },
+          }),
           signal: AbortSignal.timeout(10_000),
         });
         return { ok: res.ok, status: res.status };

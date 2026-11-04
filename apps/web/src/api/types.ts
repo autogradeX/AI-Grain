@@ -128,6 +128,11 @@ export interface ReferenceResult {
   graderName?: string;
   gradedOn?: string;
   notes?: string;
+  lab?: string;
+  reportNo?: string;
+  moisturePct?: number;
+  proteinPct?: number;
+  oilPct?: number;
 }
 
 export type BatchStatus =
@@ -365,16 +370,36 @@ export interface ValidationReport {
       meanBiasPct: number;
       meanAbsDiffPct: number;
       maxAbsDiffPct: number;
+      /** Share (0–1) of samples within the class tolerance. */
+      withinTolerance: number;
     }[];
+    /** Moisture, protein and oil against the lab. */
+    measurements: {
+      field: "moisture" | "protein" | "oil";
+      n: number;
+      meanBias: number;
+      meanAbsDiff: number;
+      maxAbsDiff: number;
+      withinTolerance: number;
+    }[];
+    tolerances: {
+      classPct: number;
+      moisture: number;
+      protein: number;
+      oil: number;
+    };
   };
   samples: {
     id: string;
     number: number;
     crop: string;
+    enamLotId: string | null;
     standardName: string | null;
     completedAt: string;
     methodGrade: string | null;
     referenceGrade: string | null;
+    lab: string | null;
+    reportNo: string | null;
   }[];
   /** The summary covers every sample; `samples` is one page of them. */
   total: number;

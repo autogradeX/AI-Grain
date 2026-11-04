@@ -1,8 +1,9 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Pager, usePage } from "../components/Pager";
+import { Pager, useDebounced, usePage } from "../components/Pager";
 import { Link } from "react-router-dom";
-import { api } from "../api/client";
+import { api, download } from "../api/client";
+import { useCan } from "../auth/AuthContext";
 import { useCrop } from "../api/crops";
 import { CropSelect } from "../components/CropSelect";
 import type { ValidationReport } from "../api/types";
@@ -11,6 +12,8 @@ import { useT } from "../i18n";
 import { useGrainLabels } from "../i18n/common";
 import { m } from "./ValidationPage.i18n";
 import { RepeatabilityCard } from "./Repeatability";
+import { LabImport } from "./LabImport";
+import { m as labMessages } from "./LabImport.i18n";
 
 const f = (v: number) => v.toFixed(2);
 
@@ -21,12 +24,33 @@ export function ValidationPage() {
   const [page, setPage] = usePage();
   const t = useT(m);
   const { classLabel } = useGrainLabels();
+  const can = useCan();
+  const [importing, setImporting] = useState(false);
+  const tl = useT(labMessages);
+  // Agreement tolerances in percentage points; empty uses the default.
+  const [tol, setTol] = useState({
+    cls: "",
+    moisture: "",
+    protein: "",
+    oil: "",
+  });
+  const tolQuery = useDebounced(
+    new URLSearchParams(
+      Object.entries({
+        tolClass: tol.cls,
+        tolMoisture: tol.moisture,
+        tolProtein: tol.protein,
+        tolOil: tol.oil,
+      }).filter(([, v]) => v.trim() !== "" && Number(v) >= 0),
+    ).toString(),
+  );
+  const filter = `crop=${encodeURIComponent(crop)}${tolQuery ? `&${tolQuery}` : ""}`;
   const report = useQuery({
-    queryKey: ["validation", crop, page],
+    queryKey: ["validation", crop, page, tolQuery],
     placeholderData: keepPreviousData,
     queryFn: () =>
       api.get<ValidationReport>(
-        `/validation?crop=${encodeURIComponent(crop)}&limit=${SAMPLES_PAGE}&offset=${page * SAMPLES_PAGE}`,
+        `/validation?${filter}&limit=${SAMPLES_PAGE}&offset=${page * SAMPLES_PAGE}`,
       ),
   });
   const classes = useCrop(crop)?.classes ?? [];
@@ -46,6 +70,22 @@ export function ValidationPage() {
           }}
         />
       </Field>
+      <div className="row wrap">
+        {can.write && (
+          <button onClick={() => setImporting(!importing)}>{tl("open")}</button>
+        )}
+        <button
+          onClick={() =>
+            void download(
+              `/validation/report.csv?${filter}`,
+              "ai-grain-validation.csv",
+            )
+          }
+        >
+          {t("downloadReport")}
+        </button>
+      </div>
+      {importing && <LabImport onClose={() => setImporting(false)} />}
       <RepeatabilityCard crop={crop} />
       {report.isPending && <Spinner />}
       <ErrorNote error={report.error} />
@@ -101,6 +141,9 @@ export function ValidationPage() {
                       <th>{t("bias")}</th>
                       <th>{t("meanAbsDiff")}</th>
                       <th>{t("maxAbsDiff")}</th>
+                      <th>
+                        {t("within", { tol: r.summary.tolerances.classPct })}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -116,6 +159,9 @@ export function ValidationPage() {
                         </td>
                         <td className="num">{f(c.meanAbsDiffPct)}</td>
                         <td className="num">{f(c.maxAbsDiffPct)}</td>
+                        <td className="num">
+                          {Math.round(c.withinTolerance * 100)} %
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -124,6 +170,68 @@ export function ValidationPage() {
               <p className="muted small">{t("biasNote")}</p>
             </Card>
           )}
+          {r.summary.measurements.length > 0 && (
+            <Card title={t("measurements")}>
+              <div className="table-scroll">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>{t("measurement")}</th>
+                      <th>n</th>
+                      <th>{t("bias")}</th>
+                      <th>{t("meanAbsDiff")}</th>
+                      <th>{t("maxAbsDiff")}</th>
+                      <th>{t("withinPlain")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {r.summary.measurements.map((x) => (
+                      <tr key={x.field}>
+                        <td>
+                          {t(x.field)} (±{r.summary.tolerances[x.field]})
+                        </td>
+                        <td className="num">{x.n}</td>
+                        <td className="num">
+                          {x.meanBias > 0 ? "+" : ""}
+                          {f(x.meanBias)}
+                        </td>
+                        <td className="num">{f(x.meanAbsDiff)}</td>
+                        <td className="num">{f(x.maxAbsDiff)}</td>
+                        <td className="num">
+                          {Math.round(x.withinTolerance * 100)} %
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+          <Card title={t("tolerances")}>
+            <p className="muted small">{t("tolerancesHint")}</p>
+            <div className="grid-3">
+              {(
+                [
+                  ["cls", "classPct", t("tolClass")],
+                  ["moisture", "moisture", t("moisture")],
+                  ["protein", "protein", t("protein")],
+                  ["oil", "oil", t("oil")],
+                ] as const
+              ).map(([key, field, label]) => (
+                <Field key={key} label={`${label} (±)`}>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    min="0"
+                    placeholder={String(r.summary.tolerances[field])}
+                    value={tol[key]}
+                    onChange={(e) => setTol({ ...tol, [key]: e.target.value })}
+                  />
+                </Field>
+              ))}
+            </div>
+          </Card>
           {r.samples.length > 0 && (
             <Card title={t("samples")}>
               <ul className="list">
@@ -131,7 +239,15 @@ export function ValidationPage() {
                   <li key={s.id}>
                     <Link to={`/app/samples/${s.id}`} className="list-item">
                       <span>
-                        #{s.number} · {s.standardName ?? t("noStandard")}
+                        #{s.number}
+                        {s.enamLotId && ` · ${s.enamLotId}`} ·{" "}
+                        {s.standardName ?? t("noStandard")}
+                        {(s.lab || s.reportNo) && (
+                          <span className="muted small">
+                            {" "}
+                            · {[s.lab, s.reportNo].filter(Boolean).join(" ")}
+                          </span>
+                        )}
                       </span>
                       <span>
                         {t("versus", {
