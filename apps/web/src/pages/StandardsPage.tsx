@@ -20,6 +20,17 @@ import { useT } from "../i18n";
 import { useGrainLabels } from "../i18n/common";
 import { m } from "./StandardsPage.i18n";
 
+/** A standard drafted by Model Orchestration (POST /standards/draft). */
+interface StandardDraft {
+  name: string;
+  description: string;
+  grades: GradeSpec[];
+  definitions: Record<string, string>;
+  basis: string;
+  uncertain: string[];
+  unmatched: string[];
+}
+
 export function StandardsPage() {
   const can = useCan();
   const t = useT(m);
@@ -180,6 +191,25 @@ function StandardForm({ standard }: { standard: Standard | null }) {
     standard?.grades.map(toForm) ?? [emptyGrade("1"), emptyGrade("2")],
   );
 
+  // A draft by Model Orchestration, for the admin to check before saving.
+  const [reference, setReference] = useState("");
+  const draft = useMutation({
+    mutationFn: () =>
+      api.post<{ draft: StandardDraft }>("/standards/draft", {
+        crop,
+        reference,
+      }),
+    onSuccess: ({ draft: d }) => {
+      if (d.grades.length) {
+        setName(d.name);
+        setDescription(d.description);
+        setGrades(d.grades.map(toForm));
+        setDefinitions(d.definitions);
+      }
+    },
+  });
+  const drafted = draft.data?.draft;
+
   const save = useMutation({
     mutationFn: () => {
       const body = {
@@ -248,6 +278,68 @@ function StandardForm({ standard }: { standard: Standard | null }) {
         </Link>
         <h1>{standard ? standard.name : t("newStandard")}</h1>
       </div>
+      {!standard && !readOnly && (
+        <Card title={t("draftTitle")}>
+          <p className="muted small">{t("draftHint")}</p>
+          <div className="row wrap">
+            <input
+              className="grow"
+              value={reference}
+              maxLength={300}
+              placeholder={t("draftPlaceholder")}
+              aria-label={t("draftTitle")}
+              onChange={(e) => setReference(e.target.value)}
+            />
+            <button
+              type="button"
+              disabled={draft.isPending || reference.trim().length < 3}
+              onClick={() => draft.mutate()}
+            >
+              {draft.isPending ? t("drafting") : t("draft")}
+            </button>
+          </div>
+          <ErrorNote error={draft.error} />
+          {drafted && (
+            <div className="draft-note small" role="status">
+              {drafted.grades.length ? (
+                <p>
+                  <strong>{t("draftFilled")}</strong>{" "}
+                  {t("draftCheck", {
+                    basis: drafted.basis.replace(/[.\s]+$/, ""),
+                  })}
+                </p>
+              ) : (
+                <p>
+                  <strong>{t("draftEmpty")}</strong> {drafted.basis}
+                </p>
+              )}
+              {drafted.uncertain.length > 0 && (
+                <>
+                  <p>{t("draftUncertain")}</p>
+                  <ul>
+                    {drafted.uncertain.map((u) => (
+                      <li key={u}>{u}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {drafted.unmatched.length > 0 && (
+                <>
+                  <p>
+                    {t("draftUnmatched")}{" "}
+                    <Link to="/app/crops">{t("editCrops")}</Link>
+                  </p>
+                  <ul>
+                    {drafted.unmatched.map((u) => (
+                      <li key={u}>{u}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
       <Card title={t("standard")}>
         <div className="grid-2">
           <Field label={t("name")} hint={t("nameHint")}>

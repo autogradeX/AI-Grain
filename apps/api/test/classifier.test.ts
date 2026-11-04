@@ -106,6 +106,54 @@ describe("ClaudeClassifier", () => {
     expect(body).toContain("no numeric limits");
   });
 
+  it("drafts a standard with the crop's class ids and asks for the doubts", async () => {
+    const captured: Captured[] = [];
+    const classifier = new ClaudeClassifier({
+      apiKey: "test-key",
+      fetch: fakeFetch(
+        captured,
+        message(
+          JSON.stringify({
+            name: "FCI rice (raw) 2025-26",
+            description: "Uniform specifications for raw rice.",
+            basis: "FCI uniform specifications, KMS 2025-26.",
+            grades: [
+              {
+                grade: "FAQ",
+                limits: [{ classId: "broken", maxPct: 25 }],
+                groupLimits: [{ group: "impurity", maxPct: 0.5 }],
+                maxTotalDefectsPct: null,
+                maxMoisturePct: 14,
+                minTestWeightKgPerHl: null,
+              },
+            ],
+            definitions: [],
+            uncertain: ["The moisture limit for this season."],
+            unmatched: [],
+          }),
+        ),
+      ),
+    });
+    const { draft } = await classifier.draftStandard({
+      model: "claude-opus-5-5",
+      reference: "FCI URS rice 2025-26",
+      cropLabel: "Rice",
+      classes: [{ id: "broken", label: "Brokens", group: "broken_defective" }],
+    });
+    expect(draft.grades).toEqual([
+      {
+        grade: "FAQ",
+        maxDefectPct: { broken: 25 },
+        maxGroupPct: { impurity: 0.5 },
+        maxMoisturePct: 14,
+      },
+    ]);
+    const body = JSON.stringify(captured[0]!.body);
+    expect(body).toContain("Standard: FCI URS rice 2025-26");
+    expect(body).toContain('\\"broken\\" (Brokens)');
+    expect(body).toContain("Never invent a limit");
+  });
+
   it("asks for the side when it wasn't given, and passes expert notes", async () => {
     const captured: Captured[] = [];
     const classifier = new ClaudeClassifier({

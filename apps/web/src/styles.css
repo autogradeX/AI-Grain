@@ -566,6 +566,23 @@ button.link:hover:not(:disabled) {
   padding: 1.25rem 1rem 3rem;
 }
 
+.grow {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.draft-note {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-bg);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+}
+
+.draft-note p,
+.draft-note ul {
+  margin: 0.3rem 0;
+}
+
 .fake-alert {
   border: 1px solid var(--bad);
   background: var(--bad-bg);

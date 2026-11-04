@@ -1,10 +1,12 @@
 import { randomBytes } from "node:crypto";
 import pg from "pg";
-import type { KernelVerdict } from "../src/ai/classifier.js";
-import type {
-  Classifier,
-  ClassifyRequest,
-  SummaryRequest,
+import {
+  cleanStandardDraft,
+  type Classifier,
+  type ClassifyRequest,
+  type DraftStandardRequest,
+  type KernelVerdict,
+  type SummaryRequest,
 } from "../src/ai/classifier.js";
 import { buildApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
@@ -73,6 +75,49 @@ export class FakeClassifier implements Classifier {
       usage: {
         inputTokens: 300,
         outputTokens: 600,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+      },
+    });
+  }
+
+  readonly drafts: DraftStandardRequest[] = [];
+
+  /** A two-grade draft: one known class, one the crop lacks, one group limit. */
+  draftStandard(req: DraftStandardRequest) {
+    this.drafts.push(req);
+    return Promise.resolve({
+      draft: cleanStandardDraft(
+        {
+          name: `${req.reference} (draft)`,
+          description: "Drafted for testing.",
+          basis: "Test specification, 2026 edition.",
+          grades: ["A", "B"].map((grade, i) => ({
+            grade,
+            limits: [
+              { classId: "broken", maxPct: 2 + i * 2 },
+              { classId: "not_a_class_here", maxPct: 3 },
+            ],
+            groupLimits: [{ group: "impurity" as const, maxPct: 0.5 + i }],
+            maxTotalDefectsPct: null,
+            maxMoisturePct: 14,
+            minTestWeightKgPerHl: null,
+          })),
+          definitions: [
+            {
+              classId: "broken",
+              definition: "Below three quarters of a kernel.",
+            },
+          ],
+          uncertain: ["Moisture limit may have changed this season."],
+          unmatched: [],
+        },
+        req.classes,
+        req.reference,
+      ),
+      usage: {
+        inputTokens: 500,
+        outputTokens: 800,
         cacheReadTokens: 0,
         cacheWriteTokens: 0,
       },

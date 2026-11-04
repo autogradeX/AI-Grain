@@ -104,6 +104,42 @@ export function standardRoutes(ctx: AppContext) {
       };
     });
 
+    /**
+     * Drafts a standard's grades, limits and definitions from the standard
+     * the lab names, for this crop's classes. Nothing is saved: the admin
+     * checks the draft against the official document in the editor first.
+     * The Advanced tier: this needs the widest knowledge of official texts.
+     */
+    app.post("/standards/draft", admin, async (request) => {
+      const me = authOf(request);
+      const body = z
+        .object({
+          crop: z.string().trim().min(1).max(60).transform(normalizeCropKey),
+          reference: z.string().trim().min(3).max(300),
+        })
+        .parse(request.body);
+      const crop = await ensureCrop(ctx, me.orgId, body.crop);
+      try {
+        const { draft } = await ctx.classifier.draftStandard({
+          model: ctx.config.EXPERT_MODEL,
+          reference: body.reference,
+          cropLabel: crop.label,
+          classes: crop.classes,
+        });
+        await audit(ctx.db, {
+          orgId: me.orgId,
+          userId: me.id,
+          action: "standards.drafted",
+          detail: { crop: body.crop, reference: body.reference },
+        });
+        return { draft };
+      } catch (err) {
+        throw badRequest(
+          `Model Orchestration could not draft the standard: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    });
+
     app.get("/standards/:id", async (request) => {
       const { id } = z.object({ id: z.uuid() }).parse(request.params);
       const row = await getStandard(ctx, authOf(request).orgId, id);

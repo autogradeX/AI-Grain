@@ -1,6 +1,40 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  draftTitle: {
+    en: "Draft with Model Orchestration",
+    hi: "मॉडल ऑर्केस्ट्रेशन से मसौदा बनाएँ",
+  },
+  draftHint: {
+    en: "Name the official standard you grade against (agency, commodity, grade, season). Model Orchestration drafts its grades, limits and definitions for this crop's classes. It can be wrong or out of date: check every limit against the official document before saving.",
+    hi: "जिस आधिकारिक मानक से आप ग्रेडिंग करते हैं उसका नाम लिखें (एजेंसी, फ़सल, ग्रेड, सीज़न)। मॉडल ऑर्केस्ट्रेशन इस फ़सल के वर्गों के लिए उसके ग्रेड, सीमाएँ और परिभाषाएँ का मसौदा बनाता है। यह ग़लत या पुराना हो सकता है: सहेजने से पहले हर सीमा आधिकारिक दस्तावेज़ से मिलाएँ।",
+  },
+  draftPlaceholder: {
+    en: "e.g. FCI Uniform Specifications, rice (raw), 2025-26",
+    hi: "जैसे FCI समान विनिर्देश, चावल (कच्चा), 2025-26",
+  },
+  draft: { en: "Draft the limits", hi: "सीमाओं का मसौदा बनाएँ" },
+  drafting: { en: "Drafting…", hi: "मसौदा बन रहा है…" },
+  draftFilled: {
+    en: "The form below is filled with the draft.",
+    hi: "नीचे का फ़ॉर्म मसौदे से भर दिया गया है।",
+  },
+  draftCheck: {
+    en: "Based on: {basis}. Check every limit against the official document, then save.",
+    hi: "आधार: {basis}। हर सीमा आधिकारिक दस्तावेज़ से मिलाएँ, फिर सहेजें।",
+  },
+  draftEmpty: {
+    en: "No draft: Model Orchestration doesn't know this standard well enough.",
+    hi: "कोई मसौदा नहीं: मॉडल ऑर्केस्ट्रेशन इस मानक को पर्याप्त नहीं जानता।",
+  },
+  draftUncertain: {
+    en: "Not sure about (check these first):",
+    hi: "इन पर निश्चित नहीं (पहले इन्हें जाँचें):",
+  },
+  draftUnmatched: {
+    en: "The standard limits these, but this crop has no class for them. Add the classes to the crop to set their limits:",
+    hi: "मानक इनकी सीमा तय करता है, पर इस फ़सल में इनका कोई वर्ग नहीं है। इनकी सीमा रखने के लिए फ़सल में वर्ग जोड़ें:",
+  },
   title: { en: "Grading standards", hi: "ग्रेडिंग मानक" },
   newStandard: { en: "New standard", hi: "नया मानक" },
   intro: {

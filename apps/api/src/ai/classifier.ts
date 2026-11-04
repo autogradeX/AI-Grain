@@ -7,13 +7,16 @@ import {
   slugifyClassId,
   UNCLEAR,
   type ClassDef,
+  type GradeSpec,
 } from "@ai-grain/core";
 import { z } from "zod";
 import type { ClaudeModel } from "../config.js";
 import {
   CLASSIFY_SYSTEM,
+  classLines,
   CROP_SYSTEM,
   EXPERT_NOTE,
+  STANDARD_SYSTEM,
   SUMMARY_SYSTEM,
   classifyContext,
 } from "./prompts.js";
@@ -76,6 +79,28 @@ export interface CropSuggestion {
   classes: ClassDef[];
 }
 
+/** A grading standard drafted by Model Orchestration: for the lab to check, never used as is. */
+export interface StandardDraft {
+  name: string;
+  description: string;
+  grades: GradeSpec[];
+  definitions: Record<string, string>;
+  /** Which document and edition the draft follows. */
+  basis: string;
+  /** Limits and definitions it isn't sure of. */
+  uncertain: string[];
+  /** Limits of the standard this crop has no class for. */
+  unmatched: string[];
+}
+
+export interface DraftStandardRequest {
+  model: ClaudeModel;
+  /** The standard the lab grades against, in its own words. */
+  reference: string;
+  cropLabel: string;
+  classes: readonly ClassDef[];
+}
+
 export interface Classifier {
   classify(req: ClassifyRequest): Promise<ClassifyResult>;
   /** A new crop's label and defect classes, from its name. */
@@ -84,6 +109,10 @@ export interface Classifier {
     name: string;
   }): Promise<{ suggestion: CropSuggestion; usage: Usage }>;
   summarize(req: SummaryRequest): Promise<{ text: string; usage: Usage }>;
+  /** A draft of a grading standard's grades and limits, from the standard's name. */
+  draftStandard(
+    req: DraftStandardRequest,
+  ): Promise<{ draft: StandardDraft; usage: Usage }>;
 }
 
 export class ClassifierError extends Error {}
@@ -331,6 +360,43 @@ export class ClaudeClassifier implements Classifier {
     return this.suggestCropOnline(req).catch(unavailable);
   }
 
+  draftStandard(req: DraftStandardRequest) {
+    return this.draftStandardOnline(req).catch(unavailable);
+  }
+
+  private async draftStandardOnline(req: DraftStandardRequest) {
+    const message = await this.client.beta.messages.parse({
+      model: req.model,
+      max_tokens: 12000,
+      ...fallbackParams(req.model),
+      system: STANDARD_SYSTEM,
+      messages: [
+        {
+          role: "user",
+          content: `Standard: ${req.reference.trim().slice(0, 300)}
+Commodity: ${req.cropLabel}
+
+The tool's classes for this commodity, by group (use these ids):
+${classLines(req.classes)}`,
+        },
+      ],
+      output_config: { format: betaZodOutputFormat(standardSchema) },
+    });
+    checkStop(message);
+    if (!message.parsed_output)
+      throw new ClassifierError(
+        "The Model Orchestration answer was not valid JSON",
+      );
+    return {
+      draft: cleanStandardDraft(
+        message.parsed_output,
+        req.classes,
+        req.reference,
+      ),
+      usage: usageOf(message.usage),
+    };
+  }
+
   private async summarizeOnline(req: SummaryRequest) {
     const message = await this.client.beta.messages.create({
       model: req.model,
@@ -399,6 +465,94 @@ export function cleanCropSuggestion(
   return { label: raw.label.trim().slice(0, 80) || name.trim(), classes };
 }
 
+const standardSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  basis: z.string(),
+  grades: z.array(
+    z.object({
+      grade: z.string(),
+      limits: z.array(z.object({ classId: z.string(), maxPct: z.number() })),
+      groupLimits: z.array(
+        z.object({ group: z.enum(CLASS_GROUPS), maxPct: z.number() }),
+      ),
+      maxTotalDefectsPct: z.number().nullable(),
+      maxMoisturePct: z.number().nullable(),
+      minTestWeightKgPerHl: z.number().nullable(),
+    }),
+  ),
+  definitions: z.array(
+    z.object({ classId: z.string(), definition: z.string() }),
+  ),
+  uncertain: z.array(z.string()),
+  unmatched: z.array(z.string()),
+});
+
+/**
+ * Turns the model's answer into a standard the editor accepts: only this
+ * crop's class ids (others are reported as unmatched), percentages within
+ * 0–100, unique grade names. A draft with no grades is still returned: its
+ * basis says why.
+ */
+export function cleanStandardDraft(
+  raw: z.infer<typeof standardSchema>,
+  classes: readonly ClassDef[],
+  reference: string,
+): StandardDraft {
+  const ids = new Set(classes.map((c) => c.id));
+  const unmatched = raw.unmatched.map((u) => u.trim().slice(0, 200));
+  const pct = (v: number | null) =>
+    v === null || !Number.isFinite(v) || v < 0 || v > 100
+      ? undefined
+      : Math.round(v * 100) / 100;
+  const seen = new Set<string>();
+  const grades: GradeSpec[] = [];
+  for (const g of raw.grades.slice(0, 20)) {
+    const grade = g.grade.trim().slice(0, 40);
+    if (!grade || seen.has(grade)) continue;
+    seen.add(grade);
+    const maxDefectPct: Record<string, number> = {};
+    for (const l of g.limits) {
+      const v = pct(l.maxPct);
+      if (v === undefined) continue;
+      if (ids.has(l.classId)) maxDefectPct[l.classId] = v;
+      else unmatched.push(`${l.classId}: ${v}% (${grade})`);
+    }
+    const spec: GradeSpec = { grade, maxDefectPct };
+    const groups: Partial<Record<(typeof CLASS_GROUPS)[number], number>> = {};
+    for (const l of g.groupLimits) {
+      const v = pct(l.maxPct);
+      if (v !== undefined) groups[l.group] = v;
+    }
+    if (Object.keys(groups).length) spec.maxGroupPct = groups;
+    const total = pct(g.maxTotalDefectsPct);
+    const moisture = pct(g.maxMoisturePct);
+    const tw =
+      g.minTestWeightKgPerHl !== null &&
+      g.minTestWeightKgPerHl > 0 &&
+      g.minTestWeightKgPerHl < 200
+        ? Math.round(g.minTestWeightKgPerHl * 10) / 10
+        : undefined;
+    if (total !== undefined) spec.maxTotalDefectsPct = total;
+    if (moisture !== undefined) spec.maxMoisturePct = moisture;
+    if (tw !== undefined) spec.minTestWeightKgPerHl = tw;
+    grades.push(spec);
+  }
+  const definitions: Record<string, string> = {};
+  for (const d of raw.definitions)
+    if (ids.has(d.classId) && d.definition.trim())
+      definitions[d.classId] = d.definition.trim().slice(0, 1000);
+  return {
+    name: raw.name.trim().slice(0, 120) || reference.trim().slice(0, 120),
+    description: raw.description.trim().slice(0, 2000),
+    grades,
+    definitions,
+    basis: raw.basis.trim().slice(0, 500),
+    uncertain: raw.uncertain.map((u) => u.trim().slice(0, 300)).slice(0, 30),
+    unmatched: [...new Set(unmatched)].slice(0, 30),
+  };
+}
+
 /** Used when no API key is configured: every call fails with a clear message. */
 export class UnconfiguredClassifier implements Classifier {
   classify(): Promise<never> {
@@ -414,6 +568,10 @@ export class UnconfiguredClassifier implements Classifier {
   }
 
   suggestCrop(): Promise<never> {
+    return this.classify();
+  }
+
+  draftStandard(): Promise<never> {
     return this.classify();
   }
 }
