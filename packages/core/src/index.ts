@@ -67,3 +67,9 @@ export {
   type MeasurementField,
   type MeasurementRow,
 } from "./table.js";
+export {
+  applySimilarity,
+  matchViews,
+  type Similarity,
+  type ViewMatch,
+} from "./views.js";

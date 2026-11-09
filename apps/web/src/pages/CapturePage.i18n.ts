@@ -1,6 +1,10 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  twoCameras: {
+    en: "Two USB cameras (top and bottom)",
+    hi: "दो USB कैमरे (ऊपर और नीचे)",
+  },
   notAnImage: {
     en: "That file is not an image the browser can open",
     hi: "यह फ़ाइल ऐसा चित्र नहीं है जिसे ब्राउज़र खोल सके",

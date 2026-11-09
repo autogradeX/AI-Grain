@@ -209,6 +209,10 @@ export interface Sample {
     /** False for photos without the grid board: no sizes in mm. */
     scaleKnown: boolean;
     error: string | null;
+    /** Two cameras: this is the bottom camera's photo of that top photo. */
+    pairOf?: string | null;
+    /** On a top photo: how many of its grains the bottom photo matched. */
+    pairMatch?: { pairs: number; share: number } | null;
     createdAt: string;
   }[];
   kernels: KernelSummary;
@@ -327,6 +331,10 @@ export interface ReviewKernel {
   firstClass: string | null;
   expertClass: string | null;
   flagReason: FlagReason | null;
+  /** Two cameras: the underside of this grain, and the verdict on it. */
+  undersideId?: string | null;
+  otherSideClass?: string | null;
+  otherSideReason?: string | null;
 }
 
 export interface UserRow {

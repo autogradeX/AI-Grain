@@ -1,3 +1,4 @@
+import { notUnderside } from "../batches/service.js";
 import {
   CLASS_GROUPS,
   summarizePercentages,
@@ -346,7 +347,7 @@ export function analyticsRoutes(ctx: AppContext) {
               spotAgreed: sql<number>`count(*) filter (where ${kernels.flagReason} = 'spot_check' and ${kernels.reviewStatus} = 'confirmed')::int`,
             })
             .from(kernels)
-            .where(inArray(kernels.sampleId, ids))
+            .where(and(inArray(kernels.sampleId, ids), notUnderside))
         : [];
 
       const turnaround = completed.map(

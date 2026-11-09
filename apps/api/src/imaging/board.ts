@@ -23,9 +23,15 @@ export interface RawImage {
  */
 export async function normalizeUpload(
   input: Buffer,
+  /** Mirror left–right: a camera below a glass tray sees the kernels mirrored. */
+  options: { mirror?: boolean } = {},
 ): Promise<{ jpeg: Buffer; width: number; height: number }> {
-  const { data, info } = await sharp(input)
-    .rotate()
+  // Turned upright (EXIF) first, then mirrored: a separate step, so the
+  // mirror never mixes with the turn.
+  const upright = options.mirror
+    ? sharp(await sharp(input).rotate().toBuffer()).flop()
+    : sharp(input).rotate();
+  const { data, info } = await upright
     .resize({
       width: 4800,
       height: 4800,

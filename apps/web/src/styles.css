@@ -566,6 +566,15 @@ button.link:hover:not(:disabled) {
   padding: 1.25rem 1rem 3rem;
 }
 
+.dual-preview {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #000;
+  border-radius: 8px;
+  margin-top: 0.5rem;
+}
+
 .grow {
   flex: 1;
   min-width: 12rem;

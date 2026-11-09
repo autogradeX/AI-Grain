@@ -214,11 +214,23 @@ function ReviewCard({
   return (
     <Card>
       <div className="kernel-detail">
-        <AuthImage
-          path={`/kernels/${kernel.id}/crop`}
-          alt={t("kernelAlt", { number: kernel.number })}
-          className="crop"
-        />
+        <div className="stack-sm">
+          <AuthImage
+            path={`/kernels/${kernel.id}/crop`}
+            alt={t("kernelAlt", { number: kernel.number })}
+            className="crop"
+          />
+          {kernel.undersideId && (
+            <>
+              <AuthImage
+                path={`/kernels/${kernel.undersideId}/crop`}
+                alt={t("undersideAlt", { number: kernel.number })}
+                className="crop"
+              />
+              <span className="muted small">{t("underside")}</span>
+            </>
+          )}
+        </div>
         <div className="stack-sm">
           <strong>
             {t("cell", { cell: kernel.cell, number: kernel.number })}
@@ -241,6 +253,18 @@ function ReviewCard({
           </div>
           {kernel.aiReason && (
             <span className="muted small">“{kernel.aiReason}”</span>
+          )}
+          {kernel.otherSideClass && (
+            <span className="small">
+              {t.rich("undersideSaid", {
+                class: (
+                  <ClassBadge cls={kernel.otherSideClass} classes={classes} />
+                ),
+              })}
+              {kernel.otherSideReason && (
+                <span className="muted"> “{kernel.otherSideReason}”</span>
+              )}
+            </span>
           )}
           {kernel.flagReason === "disagreement" && kernel.aiClass2 && (
             <span className="small">

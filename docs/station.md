@@ -85,10 +85,41 @@ Stations download models with their station key (`GET /api/v1/local-models`,
 - Mini PC or laptop: 4 cores, 8–16 GB RAM, 256 GB SSD, Linux (Ubuntu 24.04 LTS) or Windows with Docker Desktop.
 - Wi-Fi router for the mandi (it doesn't need internet; plug its WAN port into the internet line when there is one).
 - Optional: 80 mm thermal printer (USB), lab balance with USB/RS-232 (read in Chrome or Edge on the station itself), UPS.
+- Optional: two USB cameras for both sides of every grain at once (see **Two cameras** below).
 - Optional: grain moisture meter with a USB or RS-232 output. The drop button beside **Moisture** waits for the meter's next result (press its print or test key); most layouts are understood ("MOISTURE: 13.4 %", "13.4% T=27.1C", "Wheat,13.4,27.1"). The balance and the meter each remember their own port.
 - Optional: NIR analyser for protein and oil. Export its results as CSV and use **Samples → Import NIR results**: rows are matched by sample number or e-NAM lot ID, previewed, and only change samples still in progress.
 
 Give the station a fixed address on the router (DHCP reservation), for example `192.168.1.20`.
+
+## Two cameras (top and bottom)
+
+A rig with one camera above and one below a clear glass or acrylic tray
+photographs both sides of every grain in one go. On the capture screen choose
+**Two USB cameras (top and bottom)**, pick which camera is which (remembered
+on that computer), and press **Take both photos**.
+
+- **Tray:** clear glass or acrylic, clean, with no printed grid (the grid
+  board is opaque). Spread the kernels in one layer, not touching. Without
+  the board, sizes in mm need a reference coin on the tray (Settings).
+- **Light:** even, diffused light from both sides (a light panel under the
+  glass and a ring or panel above), so neither camera sees glare or deep
+  shadows.
+- **Cameras:** 8 MP or more, fixed focus at the tray, mounted firmly. They may
+  sit at different heights or be turned against each other: the server lines
+  the two photos up from the kernels themselves, no calibration needed. The
+  bottom camera's photo is mirrored on arrival.
+- **USB:** two high-resolution cameras need the bandwidth of two USB ports
+  on different controllers, or a powered USB 3 hub. If the second camera
+  doesn't appear or its preview freezes, move it to another port.
+
+What happens: each grain the top camera sees is paired with its underside;
+it is counted once, and a defect seen only from below counts (a "sound" top
+with a confident underside defect takes the defect). An unsure underside
+verdict, two different defects, or anything harmful on either side goes to a
+person, who sees both crops in review. Grains only one camera saw count on
+their own. If the two photos can't be lined up (different trays, the tray
+moved, a camera knocked), the bottom photo is marked failed with that reason:
+delete both and take them again.
 
 ## Install
 

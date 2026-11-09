@@ -7,6 +7,7 @@ import {
   insetCorners,
   type Corners,
 } from "../components/CornerEditor";
+import { DualCamera } from "../components/DualCamera";
 import { LiveCamera } from "../components/LiveCamera";
 import { Card, ErrorNote, Field } from "../components/ui";
 import { useT } from "../i18n";
@@ -45,7 +46,7 @@ export function CapturePage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [mode, setMode] = useState<"choose" | "live">("choose");
+  const [mode, setMode] = useState<"choose" | "live" | "dual">("choose");
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [corners, setCorners] = useState<Corners | null>(null);
   const [side, setSide] = useState<Side>("auto");
@@ -241,6 +242,19 @@ export function CapturePage() {
         <h1>{t("title")}</h1>
       </div>
 
+      {mode === "dual" && (
+        <DualCamera
+          sampleId={id}
+          autopilot={!!autopilot}
+          onCancel={() => setMode("choose")}
+          onDone={() => {
+            void qc.invalidateQueries({ queryKey: ["sample", id] });
+            void qc.invalidateQueries({ queryKey: ["samples"] });
+            void navigate(`/app/samples/${id}`, { replace: true });
+          }}
+        />
+      )}
+
       {mode === "live" && (
         <LiveCamera
           onCancel={() => setMode("choose")}
@@ -264,6 +278,7 @@ export function CapturePage() {
               {t("takePhoto")}
             </button>
             <button onClick={() => setMode("live")}>{t("liveCamera")}</button>
+            <button onClick={() => setMode("dual")}>{t("twoCameras")}</button>
             <button onClick={() => galleryInput.current?.click()}>
               {t("choosePhoto")}
             </button>

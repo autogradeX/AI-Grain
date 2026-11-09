@@ -33,6 +33,7 @@ import {
 } from "../batches/service.js";
 import { issueCertificate } from "../certificates/service.js";
 import { notifyCompleted } from "../integration/service.js";
+import { joinViews } from "./views.js";
 import { queueTrainingExamples } from "../localmodel/network.js";
 import { prepareReport } from "../reports/service.js";
 import { ensureCrop } from "../crops/service.js";
@@ -188,6 +189,8 @@ export async function triageBatch(
       aiSource: kernels.aiSource,
       flagReason: kernels.flagReason,
       reviewStatus: kernels.reviewStatus,
+      otherSideClass: kernels.otherSideClass,
+      otherSideConfidence: kernels.otherSideConfidence,
     })
     .from(kernels)
     .where(eq(kernels.batchId, batchId));
@@ -270,6 +273,8 @@ export async function classifyAndTriage(
   if (!classified && (await batchStatus(ctx, batchId)) === "waiting") return;
   await triageBatch(ctx, batchId);
   if (classified) await markClassified(ctx, batchId);
+  // Two cameras: once both photos are classified, pair their kernels.
+  await joinViews(ctx, batchId);
   await finishIfReady(ctx, c.sample.id);
 }
 

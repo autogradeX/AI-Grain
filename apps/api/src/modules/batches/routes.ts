@@ -33,6 +33,7 @@ import {
   expireStaleBatches,
   kernelSummary,
   needsReview,
+  notUnderside,
 } from "./service.js";
 import {
   classifyAndTriage,
@@ -96,8 +97,34 @@ export function batchRoutes(ctx: AppContext) {
           finish: z.enum(["true", "false"]).optional(),
           // From a device that queued the photo offline: a retry returns the same batch.
           clientRef: z.string().trim().min(8).max(64).optional(),
+          // Two cameras: this is the bottom camera's photo of the kernels in
+          // that top photo (same moment, glass tray). It is mirrored, so both
+          // show the kernels the same way round, and paired kernel by kernel.
+          pairWith: z.uuid().optional(),
         })
         .parse(upload.fields);
+      if (fields.pairWith) {
+        const [top] = await ctx.db
+          .select({
+            id: batches.id,
+            sampleId: batches.sampleId,
+            pairOf: batches.pairOf,
+          })
+          .from(batches)
+          .where(
+            and(eq(batches.id, fields.pairWith), eq(batches.orgId, me.orgId)),
+          );
+        if (!top || top.sampleId !== sample.id)
+          throw badRequest("The top photo isn't a photo of this sample");
+        if (top.pairOf)
+          throw badRequest("That photo is itself a bottom camera's photo");
+        const [taken] = await ctx.db
+          .select({ id: batches.id })
+          .from(batches)
+          .where(eq(batches.pairOf, top.id));
+        if (taken)
+          throw conflict("That top photo already has its bottom photo");
+      }
       if (fields.clientRef) {
         const [existing] = await ctx.db
           .select()
@@ -120,7 +147,9 @@ export function batchRoutes(ctx: AppContext) {
 
       let normalized;
       try {
-        normalized = await normalizeUpload(upload.file);
+        normalized = await normalizeUpload(upload.file, {
+          mirror: Boolean(fields.pairWith),
+        });
       } catch {
         throw badRequest("The file is not a readable image");
       }
@@ -136,8 +165,11 @@ export function batchRoutes(ctx: AppContext) {
         .values({
           orgId: me.orgId,
           sampleId: sample.id,
-          side: fields.side === "crease" ? "crease" : "front",
-          sideDetected: fields.side === "auto",
+          // The bottom camera sees the other side of the top photo's kernels.
+          side:
+            fields.pairWith || fields.side === "crease" ? "crease" : "front",
+          sideDetected: !fields.pairWith && fields.side === "auto",
+          pairOf: fields.pairWith ?? null,
           clientRef: fields.clientRef ?? null,
           originalKey: "",
           originalWidth: normalized.width,
@@ -330,7 +362,7 @@ export function batchRoutes(ctx: AppContext) {
       const harmful = crop.classes
         .filter((c) => c.group === "harmful")
         .map((c) => c.id);
-      const conditions = [eq(kernels.sampleId, sampleId)];
+      const conditions = [eq(kernels.sampleId, sampleId), notUnderside];
       if (scope !== "all") conditions.push(needsReview);
       if (scope === "pending")
         conditions.push(eq(kernels.reviewStatus, "pending"));
@@ -353,6 +385,12 @@ export function batchRoutes(ctx: AppContext) {
           reviewStatus: kernels.reviewStatus,
           aiClass2: kernels.aiClass2,
           flagReason: kernels.flagReason,
+          // Two cameras: the underside, as the bottom camera saw it.
+          otherSideClass: kernels.otherSideClass,
+          otherSideReason: kernels.otherSideReason,
+          undersideId: sql<
+            string | null
+          >`(select u.id from kernels u where u.twin_of = ${kernels.id} limit 1)`,
         })
         .from(kernels)
         .innerJoin(batches, eq(batches.id, kernels.batchId))
@@ -419,6 +457,7 @@ export function batchRoutes(ctx: AppContext) {
           and(
             eq(kernels.orgId, me.orgId),
             eq(kernels.sampleId, sampleId),
+            notUnderside,
             needsReview,
             eq(kernels.reviewStatus, "pending"),
           ),

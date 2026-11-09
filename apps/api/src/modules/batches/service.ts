@@ -52,18 +52,33 @@ import { MAX_REFERENCES_PER_REQUEST } from "../references/routes.js";
 /** A kernel a person must look at: triage gave it a reason (see autopilot/triage.ts). */
 export const needsReview: SQL<boolean> = sql<boolean>`(${kernels.flagReason} is not null)`;
 
-/** The class that counts: the operator's decision, else the expert pass's, else the first look's. */
-export const effectiveClass = sql<
-  string | null
->`coalesce(${kernels.finalClass}, ${kernels.expertClass}, ${kernels.aiClass})`;
+/** The verdict on the side this kernel's photo shows: the expert pass's, else the first look's. */
+const ownVerdict = sql`coalesce(${kernels.expertClass}, ${kernels.aiClass})`;
+/**
+ * With two cameras, a defect seen on the underside counts: it replaces a
+ * "sound" verdict from the top. (Two different defects keep the top's; a
+ * person settles those, see autopilot/views.ts.)
+ */
+const undersideCounts = sql`(${kernels.otherSideClass} is not null and ${kernels.otherSideClass} not in ('sound', 'unclear') and ${ownVerdict} = 'sound')`;
 
-/** The AI's verdict: the expert pass's when there is one, else the first look's. */
+/** The AI's verdict: the expert pass's when there is one, else the first look's; with two cameras, an underside defect. */
 export const aiVerdict = sql<
   string | null
->`coalesce(${kernels.expertClass}, ${kernels.aiClass})`;
+>`(case when ${undersideCounts} then ${kernels.otherSideClass} else ${ownVerdict} end)`;
 export const aiVerdictConfidence = sql<
   "high" | "medium" | "low" | null
->`case when ${kernels.expertClass} is not null then ${kernels.expertConfidence} else ${kernels.aiConfidence} end`;
+>`(case when ${undersideCounts} then ${kernels.otherSideConfidence} when ${kernels.expertClass} is not null then ${kernels.expertConfidence} else ${kernels.aiConfidence} end)`;
+
+/** The class that counts: the operator's decision, else the AI's verdict. */
+export const effectiveClass = sql<
+  string | null
+>`coalesce(${kernels.finalClass}, ${aiVerdict})`;
+
+/**
+ * Kernels counted on their own: not the underside of a grain the top camera
+ * also saw (two cameras). Every count, estimate and review list uses it.
+ */
+export const notUnderside: SQL<boolean> = sql<boolean>`(${kernels.twinOf} is null)`;
 
 export const batchPrefix = (b: {
   orgId: string;
@@ -581,10 +596,12 @@ export async function kernelSummary(
   ctx: AppContext,
   where: { sampleId: string } | { batchId: string },
 ) {
-  const filter =
+  const filter = and(
     "sampleId" in where
       ? eq(kernels.sampleId, where.sampleId)
-      : eq(kernels.batchId, where.batchId);
+      : eq(kernels.batchId, where.batchId),
+    notUnderside,
+  );
   const byClass = await ctx.db
     .select({ cls: effectiveClass, count: sql<number>`count(*)::int` })
     .from(kernels)
@@ -620,6 +637,7 @@ export async function dimensionsFor(ctx: AppContext, sampleId: string) {
     .where(
       and(
         eq(kernels.sampleId, sampleId),
+        notUnderside,
         sql`${effectiveClass} = 'sound'`,
         isNotNull(kernels.lengthMm),
       ),

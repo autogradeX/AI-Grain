@@ -19,7 +19,7 @@ import {
   type SampleResult,
 } from "../../db/schema.js";
 import { notFound } from "../../lib/errors.js";
-import { effectiveClass } from "../batches/service.js";
+import { effectiveClass, notUnderside } from "../batches/service.js";
 import { ensureCrop } from "../crops/service.js";
 
 export type SampleRow = typeof samples.$inferSelect;
@@ -108,7 +108,7 @@ export async function estimateFor(
   const rows = await ctx.db
     .select({ cls: effectiveClass, area: kernels.area })
     .from(kernels)
-    .where(eq(kernels.sampleId, sampleId));
+    .where(and(eq(kernels.sampleId, sampleId), notUnderside));
   return estimateFromObjects(rows, classes);
 }
 

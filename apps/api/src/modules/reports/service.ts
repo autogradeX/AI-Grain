@@ -21,6 +21,7 @@ import {
   effectiveClass,
   kernelSummary,
   modelFor,
+  notUnderside,
 } from "../batches/service.js";
 import { currentCertificate } from "../certificates/service.js";
 import { ensureCrop } from "../crops/service.js";
@@ -174,7 +175,7 @@ async function buildReport(
             reviewStatus: kernels.reviewStatus,
           })
           .from(kernels)
-          .where(and(eq(kernels.sampleId, id), notSound));
+          .where(and(eq(kernels.sampleId, id), notUnderside, notSound));
   const ordered = flaggedRows.sort(
     (a, b) =>
       (batchIndex.get(a.batchId) ?? 0) - (batchIndex.get(b.batchId) ?? 0) ||

@@ -41,6 +41,7 @@ import {
   expireStaleBatches,
   kernelSummary,
   modelFor,
+  notUnderside,
 } from "../batches/service.js";
 import { ensureCrop, normalizeCropKey } from "../crops/service.js";
 import { withdrawCertificates } from "../certificates/service.js";
@@ -109,7 +110,13 @@ export function sampleRoutes(ctx: AppContext) {
         .select({ reason: kernels.flagReason, count: count() })
         .from(kernels)
         // Only kernels the AI has looked at: unclassified ones aren't "accepted".
-        .where(and(eq(kernels.sampleId, sampleId), isNotNull(kernels.aiClass)))
+        .where(
+          and(
+            eq(kernels.sampleId, sampleId),
+            notUnderside,
+            isNotNull(kernels.aiClass),
+          ),
+        )
         .groupBy(kernels.flagReason);
       const flagged: Partial<Record<string, number>> = {};
       let accepted = 0;
@@ -123,7 +130,7 @@ export function sampleRoutes(ctx: AppContext) {
           settled: sql<number>`count(*) filter (where ${kernels.expertClass} is not null and ${kernels.flagReason} is null)::int`,
         })
         .from(kernels)
-        .where(eq(kernels.sampleId, sampleId));
+        .where(and(eq(kernels.sampleId, sampleId), notUnderside));
       return {
         ...policy,
         acceptedByAi: accepted,
@@ -325,6 +332,7 @@ export function sampleRoutes(ctx: AppContext) {
               .where(
                 and(
                   inArray(kernels.sampleId, ids),
+                  notUnderside,
                   isNotNull(kernels.flagReason),
                   eq(kernels.reviewStatus, "pending"),
                 ),
@@ -463,6 +471,8 @@ export function sampleRoutes(ctx: AppContext) {
             grainCount: batches.grainCount,
             scaleKnown: batches.scaleKnown,
             error: batches.error,
+            pairOf: batches.pairOf,
+            pairMatch: batches.pairMatch,
             createdAt: batches.createdAt,
           })
           .from(batches)

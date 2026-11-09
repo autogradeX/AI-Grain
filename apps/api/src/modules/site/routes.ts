@@ -25,6 +25,7 @@ import {
   aiVerdictConfidence,
   batchPrefix,
   effectiveClass,
+  notUnderside,
 } from "../batches/service.js";
 import { currentCertificate } from "../certificates/service.js";
 import { ensureCrop } from "../crops/service.js";
@@ -124,9 +125,12 @@ export function publicSiteRoutes(ctx: AppContext) {
             })
             .from(kernels)
             .where(
-              inArray(
-                kernels.sampleId,
-                rows.map((r) => r.id),
+              and(
+                inArray(
+                  kernels.sampleId,
+                  rows.map((r) => r.id),
+                ),
+                notUnderside,
               ),
             )
             .groupBy(kernels.sampleId)
@@ -169,7 +173,7 @@ export function publicSiteRoutes(ctx: AppContext) {
           reviewed: sql<boolean>`${kernels.reviewStatus} <> 'pending'`,
         })
         .from(kernels)
-        .where(eq(kernels.sampleId, id))
+        .where(and(eq(kernels.sampleId, id), notUnderside))
         .orderBy(asc(kernels.number));
       const cert = await currentCertificate(ctx, id);
       return {

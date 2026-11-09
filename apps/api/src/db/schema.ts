@@ -445,6 +445,20 @@ export const batches = pgTable("batches", {
   side: text("side").$type<"front" | "crease">().notNull().default("front"),
   /** The side wasn't given at upload: Model Orchestration reads it from the photo. */
   sideDetected: boolean("side_detected").notNull().default(false),
+  /**
+   * The bottom camera's photo of the same kernels as this top photo (two
+   * cameras, glass tray): its kernels are paired with the top's, counted
+   * once, and their verdicts join the top kernels' (see autopilot/views.ts).
+   */
+  pairOf: uuid("pair_of").references((): AnyPgColumn => batches.id, {
+    onDelete: "set null",
+  }),
+  /** How well the two views lined up, once paired. */
+  pairMatch: jsonb("pair_match").$type<{
+    pairs: number;
+    share: number;
+    meanErrorPx: number;
+  }>(),
   status: batchStatusEnum("status").notNull().default("uploaded"),
   originalKey: text("original_key").notNull(),
   originalWidth: integer("original_width").notNull(),
@@ -528,6 +542,19 @@ export const kernels = pgTable(
     aiReason: text("ai_reason"),
     /** Who gave aiClass: Model Orchestration (online), or the local model (offline). */
     aiSource: text("ai_source").$type<"orchestration" | "local">(),
+    /**
+     * This kernel is the underside of `twinOf` (the same grain seen by the
+     * bottom camera): not counted on its own, its verdict joins its twin's.
+     */
+    twinOf: uuid("twin_of").references((): AnyPgColumn => kernels.id, {
+      onDelete: "set null",
+    }),
+    /** On a top kernel: the verdict on its underside, from its twin. */
+    otherSideClass: text("other_side_class"),
+    otherSideConfidence: text("other_side_confidence").$type<
+      "high" | "medium" | "low"
+    >(),
+    otherSideReason: text("other_side_reason"),
     /**
      * Colour, texture and shape measurements of the kernel's crop, for the
      * local model (see imaging/features.ts). Null for kernels detected before.

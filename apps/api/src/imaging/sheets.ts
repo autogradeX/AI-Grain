@@ -2,7 +2,7 @@ import sharp, { type OverlayOptions } from "sharp";
 import { BOARD_PX_PER_CM, rawToSharp, type RawImage } from "./board.js";
 
 export const TILE_PX = 200;
-const LABEL_PX = 28;
+export const LABEL_PX = 28;
 export const SHEET_COLS = 6;
 export const SHEET_ROWS = 5;
 export const KERNELS_PER_SHEET = SHEET_COLS * SHEET_ROWS;

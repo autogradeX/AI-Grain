@@ -61,6 +61,14 @@ export const m = defineMessages({
   noPhotos: { en: "No photos yet.", hi: "अभी कोई फ़ोटो नहीं।" },
   batchTitle: { en: "Batch {number} · {side}", hi: "बैच {number} · {side}" },
   creaseSide: { en: "crease side", hi: "खाँचे वाली तरफ़" },
+  bottomCamera: {
+    en: "underside (bottom camera)",
+    hi: "निचली तरफ़ (नीचे का कैमरा)",
+  },
+  pairedGrains: {
+    en: "{count} grains seen from both sides ({pct}%)",
+    hi: "{count} दाने दोनों तरफ़ से देखे गए ({pct}%)",
+  },
   topSide: { en: "top side", hi: "ऊपरी तरफ़" },
   sideDetected: {
     en: "side read from the photo",

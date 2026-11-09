@@ -512,9 +512,21 @@ function PhotosCard({
                   <strong>
                     {t("batchTitle", {
                       number: i + 1,
-                      side: t(b.side === "crease" ? "creaseSide" : "topSide"),
+                      side: b.pairOf
+                        ? t("bottomCamera")
+                        : t(b.side === "crease" ? "creaseSide" : "topSide"),
                     })}
                   </strong>
+                  {b.pairMatch && (
+                    <span className="muted small">
+                      {" "}
+                      ·{" "}
+                      {t("pairedGrains", {
+                        count: b.pairMatch.pairs,
+                        pct: Math.round(b.pairMatch.share * 100),
+                      })}
+                    </span>
+                  )}
                   {b.sideDetected && b.status === "classified" && (
                     <span className="muted small"> · {t("sideDetected")}</span>
                   )}

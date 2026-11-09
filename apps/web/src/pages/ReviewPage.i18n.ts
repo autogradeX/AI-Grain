@@ -1,6 +1,15 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  underside: {
+    en: "Underside (bottom camera)",
+    hi: "निचली तरफ़ (नीचे का कैमरा)",
+  },
+  undersideAlt: {
+    en: "Kernel {number}, underside",
+    hi: "दाना {number}, निचली तरफ़",
+  },
+  undersideSaid: { en: "Underside: {class}", hi: "निचली तरफ़: {class}" },
   acceptAllTitle: {
     en: "No time to check each kernel?",
     hi: "हर दाना जाँचने का समय नहीं?",

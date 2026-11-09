@@ -36,6 +36,12 @@ export interface TriageKernel {
   aiSource?: "orchestration" | "local" | null;
   /** 0–1, stable per kernel: decides spot checks. */
   draw: number;
+  /**
+   * Two cameras: the verdict on this kernel's underside, "high" when it
+   * stood on its own side and "low" when a person would have checked it.
+   */
+  otherSideClass?: string | null;
+  otherSideConfidence?: Confidence | null;
 }
 
 const isHarmful = (classes: readonly ClassDef[], cls: string | null) =>
@@ -105,6 +111,26 @@ export function wantsExpert(
  * measuring the AI's accuracy.
  */
 export function flagFor(
+  k: TriageKernel,
+  classes: readonly ClassDef[],
+  policy: AutopilotPolicy,
+): FlagReason | null {
+  const own = ownSideFlag(k, classes, policy);
+  // Two cameras: the underside counts too (see aiVerdict in batches/service.ts).
+  const other = k.otherSideClass;
+  if (!other || other === UNCLEAR || other === SOUND) return own;
+  if (own === "harmful" || isHarmful(classes, other)) return "harmful";
+  const top = k.expertClass ?? k.aiClass;
+  // Sound on top, a defect underneath: it counts when its own side settled
+  // it; an unsure one, or two different defects, a person decides.
+  if (top === SOUND)
+    return k.otherSideConfidence === "high" ? own : "disagreement";
+  if (top && top !== UNCLEAR && top !== other) return own ?? "disagreement";
+  return own;
+}
+
+/** The decision from the photo this kernel is on alone (see flagFor). */
+function ownSideFlag(
   k: TriageKernel,
   classes: readonly ClassDef[],
   policy: AutopilotPolicy,
