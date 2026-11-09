@@ -57,13 +57,33 @@ export function fullFrameCorners(width: number, height: number): Corners {
  * Corners for a photo without the board: the whole photo, fitted into the
  * board's 20 × 28 shape with its own proportions (centred, the rest filled),
  * so nothing is stretched and one pixel is the same size in both directions.
+ * A landscape photo (most webcams) is turned a quarter turn to fill the
+ * upright board, instead of leaving wide bands above and below it.
  */
 export function photoCorners(width: number, height: number): Corners {
-  const aspect = GRID_COLS / GRID_ROWS;
+  const upright = GRID_COLS / GRID_ROWS;
+  if (width > height) {
+    // Turned: the photo's width runs along the board's height.
+    const target = 1 / upright;
+    let w = width;
+    let h = height;
+    if (width / height < target) w = height * target;
+    else h = width / target;
+    const x0 = (width - w) / 2;
+    const y0 = (height - h) / 2;
+    // Board top-left, top-right, bottom-right, bottom-left: the photo's
+    // bottom-left, top-left, top-right, bottom-right (a quarter turn clockwise).
+    return [
+      { x: x0, y: y0 + h },
+      { x: x0, y: y0 },
+      { x: x0 + w, y: y0 },
+      { x: x0 + w, y: y0 + h },
+    ];
+  }
   let w = width;
   let h = height;
-  if (width / height < aspect) w = height * aspect;
-  else h = width / aspect;
+  if (width / height < upright) w = height * upright;
+  else h = width / upright;
   const x0 = (width - w) / 2;
   const y0 = (height - h) / 2;
   return [

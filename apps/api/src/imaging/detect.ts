@@ -422,6 +422,9 @@ export async function contrastMap(
       // Brightness, red–green and yellow–blue differences; colour weighs more.
       let dl = l - (0.299 * br + 0.587 * bgG + 0.114 * bb);
       if (lightBackground) dl *= LIGHT_BRIGHTNESS_WEIGHT;
+      // On a dark board or tray, kernels are brighter (or another colour):
+      // something only darker is a shadow or a dark box under the glass.
+      else dl = Math.max(0, dl);
       const da = r - g - (br - bgG);
       const dy = (r + g) / 2 - b - ((br + bgG) / 2 - bb);
       contrast[i] = Math.min(

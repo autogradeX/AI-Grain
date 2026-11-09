@@ -245,6 +245,9 @@ export function DualCamera({
       ]);
       const first = new FormData();
       first.set("side", "front");
+      // A glass tray, no grid board: the whole picture, never a dark area
+      // mistaken for the board.
+      first.set("board", "none");
       first.set("photo", a, "top.jpg");
       const made = await api.upload<{ id: string }>(
         `/samples/${sampleId}/batches`,

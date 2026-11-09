@@ -98,6 +98,16 @@ photographs both sides of every grain in one go. On the capture screen choose
 **Two USB cameras (top and bottom)**, pick which camera is which (remembered
 on that computer), and press **Take both photos**.
 
+- **Same view:** both cameras must frame the same area of the glass,
+  ideally the whole tray. A close-up from one camera and the whole tray
+  from the other can't be lined up: the bottom photo is then refused
+  ("couldn't be lined up … kernels paired").
+- **Nothing printed in view:** no boxes, labels or text behind the glass or
+  around the tray: lettering is counted as small grains. A plain backdrop
+  (or the light panel) is best. Dark plain areas are ignored.
+- **Pictures:** two-camera photos always use the whole picture (no board is
+  looked for). Wide webcam pictures are turned a quarter turn to fill the
+  upright frame.
 - **Tray:** clear glass or acrylic, clean, with no printed grid (the grid
   board is opaque). Spread the kernels in one layer, not touching. Without
   the board, sizes in mm need a reference coin on the tray (Settings).

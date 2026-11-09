@@ -1,0 +1,1 @@
+ALTER TABLE "batches" ADD COLUMN "no_board" boolean DEFAULT false NOT NULL;

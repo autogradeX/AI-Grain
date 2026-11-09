@@ -13,15 +13,29 @@ import {
 const W = 2400;
 const H = 3200;
 
-/** Grains on a backlit glass tray, well apart, in a repeatable random layout. */
-function layout(n: number, seed: number) {
+interface Frame {
+  w: number;
+  h: number;
+  /** The tray's colour as the cameras see it. */
+  bg: string;
+  /**
+   * A dark box under the glass in one corner (as in a real rig): it looks
+   * like a board to the board finder. (Lettering would be counted as grains:
+   * nothing printed belongs in the cameras' view.)
+   */
+  print?: boolean;
+}
+const TALL: Frame = { w: W, h: H, bg: "#e4e9ec" };
+
+/** Grains on a glass tray, well apart, in a repeatable random layout. */
+function layout(n: number, seed: number, f: Frame = TALL) {
   let s = seed;
   const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
   const grains: { x: number; y: number; angle: number }[] = [];
   while (grains.length < n) {
     const g = {
-      x: 250 + r() * (W - 500),
-      y: 250 + r() * (H - 500),
+      x: 250 + r() * (f.w - 500),
+      y: 250 + r() * (f.h - 500),
       angle: r() * 180,
     };
     if (grains.every((o) => Math.hypot(o.x - g.x, o.y - g.y) > 170))
@@ -34,6 +48,7 @@ function layout(n: number, seed: number) {
 function trayPhoto(
   grains: { x: number; y: number; angle: number }[],
   dark: Set<number>,
+  f: Frame = TALL,
 ) {
   const shapes = grains
     .map(
@@ -41,9 +56,12 @@ function trayPhoto(
         `<ellipse cx="${g.x}" cy="${g.y}" rx="62" ry="26" fill="${dark.has(i) ? "#4a2e17" : "#d9b46c"}" transform="rotate(${g.angle} ${g.x} ${g.y})"/>`,
     )
     .join("");
+  const print = f.print
+    ? `<rect x="40" y="40" width="${f.w * 0.3}" height="${f.h * 0.35}" fill="#20262c"/>`
+    : "";
   return sharp(
     Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="100%" height="100%" fill="#e4e9ec"/>${shapes}</svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${f.w}" height="${f.h}"><rect width="100%" height="100%" fill="${f.bg}"/>${print}${shapes}</svg>`,
     ),
   )
     .jpeg({ quality: 92 })
@@ -54,15 +72,21 @@ function trayPhoto(
  * What the camera below the glass records: the other side of the same
  * grains, turned 180°, from further away (0.9×), off-centre, and mirrored.
  */
-async function bottomCamera(underside: Buffer) {
+async function bottomCamera(underside: Buffer, f: Frame = TALL) {
   const turned = await sharp(underside)
     .rotate(180)
-    .resize(Math.round(W * 0.9), Math.round(H * 0.9))
+    .resize(Math.round(f.w * 0.9), Math.round(f.h * 0.9))
     .toBuffer();
   const placed = await sharp({
-    create: { width: W, height: H, channels: 3, background: "#e4e9ec" },
+    create: { width: f.w, height: f.h, channels: 3, background: f.bg },
   })
-    .composite([{ input: turned, left: 150, top: 200 }])
+    .composite([
+      {
+        input: turned,
+        left: Math.round(f.w * 0.06),
+        top: Math.round(f.h * 0.06),
+      },
+    ])
     .png()
     .toBuffer();
   // A separate step: sharp composites after flipping in the same pipeline.
@@ -183,6 +207,43 @@ describe("two cameras, above and below a glass tray", () => {
     expect(s.body.kernels.total).toBe(60);
     expect(s.body.kernels.byClass).toEqual({ sound: 56, heat_damaged: 4 });
     expect(s.body.status).toBe("completed");
+  }, 240000);
+
+  it("uses the whole of wide webcam pictures, never a dark area as the board", async () => {
+    // 16:9 webcams over a dark tray with a printed box in one corner.
+    const wide: Frame = { w: 3200, h: 1800, bg: "#3b4650", print: true };
+    const grains = layout(40, 5, wide);
+    const sample = await api<{ id: string }>("POST", "/api/samples", {
+      crop: "wheat",
+    });
+    const id = sample.body.id;
+    const first = await upload(id, await trayPhoto(grains, new Set(), wide), {
+      side: "front",
+      board: "none",
+    });
+    const topId = first.json<{ id: string }>().id;
+    await upload(
+      id,
+      await bottomCamera(await trayPhoto(grains, new Set([7]), wide), wide),
+      { pairWith: topId, finish: "true" },
+    );
+    await t.jobs.idle();
+    const top = await api<{
+      kernelCount: number;
+      pairMatch: { share: number };
+      kernels: { y: number; h: number }[];
+    }>("GET", `/api/batches/${topId}`);
+    expect(top.body.kernelCount).toBe(40);
+    expect(top.body.pairMatch.share).toBeGreaterThan(0.95);
+    // Turned to fill the upright board: grains spread over most of its
+    // height, not squeezed into a band between stretched stripes.
+    const ys = top.body.kernels.map((k) => k.y + k.h / 2);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(2800 * 0.6);
+    const s = await api<{
+      kernels: { total: number; byClass: Record<string, number> };
+    }>("GET", `/api/samples/${id}`);
+    expect(s.body.kernels.total).toBe(40);
+    expect(s.body.kernels.byClass.heat_damaged).toBe(1);
   }, 240000);
 
   it("doesn't count photos of two different trays as one", async () => {

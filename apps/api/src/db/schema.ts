@@ -450,6 +450,11 @@ export const batches = pgTable("batches", {
    * cameras, glass tray): its kernels are paired with the top's, counted
    * once, and their verdicts join the top kernels' (see autopilot/views.ts).
    */
+  /**
+   * No grid board in the rig (two cameras over a glass tray): the whole
+   * photo is used, never a dark area mistaken for the board.
+   */
+  noBoard: boolean("no_board").notNull().default(false),
   pairOf: uuid("pair_of").references((): AnyPgColumn => batches.id, {
     onDelete: "set null",
   }),

@@ -145,7 +145,11 @@ export async function processBatch(
     // there is no scale for sizes in mm.
     let corners = given;
     let scaleKnown = true;
-    if (!corners) {
+    if (!corners && (batch.noBoard || batch.pairOf)) {
+      // A rig without the board (two cameras, glass tray): the whole photo.
+      corners = photoCorners(batch.originalWidth, batch.originalHeight);
+      scaleKnown = false;
+    } else if (!corners) {
       const found = await findGridCorners(original);
       // A board-shaped dark area without a visible grid counts only when it
       // isn't the whole photo (that is the paper or table itself).

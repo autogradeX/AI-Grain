@@ -101,6 +101,8 @@ export function batchRoutes(ctx: AppContext) {
           // that top photo (same moment, glass tray). It is mirrored, so both
           // show the kernels the same way round, and paired kernel by kernel.
           pairWith: z.uuid().optional(),
+          // "none": no grid board in this rig (the top camera of a pair).
+          board: z.enum(["auto", "none"]).default("auto"),
         })
         .parse(upload.fields);
       if (fields.pairWith) {
@@ -170,6 +172,7 @@ export function batchRoutes(ctx: AppContext) {
             fields.pairWith || fields.side === "crease" ? "crease" : "front",
           sideDetected: !fields.pairWith && fields.side === "auto",
           pairOf: fields.pairWith ?? null,
+          noBoard: fields.board === "none" || Boolean(fields.pairWith),
           clientRef: fields.clientRef ?? null,
           originalKey: "",
           originalWidth: normalized.width,
