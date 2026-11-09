@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
+import {
+  browserCameras,
+  findPair,
+  PairError,
+  startPair,
+  type Size,
+} from "../devices/cameras";
 import { useT } from "../i18n";
 import { Card, ErrorNote, Field } from "./ui";
 import { m } from "./DualCamera.i18n";
@@ -18,98 +25,9 @@ const remember = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
   } catch {
-    // Asked again next time.
+    // Found again next time.
   }
 };
-
-/**
- * Sizes tried in turn. Two USB cameras on one controller share its
- * bandwidth: asking each for its largest size makes the second fail to start
- * ("Could not start video source"), so start at Full HD at 15 frames a second
- * (a still photo needs no more) and step down when a camera can't start.
- */
-const LADDER = [
-  { width: 1920, height: 1080 },
-  { width: 1280, height: 720 },
-  { width: 640, height: 480 },
-];
-
-/** Errors that mean "not like this" (busy, bandwidth), worth a smaller size. */
-const RETRYABLE = new Set([
-  "NotReadableError",
-  "OverconstrainedError",
-  "AbortError",
-  "TrackStartError",
-]);
-
-export type CameraState =
-  | { status: "idle" | "starting" }
-  | { status: "live"; width: number; height: number }
-  | { status: "failed"; error: string; name: string };
-
-/**
- * A live camera by device id. Starts only when `enabled` (so two cameras
- * open one after the other) and again on each `attempt`.
- */
-function useCamera(deviceId: string, enabled: boolean, attempt: number) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const [state, setState] = useState<CameraState>({ status: "idle" });
-  useEffect(() => {
-    if (!deviceId || !enabled) return;
-    let stream: MediaStream | null = null;
-    let cancelled = false;
-    const start = async () => {
-      let last: { error: string; name: string } = { error: "", name: "" };
-      for (const size of LADDER) {
-        try {
-          const s = await navigator.mediaDevices.getUserMedia({
-            video: {
-              deviceId: { exact: deviceId },
-              width: { ideal: size.width },
-              height: { ideal: size.height },
-              frameRate: { ideal: 15, max: 15 },
-            },
-            audio: false,
-          });
-          if (cancelled) {
-            s.getTracks().forEach((tr) => tr.stop());
-            return;
-          }
-          stream = s;
-          const settings = s.getVideoTracks()[0]?.getSettings() ?? {};
-          if (ref.current) {
-            ref.current.srcObject = s;
-            void ref.current.play().catch(() => undefined);
-          }
-          setState({
-            status: "live",
-            width: settings.width ?? size.width,
-            height: settings.height ?? size.height,
-          });
-          return;
-        } catch (err) {
-          const name = err instanceof Error ? err.name : "";
-          last = {
-            error: err instanceof Error ? err.message : String(err),
-            name,
-          };
-          if (!RETRYABLE.has(name)) break;
-        }
-      }
-      if (!cancelled) setState({ status: "failed", ...last });
-    };
-    void Promise.resolve()
-      .then(() => {
-        if (!cancelled) setState({ status: "starting" });
-      })
-      .then(start);
-    return () => {
-      cancelled = true;
-      stream?.getTracks().forEach((tr) => tr.stop());
-    };
-  }, [deviceId, enabled, attempt]);
-  return { ref, state };
-}
 
 /** The current frame of a video at its full size, as a JPEG. */
 function grab(video: HTMLVideoElement): Promise<Blob> {
@@ -127,9 +45,47 @@ function grab(video: HTMLVideoElement): Promise<Blob> {
 }
 
 /**
- * Two USB cameras, above and below a glass tray: both live, one button takes
- * both frames at the same moment and sends them as a pair (the bottom one
- * mirrored and matched kernel by kernel on the server).
+ * Whether a frame shows something: a covered, unfocused or washed-out camera
+ * gives an almost even picture. Checked on a small copy: the spread of its
+ * brightness, and how much neighbouring pixels differ (edges of grains).
+ */
+export function looksBlank(video: HTMLVideoElement): boolean {
+  const w = 160;
+  const h = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * w));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const g = canvas.getContext("2d", { willReadFrequently: true })!;
+  g.drawImage(video, 0, 0, w, h);
+  const { data } = g.getImageData(0, 0, w, h);
+  const lum = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++)
+    lum[i] =
+      0.299 * data[i * 4]! +
+      0.587 * data[i * 4 + 1]! +
+      0.114 * data[i * 4 + 2]!;
+  let mean = 0;
+  for (const v of lum) mean += v / lum.length;
+  let spread = 0;
+  let edges = 0;
+  for (let i = 0; i < lum.length; i++) {
+    spread += (lum[i]! - mean) ** 2 / lum.length;
+    if (i % w < w - 1) edges += Math.abs(lum[i]! - lum[i + 1]!) / lum.length;
+  }
+  return Math.sqrt(spread) < 10 || edges < 1.5;
+}
+
+type Phase =
+  | { at: "listing" | "starting" | "finding" }
+  | { at: "live"; size: Size }
+  | { at: "failed"; which: "top" | "bottom" | "both"; reason: string };
+
+/**
+ * Two USB cameras, above and below a glass tray, running at the same time:
+ * one button takes both frames at once and sends them as a pair. The
+ * cameras are started together at the largest size both can run at; when
+ * the remembered pair won't run, the computer's cameras are tried until two
+ * give pictures together, so nobody has to know which entry is which.
  */
 export function DualCamera({
   sampleId,
@@ -144,51 +100,148 @@ export function DualCamera({
 }) {
   const t = useT(m);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [listError, setListError] = useState<string | null>(null);
-  const [topId, setTopId] = useState(remembered(TOP_KEY));
-  const [bottomId, setBottomId] = useState(remembered(BOTTOM_KEY));
+  const [pair, setPair] = useState<[string, string]>([
+    remembered(TOP_KEY),
+    remembered(BOTTOM_KEY),
+  ]);
+  const [phase, setPhase] = useState<Phase>({ at: "listing" });
+  const [attempt, setAttempt] = useState(0);
+  // "find": look for two working cameras before starting (the button).
+  const [finding, setFinding] = useState(false);
+  // Searching for a working pair happens once per attempt.
+  const searched = useRef(-1);
   const [last, setLast] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  // Opened one after the other: some drivers refuse two starts at once.
-  const [attempt, setAttempt] = useState(0);
-  const top = useCamera(topId, true, attempt);
-  const topSettled =
-    top.state.status === "live" || top.state.status === "failed";
-  const bottom = useCamera(bottomId, topSettled, attempt);
+  const topVideo = useRef<HTMLVideoElement>(null);
+  const bottomVideo = useRef<HTMLVideoElement>(null);
+  const [topId, bottomId] = pair;
 
   useEffect(() => {
     // Labels and ids are only listed once camera access is allowed.
+    let cancelled = false;
     navigator.mediaDevices
       .getUserMedia({ video: true, audio: false })
       .then((s) => s.getTracks().forEach((tr) => tr.stop()))
       .catch(() => undefined)
       .then(() => navigator.mediaDevices.enumerateDevices())
       .then((all) => {
+        if (cancelled) return;
         const cams = all.filter((d) => d.kind === "videoinput");
         setDevices(cams);
         const ids = cams.map((c) => c.deviceId);
-        if (!ids.includes(topId)) setTopId(ids[0] ?? "");
-        if (!ids.includes(bottomId))
-          setBottomId(
-            ids.find((i) => i !== (ids.includes(topId) ? topId : ids[0])) ?? "",
-          );
+        setPair(([a, b]) => {
+          const top = ids.includes(a) ? a : (ids[0] ?? "");
+          const bottom =
+            ids.includes(b) && b !== top
+              ? b
+              : (ids.find((i) => i !== top) ?? "");
+          return [top, bottom];
+        });
       })
-      .catch((err: unknown) =>
-        setListError(err instanceof Error ? err.message : String(err)),
-      );
-    // Once, on opening.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch((err: unknown) => {
+        if (!cancelled)
+          setPhase({
+            at: "failed",
+            which: "both",
+            reason: err instanceof Error ? err.message : String(err),
+          });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!devices.length) return;
+    let cancelled = false;
+    const running: MediaStream[] = [];
+    const run = async () => {
+      if (devices.length < 2 || !topId || !bottomId || topId === bottomId) {
+        setPhase({
+          at: "failed",
+          which: "both",
+          reason: t(devices.length < 2 ? "noCameras" : "same"),
+        });
+        return;
+      }
+      if (finding) {
+        // The cameras of the last try are released by now.
+        setPhase({ at: "finding" });
+        const found = await findPair(
+          browserCameras,
+          devices.map((d) => d.deviceId),
+        );
+        if (cancelled) return;
+        setFinding(false);
+        searched.current = attempt;
+        if (found && (found[0] !== topId || found[1] !== bottomId)) {
+          setPair(found);
+          return;
+        }
+        if (!found) {
+          setPhase({ at: "failed", which: "both", reason: t("noPair") });
+          return;
+        }
+      }
+      setPhase({ at: "starting" });
+      try {
+        const started = await startPair(browserCameras, topId, bottomId);
+        running.push(started.top, started.bottom);
+        if (cancelled) return;
+        if (topVideo.current) topVideo.current.srcObject = started.top;
+        if (bottomVideo.current) bottomVideo.current.srcObject = started.bottom;
+        void topVideo.current?.play().catch(() => undefined);
+        void bottomVideo.current?.play().catch(() => undefined);
+        remember(TOP_KEY, topId);
+        remember(BOTTOM_KEY, bottomId);
+        setPhase({ at: "live", size: started.size });
+      } catch (err) {
+        if (cancelled) return;
+        // The chosen pair won't run: find two cameras that do, once.
+        if (searched.current !== attempt) {
+          searched.current = attempt;
+          setPhase({ at: "finding" });
+          const found = await findPair(
+            browserCameras,
+            devices.map((d) => d.deviceId),
+          );
+          if (cancelled) return;
+          if (found && (found[0] !== topId || found[1] !== bottomId)) {
+            setPair(found);
+            return;
+          }
+        }
+        setPhase({
+          at: "failed",
+          which: err instanceof PairError ? err.which : "both",
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      }
+    };
+    void Promise.resolve().then(run);
+    return () => {
+      cancelled = true;
+      running.forEach((s) => browserCameras.stop(s));
+    };
+    // `t` changes with the language only; restarting cameras for it isn't needed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devices, topId, bottomId, attempt, finding]);
 
   const capture = async () => {
     setBusy(true);
     setError(null);
     try {
+      // A camera that sees nothing (covered, out of focus, washed out).
+      const blank = [
+        looksBlank(topVideo.current!) && t("topBlank"),
+        looksBlank(bottomVideo.current!) && t("bottomBlank"),
+      ].filter(Boolean);
+      if (blank.length) throw new Error(blank.join(" "));
       // Both frames first, so they show the tray at the same moment.
       const [a, b] = await Promise.all([
-        grab(top.ref.current!),
-        grab(bottom.ref.current!),
+        grab(topVideo.current!),
+        grab(bottomVideo.current!),
       ]);
       const first = new FormData();
       first.set("side", "front");
@@ -210,18 +263,15 @@ export function DualCamera({
     }
   };
 
-  const select = (
-    value: string,
-    onChange: (v: string) => void,
-    key: string,
-  ) => (
-    <select
-      value={value}
-      onChange={(e) => {
-        onChange(e.target.value);
-        remember(key, e.target.value);
-      }}
-    >
+  // Two cameras of the same model have the same name: number them.
+  const labelOf = (d: MediaDeviceInfo, i: number) => {
+    const name = d.label || t("cameraN", { n: i + 1 });
+    return devices.filter((o) => o.label === d.label).length > 1
+      ? `${name} · ${t("cameraN", { n: i + 1 })}`
+      : name;
+  };
+  const select = (value: string, onChange: (v: string) => void) => (
+    <select value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">{t("pick")}</option>
       {devices.map((d, i) => (
         <option key={d.deviceId} value={d.deviceId}>
@@ -230,39 +280,32 @@ export function DualCamera({
       ))}
     </select>
   );
-  const same = topId && topId === bottomId;
-  // Two cameras of the same model have the same name: number them.
-  const labelOf = (d: MediaDeviceInfo, i: number) => {
-    const name = d.label || t("cameraN", { n: i + 1 });
-    return devices.filter((o) => o.label === d.label).length > 1
-      ? `${name} · ${t("cameraN", { n: i + 1 })}`
-      : name;
-  };
-  const failed = [top.state, bottom.state].find(
-    (st): st is Extract<CameraState, { status: "failed" }> =>
-      st.status === "failed",
-  );
-  const cameraError = failed?.error ?? listError;
-  const live = top.state.status === "live" && bottom.state.status === "live";
-  const sizeOf = (st: CameraState) =>
-    st.status === "live"
-      ? t("liveAt", { size: `${st.width}×${st.height}` })
-      : st.status === "starting"
-        ? t("starting")
-        : st.status === "failed"
+  const status =
+    phase.at === "live"
+      ? t("liveAt", { size: `${phase.size.width}×${phase.size.height}` })
+      : phase.at === "finding"
+        ? t("finding")
+        : phase.at === "failed"
           ? t("notStarted")
-          : "";
+          : t("starting");
 
   return (
     <Card title={t("title")}>
       <p className="muted small">{t("hint")}</p>
-      {devices.length < 2 && !listError && (
-        <p className="warn small">{t("noCameras")}</p>
-      )}
-      {cameraError && (
-        <div className="error small">
-          <p>{t("blocked", { reason: cameraError })}</p>
-          {failed?.name !== "NotAllowedError" && <p>{t("bandwidth")}</p>}
+      {phase.at === "finding" && <p className="small">{t("findingHint")}</p>}
+      {phase.at === "failed" && (
+        <div className="error small" role="alert">
+          <p>
+            {t(
+              phase.which === "top"
+                ? "topFailed"
+                : phase.which === "bottom"
+                  ? "bottomFailed"
+                  : "bothFailed",
+              { reason: phase.reason },
+            )}
+          </p>
+          <p>{t("bandwidth")}</p>
           <button type="button" onClick={() => setAttempt(attempt + 1)}>
             {t("retry")}
           </button>
@@ -270,32 +313,30 @@ export function DualCamera({
       )}
       <div className="grid-2">
         <Field label={t("top")}>
-          {select(topId, setTopId, TOP_KEY)}
-          <video ref={top.ref} className="dual-preview" muted playsInline />
-          <span className="muted small">{sizeOf(top.state)}</span>
+          {select(topId, (v) => setPair([v, bottomId]))}
+          <video ref={topVideo} className="dual-preview" muted playsInline />
+          <span className="muted small">{status}</span>
         </Field>
         <Field label={t("bottom")}>
-          {select(bottomId, setBottomId, BOTTOM_KEY)}
-          <video ref={bottom.ref} className="dual-preview" muted playsInline />
-          <span className="muted small">{sizeOf(bottom.state)}</span>
+          {select(bottomId, (v) => setPair([topId, v]))}
+          <video ref={bottomVideo} className="dual-preview" muted playsInline />
+          <span className="muted small">{status}</span>
         </Field>
       </div>
       {devices.length >= 2 && (
-        <div>
+        <div className="row wrap">
+          <button type="button" onClick={() => setPair([bottomId, topId])}>
+            {t("swap")}
+          </button>
           <button
             type="button"
-            onClick={() => {
-              setTopId(bottomId);
-              setBottomId(topId);
-              remember(TOP_KEY, bottomId);
-              remember(BOTTOM_KEY, topId);
-            }}
+            disabled={phase.at === "finding" || phase.at === "starting"}
+            onClick={() => setFinding(true)}
           >
-            {t("swap")}
+            {t("findCameras")}
           </button>
         </div>
       )}
-      {same && <p className="warn small">{t("same")}</p>}
       {autopilot && (
         <label className="row small">
           <input
@@ -315,7 +356,7 @@ export function DualCamera({
         <button
           type="button"
           className="primary"
-          disabled={busy || !live || !!same}
+          disabled={busy || phase.at !== "live"}
           onClick={() => void capture()}
         >
           {busy ? t("sending") : t("capture")}

@@ -1,6 +1,36 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  topBlank: {
+    en: "The top camera's picture is blank or blurred: check that it sees the grains on the glass and is in focus, and that nothing covers it.",
+    hi: "ऊपर के कैमरे की तस्वीर खाली या धुँधली है: जाँचें कि वह कांच पर दाने देख रहा है, फ़ोकस में है, और कुछ उसे ढक नहीं रहा।",
+  },
+  bottomBlank: {
+    en: "The bottom camera's picture is blank or blurred: check that it looks up at the glass and is in focus (not touching the glass), that no light panel sits between it and the glass, and that the grains are lit from above. If the two pictures are the wrong way round, press Swap top and bottom.",
+    hi: 'नीचे के कैमरे की तस्वीर खाली या धुँधली है: जाँचें कि वह ऊपर कांच की ओर देख रहा है और फ़ोकस में है (कांच को छू नहीं रहा), उसके और कांच के बीच कोई लाइट पैनल नहीं है, और दानों पर ऊपर से रोशनी है। अगर दोनों तस्वीरें उलटी हैं, तो "ऊपर और नीचे बदलें" दबाएँ।',
+  },
+  finding: { en: "Looking for the cameras…", hi: "कैमरे ढूँढ रहे हैं…" },
+  findingHint: {
+    en: "Trying each camera on this computer to find the two that work together. This takes a few seconds.",
+    hi: "इस कंप्यूटर के हर कैमरे को आज़मा रहे हैं ताकि साथ काम करने वाले दो कैमरे मिलें। इसमें कुछ सेकंड लगते हैं।",
+  },
+  findCameras: { en: "Find my cameras", hi: "मेरे कैमरे ढूँढें" },
+  noPair: {
+    en: "no two cameras on this computer give pictures at the same time",
+    hi: "इस कंप्यूटर पर कोई भी दो कैमरे एक साथ तस्वीर नहीं देते",
+  },
+  topFailed: {
+    en: "The top camera didn't start: {reason}.",
+    hi: "ऊपर का कैमरा चालू नहीं हुआ: {reason}।",
+  },
+  bottomFailed: {
+    en: "The bottom camera didn't start: {reason}.",
+    hi: "नीचे का कैमरा चालू नहीं हुआ: {reason}।",
+  },
+  bothFailed: {
+    en: "The cameras didn't start: {reason}.",
+    hi: "कैमरे चालू नहीं हुए: {reason}।",
+  },
   cameraN: { en: "camera {n}", hi: "कैमरा {n}" },
   liveAt: { en: "Live at {size}", hi: "{size} पर चालू" },
   starting: { en: "Starting…", hi: "चालू हो रहा है…" },
@@ -11,8 +41,8 @@ export const m = defineMessages({
   },
   retry: { en: "Try again", hi: "फिर से कोशिश करें" },
   bandwidth: {
-    en: "Smaller sizes were tried too. Usually the two cameras share one USB controller: plug one into a port on the other side of the computer (or a USB 3 port), or use a powered USB hub. Also close any other app using a camera.",
-    hi: "छोटे आकार भी आज़माए गए। आमतौर पर दोनों कैमरे एक ही USB कंट्रोलर साझा करते हैं: एक को कंप्यूटर की दूसरी तरफ़ के पोर्ट (या USB 3 पोर्ट) में लगाएँ, या पावर वाला USB हब इस्तेमाल करें। कैमरा इस्तेमाल कर रहे दूसरे ऐप भी बंद करें।",
+    en: "Smaller sizes and every camera on this computer were tried. Plug one camera into a port on the other side of the computer (or a blue USB 3 port), or use a powered USB hub; close any other app using a camera; then press Try again.",
+    hi: 'छोटे आकार और इस कंप्यूटर के सभी कैमरे आज़माए गए। एक कैमरा कंप्यूटर की दूसरी तरफ़ के पोर्ट (या नीले USB 3 पोर्ट) में लगाएँ, या पावर वाला USB हब इस्तेमाल करें; कैमरा इस्तेमाल कर रहे दूसरे ऐप बंद करें; फिर "फिर से कोशिश करें" दबाएँ।',
   },
   title: {
     en: "Two cameras: top and bottom",

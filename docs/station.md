@@ -114,8 +114,17 @@ on that computer), and press **Take both photos**.
   preview. If one still won't start ("Could not start video source"), the
   two usually share one USB controller: plug one into a port on the other
   side of the computer or a USB 3 port, or use a powered hub, close other
-  apps using a camera, and press **Try again**. Two cameras of the same model
-  are numbered; **Swap top and bottom** fixes a mix-up.
+  apps using a camera, and press **Try again**. Both cameras run at the same
+  size, stepping down together until both fit. When the remembered pair
+  won't run (a laptop's built-in camera or a camera listed twice is in the
+  list), every camera is tried until two give pictures together; **Find my
+  cameras** does the same on demand. Two cameras of the same model are
+  numbered; **Swap top and bottom** fixes a mix-up (the top camera shows the
+  grains against the tray, the bottom one sees them from below).
+- **Blank pictures:** before sending, each picture is checked. A camera that
+  is covered, out of focus (a bottom camera touching the glass) or washed out
+  by a light panel between it and the glass gives an even picture: the screen
+  says which camera and what to check, and nothing is sent.
 
 What happens: each grain the top camera sees is paired with its underside;
 it is counted once, and a defect seen only from below counts (a "sound" top
