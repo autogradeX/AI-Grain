@@ -1,6 +1,19 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  cameraN: { en: "camera {n}", hi: "कैमरा {n}" },
+  liveAt: { en: "Live at {size}", hi: "{size} पर चालू" },
+  starting: { en: "Starting…", hi: "चालू हो रहा है…" },
+  notStarted: { en: "Not started", hi: "चालू नहीं हुआ" },
+  swap: {
+    en: "Swap top and bottom",
+    hi: "ऊपर और नीचे बदलें",
+  },
+  retry: { en: "Try again", hi: "फिर से कोशिश करें" },
+  bandwidth: {
+    en: "Smaller sizes were tried too. Usually the two cameras share one USB controller: plug one into a port on the other side of the computer (or a USB 3 port), or use a powered USB hub. Also close any other app using a camera.",
+    hi: "छोटे आकार भी आज़माए गए। आमतौर पर दोनों कैमरे एक ही USB कंट्रोलर साझा करते हैं: एक को कंप्यूटर की दूसरी तरफ़ के पोर्ट (या USB 3 पोर्ट) में लगाएँ, या पावर वाला USB हब इस्तेमाल करें। कैमरा इस्तेमाल कर रहे दूसरे ऐप भी बंद करें।",
+  },
   title: {
     en: "Two cameras: top and bottom",
     hi: "दो कैमरे: ऊपर और नीचे",

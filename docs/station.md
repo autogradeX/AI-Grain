@@ -108,9 +108,14 @@ on that computer), and press **Take both photos**.
   sit at different heights or be turned against each other: the server lines
   the two photos up from the kernels themselves, no calibration needed. The
   bottom camera's photo is mirrored on arrival.
-- **USB:** two high-resolution cameras need the bandwidth of two USB ports
-  on different controllers, or a powered USB 3 hub. If the second camera
-  doesn't appear or its preview freezes, move it to another port.
+- **USB:** both cameras run at once, opened one after the other, at Full HD
+  and 15 frames a second (enough for still photos); a camera that can't start
+  steps down to 1280×720, then 640×480. The size each runs at shows under its
+  preview. If one still won't start ("Could not start video source"), the
+  two usually share one USB controller: plug one into a port on the other
+  side of the computer or a USB 3 port, or use a powered hub, close other
+  apps using a camera, and press **Try again**. Two cameras of the same model
+  are numbered; **Swap top and bottom** fixes a mix-up.
 
 What happens: each grain the top camera sees is paired with its underside;
 it is counted once, and a defect seen only from below counts (a "sound" top

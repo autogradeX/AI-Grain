@@ -22,44 +22,93 @@ const remember = (key: string, value: string) => {
   }
 };
 
-/** A live camera by device id, at the highest resolution it offers. */
-function useCamera(deviceId: string) {
+/**
+ * Sizes tried in turn. Two USB cameras on one controller share its
+ * bandwidth: asking each for its largest size makes the second fail to start
+ * ("Could not start video source"), so start at Full HD at 15 frames a second
+ * (a still photo needs no more) and step down when a camera can't start.
+ */
+const LADDER = [
+  { width: 1920, height: 1080 },
+  { width: 1280, height: 720 },
+  { width: 640, height: 480 },
+];
+
+/** Errors that mean "not like this" (busy, bandwidth), worth a smaller size. */
+const RETRYABLE = new Set([
+  "NotReadableError",
+  "OverconstrainedError",
+  "AbortError",
+  "TrackStartError",
+]);
+
+export type CameraState =
+  | { status: "idle" | "starting" }
+  | { status: "live"; width: number; height: number }
+  | { status: "failed"; error: string; name: string };
+
+/**
+ * A live camera by device id. Starts only when `enabled` (so two cameras
+ * open one after the other) and again on each `attempt`.
+ */
+function useCamera(deviceId: string, enabled: boolean, attempt: number) {
   const ref = useRef<HTMLVideoElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<CameraState>({ status: "idle" });
   useEffect(() => {
-    if (!deviceId) return;
+    if (!deviceId || !enabled) return;
     let stream: MediaStream | null = null;
     let cancelled = false;
-    navigator.mediaDevices
-      .getUserMedia({
-        video: {
-          deviceId: { exact: deviceId },
-          width: { ideal: 4096 },
-          height: { ideal: 3072 },
-        },
-        audio: false,
-      })
-      .then((s) => {
-        if (cancelled) {
-          s.getTracks().forEach((tr) => tr.stop());
+    const start = async () => {
+      let last: { error: string; name: string } = { error: "", name: "" };
+      for (const size of LADDER) {
+        try {
+          const s = await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: { exact: deviceId },
+              width: { ideal: size.width },
+              height: { ideal: size.height },
+              frameRate: { ideal: 15, max: 15 },
+            },
+            audio: false,
+          });
+          if (cancelled) {
+            s.getTracks().forEach((tr) => tr.stop());
+            return;
+          }
+          stream = s;
+          const settings = s.getVideoTracks()[0]?.getSettings() ?? {};
+          if (ref.current) {
+            ref.current.srcObject = s;
+            void ref.current.play().catch(() => undefined);
+          }
+          setState({
+            status: "live",
+            width: settings.width ?? size.width,
+            height: settings.height ?? size.height,
+          });
           return;
+        } catch (err) {
+          const name = err instanceof Error ? err.name : "";
+          last = {
+            error: err instanceof Error ? err.message : String(err),
+            name,
+          };
+          if (!RETRYABLE.has(name)) break;
         }
-        stream = s;
-        setError(null);
-        if (ref.current) {
-          ref.current.srcObject = s;
-          void ref.current.play().catch(() => undefined);
-        }
+      }
+      if (!cancelled) setState({ status: "failed", ...last });
+    };
+    void Promise.resolve()
+      .then(() => {
+        if (!cancelled) setState({ status: "starting" });
       })
-      .catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : String(err)),
-      );
+      .then(start);
     return () => {
       cancelled = true;
       stream?.getTracks().forEach((tr) => tr.stop());
     };
-  }, [deviceId]);
-  return { ref, error };
+  }, [deviceId, enabled, attempt]);
+  return { ref, state };
 }
 
 /** The current frame of a video at its full size, as a JPEG. */
@@ -101,8 +150,12 @@ export function DualCamera({
   const [last, setLast] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const top = useCamera(topId);
-  const bottom = useCamera(bottomId);
+  // Opened one after the other: some drivers refuse two starts at once.
+  const [attempt, setAttempt] = useState(0);
+  const top = useCamera(topId, true, attempt);
+  const topSettled =
+    top.state.status === "live" || top.state.status === "failed";
+  const bottom = useCamera(bottomId, topSettled, attempt);
 
   useEffect(() => {
     // Labels and ids are only listed once camera access is allowed.
@@ -172,13 +225,33 @@ export function DualCamera({
       <option value="">{t("pick")}</option>
       {devices.map((d, i) => (
         <option key={d.deviceId} value={d.deviceId}>
-          {d.label || `Camera ${i + 1}`}
+          {labelOf(d, i)}
         </option>
       ))}
     </select>
   );
   const same = topId && topId === bottomId;
-  const cameraError = top.error ?? bottom.error ?? listError;
+  // Two cameras of the same model have the same name: number them.
+  const labelOf = (d: MediaDeviceInfo, i: number) => {
+    const name = d.label || t("cameraN", { n: i + 1 });
+    return devices.filter((o) => o.label === d.label).length > 1
+      ? `${name} · ${t("cameraN", { n: i + 1 })}`
+      : name;
+  };
+  const failed = [top.state, bottom.state].find(
+    (st): st is Extract<CameraState, { status: "failed" }> =>
+      st.status === "failed",
+  );
+  const cameraError = failed?.error ?? listError;
+  const live = top.state.status === "live" && bottom.state.status === "live";
+  const sizeOf = (st: CameraState) =>
+    st.status === "live"
+      ? t("liveAt", { size: `${st.width}×${st.height}` })
+      : st.status === "starting"
+        ? t("starting")
+        : st.status === "failed"
+          ? t("notStarted")
+          : "";
 
   return (
     <Card title={t("title")}>
@@ -187,18 +260,41 @@ export function DualCamera({
         <p className="warn small">{t("noCameras")}</p>
       )}
       {cameraError && (
-        <p className="error small">{t("blocked", { reason: cameraError })}</p>
+        <div className="error small">
+          <p>{t("blocked", { reason: cameraError })}</p>
+          {failed?.name !== "NotAllowedError" && <p>{t("bandwidth")}</p>}
+          <button type="button" onClick={() => setAttempt(attempt + 1)}>
+            {t("retry")}
+          </button>
+        </div>
       )}
       <div className="grid-2">
         <Field label={t("top")}>
           {select(topId, setTopId, TOP_KEY)}
           <video ref={top.ref} className="dual-preview" muted playsInline />
+          <span className="muted small">{sizeOf(top.state)}</span>
         </Field>
         <Field label={t("bottom")}>
           {select(bottomId, setBottomId, BOTTOM_KEY)}
           <video ref={bottom.ref} className="dual-preview" muted playsInline />
+          <span className="muted small">{sizeOf(bottom.state)}</span>
         </Field>
       </div>
+      {devices.length >= 2 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => {
+              setTopId(bottomId);
+              setBottomId(topId);
+              remember(TOP_KEY, bottomId);
+              remember(BOTTOM_KEY, topId);
+            }}
+          >
+            {t("swap")}
+          </button>
+        </div>
+      )}
       {same && <p className="warn small">{t("same")}</p>}
       {autopilot && (
         <label className="row small">
@@ -219,7 +315,7 @@ export function DualCamera({
         <button
           type="button"
           className="primary"
-          disabled={busy || !topId || !bottomId || !!same || !!cameraError}
+          disabled={busy || !live || !!same}
           onClick={() => void capture()}
         >
           {busy ? t("sending") : t("capture")}
