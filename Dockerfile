@@ -7,6 +7,7 @@ COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 RUN npm ci
 COPY . .
+
 # The local model's pretrained image model (checked against its checksum).
 RUN npm run fetch-model -w @ai-grain/api
 RUN npm run build && npm prune --omit=dev
