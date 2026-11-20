@@ -155,6 +155,13 @@
       "when": 1795185303827,
       "tag": "0021_standard_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795186285973,
+      "tag": "0022_network_standards",
+      "breakpoints": true
     }
   ]
 }

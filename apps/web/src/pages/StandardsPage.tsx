@@ -187,7 +187,10 @@ function StandardForm({ standard }: { standard: Standard | null }) {
   const { groupLabel, classLabel, cropLabel } = useGrainLabels();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const readOnly = !can.admin;
+  // Standards from the central server change only there.
+  const fromNetwork = Boolean(standard?.networkId);
+  const readOnly = !can.admin || fromNetwork;
+  const [shared, setShared] = useState(standard?.shared ?? false);
   const [name, setName] = useState(standard?.name ?? "");
   const [crop, setCrop] = useState(standard?.crop ?? "wheat");
   const [description, setDescription] = useState(standard?.description ?? "");
@@ -240,6 +243,7 @@ function StandardForm({ standard }: { standard: Standard | null }) {
         ),
         grades: grades.map((g) => fromForm(g, classIds)),
         allowEstimate,
+        shared,
         pricing: pricing
           ? fromPriceForm(
               pricing,
@@ -411,6 +415,19 @@ function StandardForm({ standard }: { standard: Standard | null }) {
           />
           {t("allowEstimate")}
         </label>
+        {fromNetwork ? (
+          <p className="muted small">{t("fromNetwork")}</p>
+        ) : (
+          <label className="row small">
+            <input
+              type="checkbox"
+              disabled={readOnly}
+              checked={shared}
+              onChange={(e) => setShared(e.target.checked)}
+            />
+            {t("shareWithStations")}
+          </label>
+        )}
       </Card>
 
       <Card

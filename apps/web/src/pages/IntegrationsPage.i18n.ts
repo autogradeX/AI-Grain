@@ -104,6 +104,51 @@ export const m = defineMessages({
     en: "A key is saved. Enter a new one only to replace it.",
     hi: "कुंजी सहेजी गई है। बदलने के लिए ही नई डालें।",
   },
+  syncNow: { en: "Sync now", hi: "अभी मिलाएँ" },
+  syncedAt: {
+    en: "Last in touch with the central server: {date}.",
+    hi: "केंद्रीय सर्वर से आख़िरी संपर्क: {date}।",
+  },
+  notSynced: {
+    en: "Not yet in touch with the central server.",
+    hi: "केंद्रीय सर्वर से अभी संपर्क नहीं हुआ।",
+  },
+  standardsChanged: {
+    en: "Shared standards changed: {count}.",
+    hi: "साझा मानक बदले: {count}।",
+  },
+  stations: { en: "Stations in the network", hi: "नेटवर्क के स्टेशन" },
+  stationsHint: {
+    en: 'Each station says how it is doing every half hour when it has internet. Standards marked "Share with stations" are copied to every station.',
+    hi: 'हर स्टेशन इंटरनेट होने पर हर आधे घंटे अपनी स्थिति बताता है। "स्टेशनों के साथ साझा करें" वाले मानक हर स्टेशन पर कॉपी होते हैं।',
+  },
+  stationName: { en: "Station", hi: "स्टेशन" },
+  lastSeen: { en: "Last seen", hi: "आख़िरी बार" },
+  today: { en: "Samples today", hi: "आज के नमूने" },
+  results7d: { en: "Results, 7 days", hi: "परिणाम, 7 दिन" },
+  meanDefects: { en: "Mean defects", hi: "औसत दोष" },
+  needs: { en: "Needs attention", hi: "ध्यान चाहिए" },
+  needOffline: {
+    en: "not heard from for 2 h",
+    hi: "2 घंटे से कोई संपर्क नहीं",
+  },
+  needWaiting: {
+    en: "{count} photos waiting for internet",
+    hi: "{count} फ़ोटो इंटरनेट की प्रतीक्षा में",
+  },
+  needOutbox: {
+    en: "{count} results not sent",
+    hi: "{count} परिणाम नहीं भेजे गए",
+  },
+  needFailed: {
+    en: "{count} failed photos this week",
+    hi: "इस हफ़्ते {count} फ़ोटो विफल",
+  },
+  needHelp: {
+    en: "{count} help reports this week",
+    hi: "इस हफ़्ते {count} मदद रिपोर्ट",
+  },
+  needNothing: { en: "All good", hi: "सब ठीक" },
   saveCentral: { en: "Save", hi: "सहेजें" },
   centralOk: {
     en: "The central server accepted this station's key.",

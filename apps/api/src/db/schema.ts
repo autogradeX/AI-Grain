@@ -118,6 +118,8 @@ export interface IntegrationSettings {
   enamUrl?: string;
   enamHeaderName?: string;
   enamHeaderValue?: string;
+  /** Station: when it last sent its heartbeat and took the shared standards. */
+  centralSyncedAt?: string;
   /**
    * Farmer messages: the result goes to the farmer's mobile by SMS or
    * WhatsApp through the organisation's messaging gateway (any provider: a
@@ -336,6 +338,15 @@ export const standards = pgTable("standards", {
    * and deductions above free allowances. The organisation's own rates.
    */
   pricing: jsonb("pricing").$type<PriceRules>(),
+  /** Central server: offered to every station, which copies it. */
+  shared: boolean("shared").notNull().default(false),
+  /**
+   * Station: the central server's standard this one copies (kept in step
+   * by the sweeper, so it isn't edited here).
+   */
+  networkId: uuid("network_id"),
+  /** When the central server last changed it. */
+  networkUpdatedAt: timestamp("network_updated_at", { withTimezone: true }),
   archived: boolean("archived").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -998,4 +1009,26 @@ export const supportReports = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("support_reports_org_idx").on(t.orgId, t.createdAt)],
+);
+
+/**
+ * Central server: the stations that report to it (one per station key),
+ * with how each said it was doing in its last heartbeat.
+ */
+export const stations = pgTable(
+  "stations",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    keyId: uuid("key_id")
+      .notNull()
+      .references(() => apiKeys.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    health: jsonb("health").$type<Record<string, unknown>>().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("stations_key_idx").on(t.keyId)],
 );

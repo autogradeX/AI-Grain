@@ -49,6 +49,10 @@ export interface Standard {
   definitions: Partial<Record<string, string>>;
   allowEstimate: boolean;
   pricing: PriceRules | null;
+  /** Central server: offered to every station. */
+  shared: boolean;
+  /** Station: copied from the central server (changed only there). */
+  networkId: string | null;
   archived: boolean;
   updatedAt: string;
 }

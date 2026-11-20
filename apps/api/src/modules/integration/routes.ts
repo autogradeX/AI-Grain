@@ -5,6 +5,7 @@ import {
   desc,
   eq,
   gt,
+  gte,
   inArray,
   isNotNull,
   isNull,
@@ -20,8 +21,11 @@ import {
   samples,
   type CertificatePayload,
   type IntegrationSettings,
+  standards,
+  stations,
   supportReports,
 } from "../../db/schema.js";
+import { Heartbeat, syncWithCentral } from "../station/network.js";
 import { outboxStatus, sendNow } from "./outbox.js";
 import { hashPayload } from "../certificates/service.js";
 import { audit } from "../../lib/audit.js";
@@ -91,6 +95,7 @@ export function integrationRoutes(ctx: AppContext) {
         webhookSecret: org?.integration.webhookSecret ?? null,
         centralUrl: org?.integration.centralUrl ?? null,
         centralKeySet: Boolean(org?.integration.centralKey),
+        centralSyncedAt: org?.integration.centralSyncedAt ?? null,
         enamUrl: org?.integration.enamUrl ?? null,
         enamHeaderName: org?.integration.enamHeaderName ?? null,
         enamHeaderValueSet: Boolean(org?.integration.enamHeaderValue),
@@ -535,6 +540,85 @@ export function integrationRoutes(ctx: AppContext) {
       }
     });
 
+    /**
+     * Central server: the stations of the network, how each said it is
+     * doing, and the results it sent in the last week.
+     */
+    app.get("/integration/stations", admin, async (request) => {
+      const me = authOf(request);
+      const rows = await ctx.db
+        .select()
+        .from(stations)
+        .where(eq(stations.orgId, me.orgId))
+        .orderBy(asc(stations.name));
+      const weekAgo = new Date(Date.now() - 7 * 86_400_000);
+      const results = await ctx.db
+        .select({
+          station: remoteCertificates.station,
+          result: remoteCertificates.result,
+          issuedAt: remoteCertificates.issuedAt,
+        })
+        .from(remoteCertificates)
+        .where(
+          and(
+            eq(remoteCertificates.orgId, me.orgId),
+            gte(remoteCertificates.issuedAt, weekAgo),
+          ),
+        );
+      const byStation = new Map<
+        string,
+        { count: number; defects: number[]; graded: number }
+      >();
+      for (const r of results) {
+        const e = byStation.get(r.station) ?? {
+          count: 0,
+          defects: [],
+          graded: 0,
+        };
+        e.count++;
+        const res = r.result as { totalDefectsPct?: unknown; grade?: unknown };
+        if (typeof res.totalDefectsPct === "number")
+          e.defects.push(res.totalDefectsPct);
+        if (typeof res.grade === "string") e.graded++;
+        byStation.set(r.station, e);
+      }
+      return {
+        items: rows.map((st) => {
+          const e = byStation.get(st.name);
+          return {
+            id: st.id,
+            name: st.name,
+            lastSeenAt: st.lastSeenAt,
+            /** Not heard from for over two hours (four heartbeats). */
+            quiet: Date.now() - st.lastSeenAt.getTime() > 2 * 3_600_000,
+            health: st.health,
+            results7d: e?.count ?? 0,
+            meanDefectsPct7d: e?.defects.length
+              ? e.defects.reduce((a, b) => a + b, 0) / e.defects.length
+              : null,
+            gradedShare7d: e?.count ? e.graded / e.count : null,
+          };
+        }),
+      };
+    });
+
+    /** Station: send the heartbeat and take the shared standards now. */
+    app.post("/integration/central/sync", admin, async (request) => {
+      const me = authOf(request);
+      const changed = await syncWithCentral(ctx, {
+        orgId: me.orgId,
+        force: true,
+      });
+      const [org] = await ctx.db
+        .select({ integration: organizations.integration })
+        .from(organizations)
+        .where(eq(organizations.id, me.orgId));
+      return {
+        standardsChanged: changed,
+        syncedAt: org?.integration.centralSyncedAt ?? null,
+      };
+    });
+
     /** Sends everything waiting now, instead of at its next retry. */
     app.post("/integration/outbox/send", admin, async (request) => {
       const me = authOf(request);
@@ -747,6 +831,59 @@ export function machineRoutes(ctx: AppContext) {
           result,
         })
         .onConflictDoNothing();
+      return { ok: true };
+    });
+
+    /** Standards this central server shares, for stations to copy. */
+    app.get("/standards", async (request) => {
+      const key = await requestKey(ctx, request);
+      if (key.scope !== "station")
+        throw forbidden("Shared standards are for stations: use a station key");
+      const rows = await ctx.db
+        .select()
+        .from(standards)
+        .where(
+          and(
+            eq(standards.orgId, key.orgId),
+            eq(standards.shared, true),
+            eq(standards.archived, false),
+          ),
+        );
+      return {
+        items: rows.map((s) => ({
+          id: s.id,
+          name: s.name,
+          crop: s.crop,
+          description: s.description,
+          grades: s.grades,
+          definitions: s.definitions,
+          allowEstimate: s.allowEstimate,
+          pricing: s.pricing,
+          updatedAt: s.updatedAt.toISOString(),
+        })),
+      };
+    });
+
+    /** A station says how it is doing (kept per station key). */
+    app.post("/stations/heartbeat", async (request) => {
+      const key = await requestKey(ctx, request);
+      if (key.scope !== "station")
+        throw forbidden("Heartbeats are for stations: use a station key");
+      const health = Heartbeat.parse(request.body);
+      const now = new Date();
+      await ctx.db
+        .insert(stations)
+        .values({
+          orgId: key.orgId,
+          keyId: key.id,
+          name: health.station || key.name,
+          health,
+          lastSeenAt: now,
+        })
+        .onConflictDoUpdate({
+          target: stations.keyId,
+          set: { name: health.station || key.name, health, lastSeenAt: now },
+        });
       return { ok: true };
     });
 

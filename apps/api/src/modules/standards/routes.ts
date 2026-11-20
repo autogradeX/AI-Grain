@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { AppContext } from "../../context.js";
 import { standards } from "../../db/schema.js";
 import { audit } from "../../lib/audit.js";
-import { badRequest, notFound } from "../../lib/errors.js";
+import { badRequest, conflict, notFound } from "../../lib/errors.js";
 import { authenticate, authOf, requireRole } from "../auth/guard.js";
 import { ensureCrop, normalizeCropKey } from "../crops/service.js";
 import { suggestStandard } from "./suggest.js";
@@ -71,6 +71,8 @@ const StandardBody = z.object({
   allowEstimate: z.boolean().default(false),
   /** Left out: unchanged on update. null: no prices. */
   pricing: PriceRulesSchema.nullable().optional(),
+  /** Central server: offer it to every station. */
+  shared: z.boolean().optional(),
 });
 
 /** Limits and definitions may only name classes of the standard's crop. */
@@ -109,6 +111,15 @@ export async function getStandard(ctx: AppContext, orgId: string, id: string) {
     .from(standards)
     .where(and(eq(standards.id, id), eq(standards.orgId, orgId)));
   return row;
+}
+
+/** A standard copied from the central server changes only there. */
+async function notFromNetwork(ctx: AppContext, orgId: string, id: string) {
+  const row = await getStandard(ctx, orgId, id);
+  if (row?.networkId)
+    throw conflict(
+      "This standard comes from the central server: change it there, and stations take it over by themselves.",
+    );
 }
 
 export function standardRoutes(ctx: AppContext) {
@@ -217,6 +228,7 @@ export function standardRoutes(ctx: AppContext) {
       const me = authOf(request);
       const { id } = z.object({ id: z.uuid() }).parse(request.params);
       const body = StandardBody.parse(request.body);
+      await notFromNetwork(ctx, me.orgId, id);
       await checkAgainstCrop(ctx, me.orgId, body);
       const [row] = await ctx.db
         .update(standards)
@@ -241,6 +253,7 @@ export function standardRoutes(ctx: AppContext) {
     app.post("/standards/:id/archive", admin, async (request) => {
       const me = authOf(request);
       const { id } = z.object({ id: z.uuid() }).parse(request.params);
+      await notFromNetwork(ctx, me.orgId, id);
       const { archived } = z
         .object({ archived: z.boolean() })
         .parse(request.body);

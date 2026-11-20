@@ -4,6 +4,7 @@ import { batches } from "../../db/schema.js";
 import { classifyAndTriage } from "../autopilot/service.js";
 import { deliverDue } from "../integration/outbox.js";
 import { pullNetworkModels } from "../localmodel/network.js";
+import { syncWithCentral } from "./network.js";
 
 /**
  * Photos waiting for Model Orchestration (no internet) whose retry time has
@@ -47,7 +48,8 @@ export async function sweep(ctx: AppContext) {
   const resumed = await resumeWaiting(ctx);
   const delivered = await deliverDue(ctx);
   const models = await pullNetworkModels(ctx);
-  return { resumed, delivered, models };
+  const standards = await syncWithCentral(ctx);
+  return { resumed, delivered, models, standards };
 }
 
 /**

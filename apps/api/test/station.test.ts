@@ -178,10 +178,10 @@ describe("a station sending results to its central server", () => {
     station.webhooks.handler = async (url, init) => {
       const path = new URL(url).pathname;
       const res = await central.app.inject({
-        method: "POST",
+        method: (init.method ?? "POST") as "GET" | "POST",
         url: path,
         headers: init.headers as Record<string, string>,
-        payload: init.body as string,
+        ...(init.body !== undefined && { payload: init.body as string }),
       });
       return new Response(res.body, { status: res.statusCode });
     };
@@ -317,6 +317,111 @@ describe("a station sending results to its central server", () => {
     expect(
       (await hq<{ items: unknown[] }>("GET", "/api/station/help")).body.items,
     ).toHaveLength(1);
+  });
+
+  it("takes the central server's shared standards and reports its health", async () => {
+    const raipur = client(station, stationToken);
+    const hq = client(central, centralToken);
+    const body = {
+      name: "State FAQ wheat",
+      crop: "wheat",
+      grades: [{ grade: "FAQ", maxDefectPct: { broken: 6 } }],
+      allowEstimate: true,
+      pricing: {
+        currency: "INR",
+        unit: "quintal",
+        basePrice: 2425,
+        deductions: [],
+      },
+      shared: true,
+    };
+    const shared = await hq<{ id: string }>("POST", "/api/standards", body);
+    expect(shared.status).toBe(201);
+    await hq("POST", "/api/standards", {
+      ...body,
+      name: "HQ internal",
+      shared: false,
+    });
+
+    const sync = await raipur<{ standardsChanged: number; syncedAt: string }>(
+      "POST",
+      "/api/integration/central/sync",
+    );
+    expect(sync.body.standardsChanged).toBe(1);
+    expect(sync.body.syncedAt).toBeTruthy();
+    type Std = {
+      id: string;
+      name: string;
+      networkId: string | null;
+      archived: boolean;
+      pricing: { basePrice: number } | null;
+    };
+    let list = await raipur<Std[]>(
+      "GET",
+      "/api/standards?includeArchived=true",
+    );
+    const copy = list.body.find((x) => x.networkId === shared.body.id)!;
+    expect(copy).toMatchObject({
+      name: "State FAQ wheat",
+      pricing: { basePrice: 2425 },
+    });
+    expect(list.body.some((x) => x.name === "HQ internal")).toBe(false);
+    // Changed only on the central server.
+    const edit = await raipur("PUT", `/api/standards/${copy.id}`, {
+      ...body,
+      shared: undefined,
+    });
+    expect(edit.status).toBe(409);
+
+    // A change and then the end of sharing reach the station.
+    await hq("PUT", `/api/standards/${shared.body.id}`, {
+      ...body,
+      name: "State FAQ wheat 2027",
+    });
+    await raipur("POST", "/api/integration/central/sync");
+    list = await raipur<Std[]>("GET", "/api/standards?includeArchived=true");
+    expect(list.body.find((x) => x.id === copy.id)?.name).toBe(
+      "State FAQ wheat 2027",
+    );
+    await hq("PUT", `/api/standards/${shared.body.id}`, {
+      ...body,
+      shared: false,
+    });
+    await raipur("POST", "/api/integration/central/sync");
+    list = await raipur<Std[]>("GET", "/api/standards?includeArchived=true");
+    expect(list.body.find((x) => x.id === copy.id)?.archived).toBe(true);
+
+    // The central server sees the station, how it is doing and its results.
+    const stations = await hq<{
+      items: {
+        name: string;
+        health: {
+          completed7d: number;
+          outboxWaiting: number;
+          helpReports7d: number;
+        };
+        results7d: number;
+      }[];
+    }>("GET", "/api/integration/stations");
+    expect(stations.body.items).toHaveLength(1);
+    expect(stations.body.items[0]).toMatchObject({
+      name: "APMC Raipur",
+      // Its one sample was reopened above: started today, not completed.
+      health: {
+        samplesToday: 1,
+        completed7d: 0,
+        outboxWaiting: 0,
+        helpReports7d: 1,
+      },
+      results7d: 1,
+    });
+    // Stations' own pages are for admins of the central server only.
+    const refused = await central.app.inject({
+      method: "GET",
+      url: "/api/v1/standards",
+      headers: { authorization: "Bearer agk_not_a_key" },
+    });
+    expect(refused.statusCode).toBe(401);
   });
 
   it("refuses a certificate whose contents don't match its hash", async () => {

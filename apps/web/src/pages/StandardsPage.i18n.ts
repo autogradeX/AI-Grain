@@ -1,6 +1,14 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  shareWithStations: {
+    en: "Share with stations: every station connected to this server copies it, with its prices",
+    hi: "स्टेशनों के साथ साझा करें: इस सर्वर से जुड़ा हर स्टेशन इसे इसके भावों के साथ कॉपी करता है",
+  },
+  fromNetwork: {
+    en: "From the central server: it is changed there, and this station takes the changes over by itself.",
+    hi: "केंद्रीय सर्वर से: इसे वहीं बदला जाता है, और यह स्टेशन बदलाव अपने-आप ले लेता है।",
+  },
   pricesTitle: { en: "Prices", hi: "भाव" },
   minProtein: { en: "Protein min %", hi: "प्रोटीन न्यूनतम %" },
   minProteinAria: {

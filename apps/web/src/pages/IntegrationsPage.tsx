@@ -4,6 +4,7 @@ import {
   KeyRound,
   Landmark,
   MessageSquareText,
+  RadioTower,
   Server,
   Webhook,
 } from "lucide-react";
@@ -33,6 +34,7 @@ interface Integration {
   webhookSecret: string | null;
   centralUrl: string | null;
   centralKeySet: boolean;
+  centralSyncedAt: string | null;
   enamUrl: string | null;
   enamHeaderName: string | null;
   enamHeaderValueSet: boolean;
@@ -84,6 +86,16 @@ function CentralCard({ data }: { data: Integration }) {
         "/integration/central/test",
       ),
   });
+  const sync = useMutation({
+    mutationFn: () =>
+      api.post<{ standardsChanged: number; syncedAt: string | null }>(
+        "/integration/central/sync",
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["integration"] });
+      void qc.invalidateQueries({ queryKey: ["standards"] });
+    },
+  });
   return (
     <Card
       title={
@@ -93,6 +105,15 @@ function CentralCard({ data }: { data: Integration }) {
       }
     >
       <p className="muted small">{t("centralHint")}</p>
+      {data.centralUrl && (
+        <p className="small">
+          {data.centralSyncedAt
+            ? t("syncedAt", { date: formatDate(data.centralSyncedAt) })
+            : t("notSynced")}{" "}
+          {sync.data &&
+            t("standardsChanged", { count: sync.data.standardsChanged })}
+        </p>
+      )}
       <form
         className="stack-sm"
         onSubmit={(e) => {
@@ -146,6 +167,13 @@ function CentralCard({ data }: { data: Integration }) {
                 onClick={() => test.mutate()}
               >
                 {t("test")}
+              </button>
+              <button
+                type="button"
+                disabled={sync.isPending}
+                onClick={() => sync.mutate()}
+              >
+                {t("syncNow")}
               </button>
               <button
                 type="button"
@@ -438,6 +466,98 @@ function FarmerCard({ data }: { data: Integration }) {
           )}
         </div>
       </form>
+    </Card>
+  );
+}
+
+interface StationRow {
+  id: string;
+  name: string;
+  lastSeenAt: string;
+  quiet: boolean;
+  health: {
+    samplesToday?: number;
+    completed7d?: number;
+    lastSampleAt?: string | null;
+    photosWaitingForInternet?: number;
+    photosFailed7d?: number;
+    outboxWaiting?: number;
+    helpReports7d?: number;
+    localModelMode?: string;
+    simpleMode?: boolean;
+  };
+  results7d: number;
+  meanDefectsPct7d: number | null;
+}
+
+/** Central server: every station of the network and how it is doing. */
+function StationsCard() {
+  const t = useT(m);
+  const q = useQuery({
+    queryKey: ["integration-stations"],
+    queryFn: () => api.get<{ items: StationRow[] }>("/integration/stations"),
+  });
+  if (!q.data?.items.length) return null;
+  return (
+    <Card
+      title={
+        <span className="row">
+          <RadioTower size={18} aria-hidden /> {t("stations")}
+        </span>
+      }
+    >
+      <p className="muted small">{t("stationsHint")}</p>
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>{t("stationName")}</th>
+              <th>{t("lastSeen")}</th>
+              <th className="num">{t("today")}</th>
+              <th className="num">{t("results7d")}</th>
+              <th className="num">{t("meanDefects")}</th>
+              <th>{t("needs")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {q.data.items.map((st) => {
+              const h = st.health;
+              const quiet = st.quiet;
+              const needs = [
+                quiet && t("needOffline"),
+                (h.photosWaitingForInternet ?? 0) > 0 &&
+                  t("needWaiting", { count: h.photosWaitingForInternet ?? 0 }),
+                (h.outboxWaiting ?? 0) > 0 &&
+                  t("needOutbox", { count: h.outboxWaiting ?? 0 }),
+                (h.photosFailed7d ?? 0) > 0 &&
+                  t("needFailed", { count: h.photosFailed7d ?? 0 }),
+                (h.helpReports7d ?? 0) > 0 &&
+                  t("needHelp", { count: h.helpReports7d ?? 0 }),
+              ].filter((x): x is string => Boolean(x));
+              return (
+                <tr key={st.id}>
+                  <td>{st.name}</td>
+                  <td>
+                    <Badge tone={quiet ? "warn" : "good"}>
+                      {formatDate(st.lastSeenAt)}
+                    </Badge>
+                  </td>
+                  <td className="num">{h.samplesToday ?? "—"}</td>
+                  <td className="num">{st.results7d}</td>
+                  <td className="num">
+                    {st.meanDefectsPct7d === null
+                      ? "—"
+                      : `${st.meanDefectsPct7d.toFixed(1)} %`}
+                  </td>
+                  <td className="small">
+                    {needs.length ? needs.join(" · ") : t("needNothing")}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }
@@ -756,6 +876,7 @@ export function IntegrationsPage() {
       {data.data && (
         <>
           <OutboxCard data={data.data} />
+          <StationsCard />
           <EnamCard key={data.data.enamUrl ?? ""} data={data.data} />
           <FarmerCard key={data.data.farmerUrl ?? ""} data={data.data} />
           <CentralCard key={data.data.centralUrl ?? ""} data={data.data} />

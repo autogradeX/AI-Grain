@@ -229,6 +229,21 @@ central server accepts it. Reopening a sample withdraws its certificate on
 the central site too. Report QR codes open the central site, so a buyer can
 verify a station's report from anywhere.
 
+The station and the central server also keep in touch every half hour
+(**Sync now** on the station's Central server card does it at once):
+
+- **Shared standards:** standards the central server marks **Share with
+  stations** (with their grade limits and prices) are copied to every
+  station. On the station they can't be edited; a change on the central
+  server reaches the stations at the next sync, and a standard no longer
+  shared is archived there.
+- **Station health:** each station sends a heartbeat (samples today,
+  completed this week, photos waiting for internet or failed, results not yet
+  sent, help reports, its local model mode). The central server lists every
+  station under **Integrations → Stations in the network**, with its results
+  of the last week and what needs attention (not heard from for 2 hours,
+  photos waiting, results not sent, failed photos, help reports).
+
 ## Phones on the station's Wi-Fi
 
 - Phones open `http://192.168.1.20:3000` (scan the QR code in Settings).
