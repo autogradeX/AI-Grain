@@ -19,6 +19,12 @@ import {
 import { useT } from "../i18n";
 import { useGrainLabels } from "../i18n/common";
 import { m } from "./StandardsPage.i18n";
+import {
+  fromPriceForm,
+  PricingEditor,
+  toPriceForm,
+  type PriceForm,
+} from "../components/PricingEditor";
 
 /** A standard drafted by Model Orchestration (POST /standards/draft). */
 interface StandardDraft {
@@ -195,6 +201,9 @@ function StandardForm({ standard }: { standard: Standard | null }) {
   const cropProfile = crops.data?.find((c) => c.key === crop);
   const classes = cropProfile?.classes ?? [];
   const classIds = classes.map((c) => c.id);
+  const [pricing, setPricing] = useState<PriceForm | null>(
+    toPriceForm(standard?.pricing),
+  );
   const [grades, setGrades] = useState<GradeForm[]>(
     standard?.grades.map(toForm) ?? [emptyGrade("1"), emptyGrade("2")],
   );
@@ -231,6 +240,12 @@ function StandardForm({ standard }: { standard: Standard | null }) {
         ),
         grades: grades.map((g) => fromForm(g, classIds)),
         allowEstimate,
+        pricing: pricing
+          ? fromPriceForm(
+              pricing,
+              grades.map((g) => g.grade.trim()),
+            )
+          : null,
       };
       return standard
         ? api.put<Standard>(`/standards/${standard.id}`, body)
@@ -559,6 +574,16 @@ function StandardForm({ standard }: { standard: Standard | null }) {
             </tbody>
           </table>
         </div>
+      </Card>
+
+      <Card title={t("pricesTitle")}>
+        <PricingEditor
+          value={pricing}
+          onChange={setPricing}
+          grades={grades.map((g) => g.grade.trim()).filter(Boolean)}
+          classes={classes}
+          readOnly={readOnly}
+        />
       </Card>
 
       <Card title={t("definitionsTitle")}>

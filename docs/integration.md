@@ -37,6 +37,22 @@ anything the receiver missed (it was down, or a delivery failed three times).
   "resultSource": "estimate",
   "purityPct": 96.4,
   "totalDefectsPct": 3.6,
+  "price": {
+    "currency": "INR",
+    "unit": "quintal",
+    "gradePrice": 2300,
+    "deductions": [
+      {
+        "scope": "moisture",
+        "key": null,
+        "value": 13.5,
+        "points": 1.5,
+        "amount": 34.5
+      }
+    ],
+    "price": 2265.5,
+    "rejected": null
+  },
   "sampleMassG": null,
   "parameters": [
     {
@@ -173,6 +189,11 @@ e-NAM's exact endpoint and authentication, come from e-NAM (SFAC / the
 state's e-NAM cell); this connection is built to carry them, and changes to
 the format will be versioned (`@2`). The farmer's mobile number is not sent
 here; connected systems that need it read it from the full result.
+
+`price` is the price per unit under the standard's own prices (Standards →
+Prices): the grade's price, each deduction beyond its free allowance, and the
+result; `null` when the standard has no prices. `rejected` is `"ungraded"`
+when the buyer takes no lot that meets no grade.
 
 ## Farmer messages (SMS / WhatsApp)
 

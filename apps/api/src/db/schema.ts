@@ -4,6 +4,7 @@ import type {
   DimensionSummary,
   GradeResult,
   GradeSpec,
+  PriceRules,
 } from "@ai-grain/core";
 import { sql } from "drizzle-orm";
 import {
@@ -328,6 +329,11 @@ export const standards = pgTable("standards", {
    * weighed. Off by default: weighing gives the verified result.
    */
   allowEstimate: boolean("allow_estimate").notNull().default(false),
+  /**
+   * What a buyer pays under this standard: a base price, prices per grade
+   * and deductions above free allowances. The organisation's own rates.
+   */
+  pricing: jsonb("pricing").$type<PriceRules>(),
   archived: boolean("archived").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true })

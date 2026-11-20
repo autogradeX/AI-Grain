@@ -1,6 +1,10 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  needsEstimate: {
+    en: "This standard needs weighed cups: allow the photo result on it, or the station can't finish by itself.",
+    hi: "इस मानक में तौले गए कप चाहिए: इस पर फ़ोटो परिणाम की अनुमति दें, नहीं तो स्टेशन अपने-आप पूरा नहीं कर सकता।",
+  },
   title: { en: "Simple mode (station screen)", hi: "सरल मोड (स्टेशन स्क्रीन)" },
   hint: {
     en: "A one-tap screen for operators who aren't technical: they pick the grain and tap once; the station weighs, reads moisture, photographs, checks and prints by itself. Set it up once here.",

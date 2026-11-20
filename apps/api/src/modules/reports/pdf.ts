@@ -9,6 +9,7 @@ import {
   type DimensionSummary,
   type GradeSpec,
   type LimitFailure,
+  type PriceQuote,
 } from "@ai-grain/core";
 import PDFDocument from "pdfkit";
 import type { ReportSettings } from "../../db/schema.js";
@@ -57,6 +58,61 @@ export interface ReportData {
   }[];
   galleryTotal: number;
   dimensions: DimensionSummary | null;
+  /** The price under the standard's prices; null when it has none. */
+  price: PriceQuote | null;
+}
+
+/** Money in the PDF's built-in fonts (which have no rupee sign). */
+function pdfMoney(value: number, currency: string): string {
+  const n = value.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  return currency === "INR" ? `Rs. ${n}` : `${n} ${currency}`;
+}
+
+/** The name of what a price deduction is measured on. */
+function deductionLabel(
+  line: PriceQuote["lines"][number],
+  classes: readonly ClassDef[],
+): string {
+  if (line.label) return line.label;
+  switch (line.scope) {
+    case "moisture":
+      return "Moisture";
+    case "totalDefects":
+      return "Total defects";
+    case "protein":
+      return "Protein";
+    case "oil":
+      return "Oil";
+    case "group":
+      return GROUP_LABELS[line.key as ClassGroup] ?? line.key ?? "";
+    case "class":
+      return classLabel(classes, line.key ?? "");
+  }
+}
+
+/** Price lines for a report or slip: the grade price, each deduction, the result. */
+export function priceLines(
+  price: PriceQuote,
+  classes: readonly ClassDef[],
+): { label: string; value: string; strong?: boolean }[] {
+  const per = `/${price.unit}`;
+  if (price.rejected)
+    return [{ label: "Price", value: "not accepted (no grade)", strong: true }];
+  return [
+    {
+      label: "Grade price",
+      value: `${pdfMoney(price.start, price.currency)}${per}`,
+    },
+    ...price.lines.map((l) => ({
+      label: `- ${deductionLabel(l, classes)} (${fmt(l.value, 1)} %)`,
+      value: `-${pdfMoney(l.amount, price.currency)}`,
+    })),
+    {
+      label: "Price",
+      value: `${pdfMoney(price.price ?? 0, price.currency)}${per}`,
+      strong: true,
+    },
+  ];
 }
 
 const fmt = (n: number | null | undefined, digits = 2) =>
@@ -296,6 +352,20 @@ export function renderReport(data: ReportData): Promise<Buffer> {
           "Estimated from the photos (kernel areas), not weighed. The standard allows completing on the estimate.",
           { width },
         )
+        .fillColor("#000");
+    }
+    if (data.price) {
+      doc.moveDown(0.3);
+      for (const p of priceLines(data.price, data.classes))
+        doc
+          .font(p.strong ? "Helvetica-Bold" : "Helvetica")
+          .fontSize(10)
+          .text(`${p.label}: ${p.value}`);
+      doc
+        .font("Helvetica")
+        .fontSize(8)
+        .fillColor("#555")
+        .text("Under the price rules set with the standard.", { width })
         .fillColor("#000");
     }
   }
@@ -666,6 +736,13 @@ export function renderSlip(data: ReportData): Promise<Buffer> {
     pair("L/B", fmt(data.dimensions.meanLb));
   }
   pair("Kernels", String(data.kernels.total));
+  if (data.price) {
+    rule();
+    for (const p of priceLines(data.price, data.classes)) {
+      if (p.strong) doc.moveDown(0.2);
+      pair(p.label, p.value);
+    }
+  }
   const fake = fakeGrainNote(data.kernels);
   if (fake) {
     rule();

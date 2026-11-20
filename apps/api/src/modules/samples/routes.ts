@@ -49,6 +49,7 @@ import { getStandard } from "../standards/routes.js";
 import {
   breakdownOf,
   estimateFor,
+  priceFor,
   gradeFor,
   loadSample,
   refreshResult,
@@ -500,9 +501,25 @@ export function sampleRoutes(ctx: AppContext) {
           };
         })(),
       };
+      const liveGrade = gradeFor(estimate, sample, standard?.grades ?? null);
       return {
         ...sample,
         result,
+        // What a buyer pays under the standard's prices.
+        price: priceFor(
+          sample,
+          standard?.pricing,
+          result
+            ? {
+                byClass: result.byClassPct,
+                byGroup: result.byGroupPct,
+                totalDefectsPct: result.totalDefectsPct,
+                grade: result.grade.grade,
+              }
+            : estimate.counted > 0
+              ? { ...estimate, grade: liveGrade.grade }
+              : null,
+        ),
         cropProfile: {
           key: crop.key,
           label: crop.label,
@@ -513,7 +530,7 @@ export function sampleRoutes(ctx: AppContext) {
           estimate.counted > 0
             ? {
                 ...estimate,
-                grade: gradeFor(estimate, sample, standard?.grades ?? null),
+                grade: liveGrade,
               }
             : null,
         standard: standard ?? null,

@@ -21,6 +21,8 @@ interface Words {
   purity: string;
   estimate: string;
   verify: string;
+  price: string;
+  rejected: string;
 }
 
 /** English is used for any language without its own words yet. */
@@ -35,6 +37,8 @@ export const FARMER_WORDS: Record<string, Words> = {
     purity: "Purity",
     estimate: "from photo",
     verify: "Check",
+    price: "Price",
+    rejected: "Not accepted at this grade",
   },
   hi: {
     title: "अनाज जाँच परिणाम",
@@ -46,8 +50,16 @@ export const FARMER_WORDS: Record<string, Words> = {
     purity: "शुद्धता",
     estimate: "फ़ोटो से अनुमान",
     verify: "जाँचें",
+    price: "भाव",
+    rejected: "इस ग्रेड पर स्वीकार नहीं",
   },
 };
+
+/** A price as people read it: ₹2,150 for rupees, else the code. */
+export function money(value: number, currency: string): string {
+  const n = value.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  return currency === "INR" ? `₹${n}` : `${n} ${currency}`;
+}
 
 const pct = (v: number) => `${Math.round(v * 10) / 10}%`;
 
@@ -71,6 +83,13 @@ export function farmerText(result: AssayingResult, language?: string): string {
       .filter(Boolean)
       .join(", ") +
       (result.resultSource === "estimate" ? ` (${w.estimate})` : ""),
+    ...(result.price
+      ? [
+          result.price.price !== null
+            ? `${w.price}: ${money(result.price.price, result.price.currency)}/${result.price.unit}`
+            : `${w.price}: ${w.rejected}`,
+        ]
+      : []),
     ...(result.certificate
       ? [`${w.verify}: ${result.certificate.verifyUrl}`]
       : []),

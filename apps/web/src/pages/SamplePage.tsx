@@ -33,6 +33,7 @@ import { KernelSizeCard, OutputButtons, RepeatCard } from "./SampleExtras";
 import { MoistureButton } from "../components/MoistureButton";
 import { ScaleButton } from "../components/ScaleButton";
 import { m } from "./SamplePage.i18n";
+import { PriceBox } from "../components/PriceBox";
 
 type T = Translate<keyof typeof m>;
 
@@ -1007,6 +1008,13 @@ function ResultCard({ sample }: { sample: Sample }) {
         <p className="muted small">
           {t("completedOn", { date: formatDate(sample.completedAt) })}
         </p>
+      )}
+      {sample.price && (
+        <PriceBox
+          price={sample.price}
+          classes={sample.cropProfile.classes}
+          estimate={!sample.result}
+        />
       )}
       <Certificates sample={sample} />
       <PublishDemo sample={sample} />

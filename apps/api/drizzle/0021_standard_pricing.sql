@@ -1,0 +1,1 @@
+ALTER TABLE "standards" ADD COLUMN "pricing" jsonb;

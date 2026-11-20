@@ -148,6 +148,13 @@
       "when": 1795184916043,
       "tag": "0020_farmer_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795185303827,
+      "tag": "0021_standard_pricing",
+      "breakpoints": true
     }
   ]
 }

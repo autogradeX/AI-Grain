@@ -95,6 +95,9 @@ export function SimpleModeCard() {
                     ))}
                 </select>
               )}
+              {standards.data?.find(
+                (s) => s.id === value.standards?.[c.key] && !s.allowEstimate,
+              ) && <span className="error small">{t("needsEstimate")}</span>}
             </div>
           ))}
         </div>

@@ -3,6 +3,8 @@ import type {
   ClassGroup,
   GradeResult,
   GradeSpec,
+  PriceQuote,
+  PriceRules,
 } from "@ai-grain/core";
 
 export type Role = "admin" | "grader" | "viewer";
@@ -46,6 +48,7 @@ export interface Standard {
   grades: GradeSpec[];
   definitions: Partial<Record<string, string>>;
   allowEstimate: boolean;
+  pricing: PriceRules | null;
   archived: boolean;
   updatedAt: string;
 }
@@ -211,6 +214,8 @@ export interface Sample {
   cropProfile: CropProfile;
   /** Mass % estimated from kernel areas in the photos; null until kernels are classified. */
   estimate: SampleEstimate | null;
+  /** What a buyer pays under the standard's prices; null when it has none. */
+  price: PriceQuote | null;
   standard: Standard | null;
   batches: {
     id: string;

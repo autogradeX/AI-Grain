@@ -73,3 +73,12 @@ export {
   type Similarity,
   type ViewMatch,
 } from "./views.js";
+export { quotePrice } from "./pricing.js";
+export type {
+  PriceDeduction,
+  PriceInput,
+  PriceLine,
+  PriceQuote,
+  PriceRules,
+  PriceScope,
+} from "./pricing.js";

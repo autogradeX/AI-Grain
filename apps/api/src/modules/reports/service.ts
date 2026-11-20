@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { summarizePercentages } from "@ai-grain/core";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import QRCode from "qrcode";
 import sharp from "sharp";
@@ -25,7 +26,7 @@ import {
 } from "../batches/service.js";
 import { currentCertificate } from "../certificates/service.js";
 import { ensureCrop } from "../crops/service.js";
-import { loadSample, type SampleRow } from "../samples/service.js";
+import { loadSample, priceFor, type SampleRow } from "../samples/service.js";
 import { getStandard } from "../standards/routes.js";
 import { verifyBase } from "../integration/service.js";
 import { renderReport, renderSlip } from "./pdf.js";
@@ -49,6 +50,8 @@ function cacheKey(
   layout: ReportSettings,
   /** Where the QR code points: a changed site address gives a new report. */
   verifyUrl: string,
+  /** The standard's prices, which the report shows. */
+  pricing: unknown,
 ): string {
   const hash = createHash("sha256")
     .update(
@@ -60,6 +63,7 @@ function cacheKey(
         sample.updatedAt.toISOString(),
         sample.completedAt?.toISOString() ?? null,
         layout,
+        pricing ?? null,
       ]),
     )
     .digest("hex")
@@ -96,6 +100,9 @@ export async function reportPdf(
     format,
     layout,
     await verifyBase(ctx, sample.orgId),
+    sample.standardId
+      ? (await getStandard(ctx, sample.orgId, sample.standardId))?.pricing
+      : null,
   );
   try {
     return await ctx.storage.get(key);
@@ -247,7 +254,22 @@ async function buildReport(
     ? `${await verifyBase(ctx, sample.orgId)}/verify/${cert.code}`
     : null;
   const render = format === "slip" ? renderSlip : renderReport;
+  const pcts = sample.result
+    ? summarizePercentages(sample.result.byClassPct, crop.classes)
+    : null;
   return render({
+    price: priceFor(
+      sample,
+      standard?.pricing,
+      pcts && sample.result
+        ? {
+            byClass: pcts.byClass,
+            byGroup: pcts.byGroup,
+            totalDefectsPct: pcts.totalDefectsPct,
+            grade: sample.result.grade.grade,
+          }
+        : null,
+    ),
     layout: org?.report ?? {},
     dimensions: sample.dimensions ?? (await dimensionsFor(ctx, id)),
     orgName: org?.name ?? "",

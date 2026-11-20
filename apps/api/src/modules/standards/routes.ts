@@ -25,6 +25,36 @@ export const GradeSpecSchema = z.object({
   minOilPct: Pct.optional(),
 });
 
+const Money = z.number().min(0).max(100_000_000);
+
+export const PriceRulesSchema = z.object({
+  currency: z.string().trim().min(1).max(8).default("INR"),
+  unit: z.string().trim().min(1).max(20).default("quintal"),
+  basePrice: Money,
+  gradePrices: z.record(z.string().max(40), Money).optional(),
+  rejectUngraded: z.boolean().optional(),
+  deductions: z
+    .array(
+      z.object({
+        scope: z.enum([
+          "moisture",
+          "totalDefects",
+          "class",
+          "group",
+          "protein",
+          "oil",
+        ]),
+        key: z.string().max(40).optional(),
+        allowance: Pct,
+        rate: z.number().min(0).max(1_000_000),
+        mode: z.enum(["amount", "percent"]),
+        label: z.string().trim().max(60).optional(),
+      }),
+    )
+    .max(30)
+    .default([]),
+});
+
 const StandardBody = z.object({
   name: z.string().trim().min(1).max(120),
   crop: z.string().trim().min(1).max(60).transform(normalizeCropKey),
@@ -39,6 +69,8 @@ const StandardBody = z.object({
     ),
   definitions: z.record(ClassId, z.string().max(1000)).default({}),
   allowEstimate: z.boolean().default(false),
+  /** Left out: unchanged on update. null: no prices. */
+  pricing: PriceRulesSchema.nullable().optional(),
 });
 
 /** Limits and definitions may only name classes of the standard's crop. */
@@ -55,6 +87,15 @@ async function checkAgainstCrop(
       if (!ids.has(id)) unknown.add(id);
   for (const id of Object.keys(body.definitions))
     if (!ids.has(id)) unknown.add(id);
+  for (const d of body.pricing?.deductions ?? []) {
+    if (d.scope === "class" && (!d.key || !ids.has(d.key)))
+      unknown.add(d.key ?? "(none)");
+    if (
+      d.scope === "group" &&
+      !(CLASS_GROUPS as readonly string[]).includes(d.key ?? "")
+    )
+      throw badRequest(`Not a class group: ${d.key ?? "(none)"}`);
+  }
   if (unknown.size) {
     throw badRequest(
       `Not classes of ${crop.label}: ${[...unknown].join(", ")}. Add them to the crop first.`,
@@ -158,6 +199,7 @@ export function standardRoutes(ctx: AppContext) {
         .values({
           ...body,
           description: body.description ?? null,
+          pricing: body.pricing ?? null,
           orgId: me.orgId,
         })
         .returning();

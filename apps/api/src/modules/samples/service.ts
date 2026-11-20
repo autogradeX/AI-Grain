@@ -9,6 +9,10 @@ import {
   type MassPercentages,
   type Measurement,
   type RunBreakdown,
+  quotePrice,
+  type ClassGroup,
+  type PriceQuote,
+  type PriceRules,
 } from "@ai-grain/core";
 import { and, eq } from "drizzle-orm";
 import type { AppContext } from "../../context.js";
@@ -65,6 +69,38 @@ export function gradeFor(
         grades,
       )
     : { grade: null, failures: {} };
+}
+
+/**
+ * What a buyer pays per unit under the standard's prices: from the saved
+ * result when there is one, else from the live photo estimate. Null when the
+ * standard has no prices or there are no figures yet.
+ */
+export function priceFor(
+  sample: Pick<SampleRow, "moisturePct" | "proteinPct" | "oilPct">,
+  pricing: PriceRules | null | undefined,
+  figures: {
+    byClass: Partial<Record<string, number>>;
+    byGroup: Partial<Record<ClassGroup, number>>;
+    totalDefectsPct: number;
+    grade: string | null;
+  } | null,
+): PriceQuote | null {
+  if (!pricing || !figures) return null;
+  return quotePrice(
+    {
+      grade: figures.grade,
+      percentages: {
+        byClass: figures.byClass as Record<string, number>,
+        byGroup: figures.byGroup as Record<ClassGroup, number>,
+        totalDefectsPct: figures.totalDefectsPct,
+      },
+      moisturePct: sample.moisturePct,
+      proteinPct: sample.proteinPct,
+      oilPct: sample.oilPct,
+    },
+    pricing,
+  );
 }
 
 function toResult(

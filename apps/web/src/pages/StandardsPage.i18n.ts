@@ -1,6 +1,7 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  pricesTitle: { en: "Prices", hi: "भाव" },
   minProtein: { en: "Protein min %", hi: "प्रोटीन न्यूनतम %" },
   minProteinAria: {
     en: "Minimum protein % for grade {grade}",

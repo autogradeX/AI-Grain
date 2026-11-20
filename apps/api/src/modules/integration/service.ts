@@ -17,7 +17,7 @@ import { enqueue } from "./outbox.js";
 import { kernelSummary } from "../batches/service.js";
 import { currentCertificate } from "../certificates/service.js";
 import { ensureCrop } from "../crops/service.js";
-import type { SampleRow } from "../samples/service.js";
+import { priceFor, type SampleRow } from "../samples/service.js";
 import { getStandard } from "../standards/routes.js";
 
 /** Version of the result format, so receivers can tell changes apart. */
@@ -188,6 +188,37 @@ export async function assayingResult(ctx: AppContext, sample: SampleRow) {
     resultSource: sample.result ? (sample.result.source ?? "weighed") : null,
     purityPct: pct ? r2(pct.purityPct) : null,
     totalDefectsPct: pct ? r2(pct.totalDefectsPct) : null,
+    /** The price per unit under the standard's prices (null when it has none). */
+    price: (() => {
+      const q = priceFor(
+        sample,
+        standard?.pricing,
+        pct && sample.result
+          ? {
+              byClass: pct.byClass,
+              byGroup: pct.byGroup,
+              totalDefectsPct: pct.totalDefectsPct,
+              grade: sample.result.grade.grade,
+            }
+          : null,
+      );
+      return q
+        ? {
+            currency: q.currency,
+            unit: q.unit,
+            gradePrice: q.start,
+            deductions: q.lines.map((l) => ({
+              scope: l.scope,
+              key: l.key ?? null,
+              value: l.value,
+              points: l.points,
+              amount: l.amount,
+            })),
+            price: q.price,
+            rejected: q.rejected ?? null,
+          }
+        : null;
+    })(),
     sampleMassG: sample.sampleMassG,
     parameters,
     kernels: {

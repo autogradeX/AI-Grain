@@ -32,6 +32,7 @@ import {
 } from "../../i18n";
 import { useGrainLabels } from "../../i18n/common";
 import { m } from "./SimplePage.i18n";
+import { PriceBox } from "../../components/PriceBox";
 
 type Step = "start" | "weigh" | "moisture" | "photo" | "analyse";
 
@@ -189,6 +190,7 @@ export function SimplePage() {
 
   /** Waits for the sample: done, a question for the operator, or a problem. */
   const follow = async (sampleId: string, notes: string[] = []) => {
+    let idle = 0;
     for (let i = 0; i < 300; i++) {
       const s = await api.get<Sample>(`/samples/${sampleId}`);
       if (s.status === "completed") {
@@ -215,6 +217,17 @@ export function SimplePage() {
         return;
       }
       const waiting = s.batches.some((b) => b.status === "waiting");
+      // Nothing left to do, yet not finished: the standard wants weighed cups.
+      if (!busy && !waiting && s.kernels.pendingReview === 0) {
+        if (s.standard && !s.standard.allowEstimate) {
+          setScreen({ at: "problem", message: t("needsWeighing") });
+          return;
+        }
+        if (++idle >= 15) {
+          setScreen({ at: "problem", message: t("notFinishing") });
+          return;
+        }
+      } else idle = 0;
       setScreen({
         at: "run",
         step: "analyse",
@@ -592,6 +605,13 @@ function SimpleResult({
           <dt>{t("grains")}</dt>
           <dd>{s.data.kernels.total}</dd>
         </dl>
+      )}
+      {s.data.price && (
+        <PriceBox
+          big
+          price={s.data.price}
+          classes={s.data.cropProfile.classes}
+        />
       )}
       <div className="row wrap">
         <button

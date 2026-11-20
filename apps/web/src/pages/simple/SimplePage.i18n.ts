@@ -1,6 +1,14 @@
 import { defineMessages } from "../../i18n";
 
 export const m = defineMessages({
+  needsWeighing: {
+    en: "This grain's standard needs every part weighed on the scale, so the station can't finish by itself. Ask the admin to allow the photo result on the standard (Standards), or finish this sample in the full app.",
+    hi: "इस अनाज के मानक में हर हिस्सा तराज़ू पर तौलना ज़रूरी है, इसलिए स्टेशन अपने-आप पूरा नहीं कर सकता। व्यवस्थापक से मानक पर फ़ोटो परिणाम की अनुमति देने को कहें (मानक), या यह नमूना पूरे ऐप में पूरा करें।",
+  },
+  notFinishing: {
+    en: "The test isn't finishing by itself. Tap Help to send a report, or finish it in the full app.",
+    hi: "जाँच अपने-आप पूरी नहीं हो रही। रिपोर्ट भेजने के लिए मदद दबाएँ, या पूरे ऐप में पूरा करें।",
+  },
   title: { en: "Grain test", hi: "अनाज जाँच" },
   pickCrop: {
     en: "Which grain? Tap to start.",
