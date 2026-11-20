@@ -5,6 +5,7 @@ import {
 } from "@ai-grain/core";
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
+import { farmerMessage } from "./farmer.js";
 import type { AppContext } from "../../context.js";
 import {
   apiKeys,
@@ -345,6 +346,11 @@ export async function notifyCompleted(
   if (!sample || sample.status !== "completed") return;
   const result = await assayingResult(ctx, sample);
   const cert = await currentCertificate(ctx, sample.id);
+  const [org] = await ctx.db
+    .select({ integration: organizations.integration })
+    .from(organizations)
+    .where(eq(organizations.id, sample.orgId));
+  const messaging = org?.integration ?? {};
   await enqueue(ctx, sample.orgId, "sample.completed", {
     webhook: result,
     ...(cert && {
@@ -352,6 +358,16 @@ export async function notifyCompleted(
     }),
     // e-NAM gets results of its own lots only.
     ...(sample.enamLotId && { enam: enamResult(result) }),
+    // The farmer, only when they agreed and gave a mobile.
+    ...(sample.farmerConsent &&
+      sample.farmerMobile && {
+        farmer: farmerMessage(result, {
+          channel: messaging.farmerChannel ?? "sms",
+          ...(messaging.farmerLanguage && {
+            language: messaging.farmerLanguage,
+          }),
+        }),
+      }),
   });
 }
 

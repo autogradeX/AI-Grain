@@ -21,6 +21,27 @@ export const m = defineMessages({
     en: "The e-NAM connection accepted the test.",
     hi: "ई-नाम कनेक्शन ने परीक्षण स्वीकार किया।",
   },
+  farmer: { en: "Farmer messages", hi: "किसान संदेश" },
+  farmerHint: {
+    en: "Farmers who agree (a tick on the sample, next to their mobile) get their result by SMS or WhatsApp when the sample completes: lot, crop, grade, moisture, defects and the certificate link. Sent through your messaging service (any provider, through its JSON API or a small relay; format ai-grain/farmer-message@1) and retried until accepted.",
+    hi: "जो किसान सहमत हैं (नमूने पर उनके मोबाइल के पास टिक) उन्हें नमूना पूरा होने पर SMS या WhatsApp से परिणाम मिलता है: लॉट, फ़सल, ग्रेड, नमी, दोष और प्रमाणपत्र लिंक। आपकी संदेश सेवा से भेजा जाता है (कोई भी प्रदाता, उसके JSON API या छोटे रिले से; प्रारूप ai-grain/farmer-message@1) और स्वीकार होने तक दोबारा भेजा जाता है।",
+  },
+  farmerUrl: { en: "Messaging service address", hi: "संदेश सेवा का पता" },
+  farmerKeyHint: {
+    en: "The key or token of your messaging service",
+    hi: "आपकी संदेश सेवा की कुंजी या टोकन",
+  },
+  farmerChannel: { en: "Send by", hi: "किससे भेजें" },
+  farmerLanguage: { en: "Message language", hi: "संदेश की भाषा" },
+  farmerOk: {
+    en: "The messaging service accepted the test message.",
+    hi: "संदेश सेवा ने परीक्षण संदेश स्वीकार किया।",
+  },
+  farmerTestMobile: {
+    en: "Your mobile, for a test",
+    hi: "परीक्षण के लिए आपका मोबाइल",
+  },
+  saveFarmer: { en: "Save farmer messages", hi: "किसान संदेश सहेजें" },
   saveEnam: { en: "Save e-NAM connection", hi: "ई-नाम कनेक्शन सहेजें" },
   title: { en: "Integrations", hi: "एकीकरण" },
   intro: {

@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CloudUpload, KeyRound, Landmark, Server, Webhook } from "lucide-react";
+import {
+  CloudUpload,
+  KeyRound,
+  Landmark,
+  MessageSquareText,
+  Server,
+  Webhook,
+} from "lucide-react";
 import { useState } from "react";
 import { api } from "../api/client";
 import {
@@ -29,6 +36,11 @@ interface Integration {
   enamUrl: string | null;
   enamHeaderName: string | null;
   enamHeaderValueSet: boolean;
+  farmerUrl: string | null;
+  farmerHeaderName: string | null;
+  farmerHeaderValueSet: boolean;
+  farmerChannel: "sms" | "whatsapp";
+  farmerLanguage: string;
   outbox: OutboxStatus;
   schema: string;
 }
@@ -41,7 +53,7 @@ interface OutboxStatus {
   lastSentAt: string | null;
   recent: {
     id: string;
-    target: "webhook" | "central" | "enam";
+    target: "webhook" | "central" | "enam" | "farmer";
     event: string;
     attempts: number;
     lastError: string | null;
@@ -276,6 +288,160 @@ function EnamCard({ data }: { data: Integration }) {
   );
 }
 
+/** Farmer messages: each consenting farmer gets their result by SMS or WhatsApp. */
+function FarmerCard({ data }: { data: Integration }) {
+  const t = useT(m);
+  const qc = useQueryClient();
+  const [url, setUrl] = useState(data.farmerUrl ?? "");
+  const [headerName, setHeaderName] = useState(
+    data.farmerHeaderName ?? "Authorization",
+  );
+  const [value, setValue] = useState("");
+  const [channel, setChannel] = useState(data.farmerChannel);
+  const [language, setLanguage] = useState(data.farmerLanguage);
+  const [mobile, setMobile] = useState("");
+  const save = useMutation({
+    mutationFn: (body: {
+      url: string | null;
+      headerName?: string;
+      headerValue?: string;
+      channel?: string;
+      language?: string;
+    }) => api.put("/integration/farmer", body),
+    onSuccess: () => {
+      setValue("");
+      void qc.invalidateQueries({ queryKey: ["integration"] });
+    },
+  });
+  const test = useMutation({
+    mutationFn: () =>
+      api.post<{ ok: boolean; status: number | null; error?: string }>(
+        "/integration/farmer/test",
+        { mobile },
+      ),
+  });
+  return (
+    <Card
+      title={
+        <span className="row">
+          <MessageSquareText size={18} aria-hidden /> {t("farmer")}
+        </span>
+      }
+    >
+      <p className="muted small">{t("farmerHint")}</p>
+      <form
+        className="stack-sm"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate({
+            url: url.trim() || null,
+            headerName: headerName.trim() || "Authorization",
+            channel,
+            language,
+            ...(value.trim() && { headerValue: value.trim() }),
+          });
+        }}
+      >
+        <div className="grid-3">
+          <Field label={t("farmerUrl")}>
+            <input
+              type="url"
+              placeholder="https://sms-relay.example.in/send"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+          </Field>
+          <Field label={t("enamHeaderName")}>
+            <input
+              className="mono"
+              value={headerName}
+              onChange={(e) => setHeaderName(e.target.value)}
+            />
+          </Field>
+          <Field
+            label={t("enamHeaderValue")}
+            hint={
+              data.farmerHeaderValueSet
+                ? t("enamHeaderValueSet")
+                : t("farmerKeyHint")
+            }
+          >
+            <input
+              className="mono"
+              type="password"
+              autoComplete="off"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </Field>
+          <Field label={t("farmerChannel")}>
+            <select
+              value={channel}
+              onChange={(e) => setChannel(e.target.value as "sms" | "whatsapp")}
+            >
+              <option value="sms">SMS</option>
+              <option value="whatsapp">WhatsApp</option>
+            </select>
+          </Field>
+          <Field label={t("farmerLanguage")}>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+            >
+              <option value="en">English</option>
+              <option value="hi">हिन्दी</option>
+            </select>
+          </Field>
+        </div>
+        <ErrorNote error={save.error ?? test.error} />
+        {test.data && (
+          <p className={test.data.ok ? "good small" : "error small"}>
+            {test.data.ok
+              ? t("farmerOk")
+              : t("testFailed", {
+                  reason: test.data.error ?? `HTTP ${test.data.status}`,
+                })}
+          </p>
+        )}
+        <div className="row wrap">
+          <button className="primary" disabled={save.isPending}>
+            {t("saveFarmer")}
+          </button>
+          {data.farmerUrl && (
+            <>
+              <input
+                type="tel"
+                aria-label={t("farmerTestMobile")}
+                placeholder={t("farmerTestMobile")}
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+              />
+              <button
+                type="button"
+                disabled={test.isPending || !mobile.trim()}
+                onClick={() => test.mutate()}
+              >
+                {t("test")}
+              </button>
+              <button
+                type="button"
+                className="danger"
+                disabled={save.isPending}
+                onClick={() => {
+                  setUrl("");
+                  save.mutate({ url: null });
+                }}
+              >
+                {t("removeWebhook")}
+              </button>
+            </>
+          )}
+        </div>
+      </form>
+    </Card>
+  );
+}
+
 /** Results waiting to go out, and what went out lately. */
 function OutboxCard({ data }: { data: Integration }) {
   const t = useT(m);
@@ -341,7 +507,9 @@ function OutboxCard({ data }: { data: Integration }) {
                       ? t("central")
                       : r.target === "enam"
                         ? t("enam")
-                        : t("webhook")}
+                        : r.target === "farmer"
+                          ? t("farmer")
+                          : t("webhook")}
                   </td>
                   <td>
                     {r.deliveredAt ? (
@@ -589,6 +757,7 @@ export function IntegrationsPage() {
         <>
           <OutboxCard data={data.data} />
           <EnamCard key={data.data.enamUrl ?? ""} data={data.data} />
+          <FarmerCard key={data.data.farmerUrl ?? ""} data={data.data} />
           <CentralCard key={data.data.centralUrl ?? ""} data={data.data} />
           <WebhookCard key={data.data.webhookUrl ?? ""} data={data.data} />
           <KeysCard data={data.data} />

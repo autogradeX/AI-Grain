@@ -196,6 +196,7 @@ export interface Sample {
   farmerName: string | null;
   farmerId: string | null;
   farmerMobile: string | null;
+  farmerConsent?: boolean;
   cupMassG: Partial<Record<string, number>>;
   result: SampleResult | null;
   reference: ReferenceResult | null;

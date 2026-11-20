@@ -405,6 +405,8 @@ export const samples = pgTable(
     farmerName: text("farmer_name"),
     farmerId: text("farmer_id"),
     farmerMobile: text("farmer_mobile"),
+    /** The farmer agreed to get the result on that mobile (SMS or WhatsApp). */
+    farmerConsent: boolean("farmer_consent").notNull().default(false),
     notes: text("notes"),
     status: sampleStatusEnum("status").notNull().default("in_progress"),
     /** All photos are taken: Autopilot finishes the sample once nothing waits on a person. */
@@ -817,7 +819,8 @@ export const outbox = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     target: text("target")
-      .$type<"webhook" | "central" | "enam" | "farmer">().notNull(),
+      .$type<"webhook" | "central" | "enam" | "farmer">()
+      .notNull(),
     event: text("event").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
     attempts: integer("attempts").notNull().default(0),

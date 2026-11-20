@@ -1,3 +1,4 @@
+import { FARMER_SCHEMA, normaliseMobile } from "./farmer.js";
 import {
   and,
   asc,
@@ -93,6 +94,11 @@ export function integrationRoutes(ctx: AppContext) {
         enamUrl: org?.integration.enamUrl ?? null,
         enamHeaderName: org?.integration.enamHeaderName ?? null,
         enamHeaderValueSet: Boolean(org?.integration.enamHeaderValue),
+        farmerUrl: org?.integration.farmerUrl ?? null,
+        farmerHeaderName: org?.integration.farmerHeaderName ?? null,
+        farmerHeaderValueSet: Boolean(org?.integration.farmerHeaderValue),
+        farmerChannel: org?.integration.farmerChannel ?? "sms",
+        farmerLanguage: org?.integration.farmerLanguage ?? "en",
         outbox: await outboxStatus(ctx, me.orgId),
         schema: RESULT_SCHEMA,
       };
@@ -377,6 +383,145 @@ export function integrationRoutes(ctx: AppContext) {
             id: "test",
             event: "test",
             data: { schema: ENAM_SCHEMA, message: "Test event from AI-Grain" },
+          }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        return { ok: res.ok, status: res.status };
+      } catch (err) {
+        return {
+          ok: false,
+          status: null,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    });
+
+    /**
+     * Farmer messages: the messaging gateway (SMS or WhatsApp) that sends
+     * each consenting farmer their result. The header value is kept when
+     * only other fields change and is never returned; url null clears it.
+     */
+    app.put("/integration/farmer", admin, async (request) => {
+      const me = authOf(request);
+      const body = z
+        .object({
+          url: z
+            .url({ protocol: /^https?$/ })
+            .max(300)
+            .nullable(),
+          headerName: z
+            .string()
+            .trim()
+            .regex(/^[A-Za-z0-9-]{1,60}$/, "A header name: letters, digits, -")
+            .optional(),
+          headerValue: z.string().trim().min(1).max(500).optional(),
+          channel: z.enum(["sms", "whatsapp"]).optional(),
+          language: z
+            .string()
+            .regex(/^[a-z]{2}$/)
+            .optional(),
+        })
+        .parse(request.body);
+      if (
+        body.url &&
+        ctx.config.NODE_ENV === "production" &&
+        !body.url.startsWith("https://")
+      )
+        throw badRequest("The messaging address must use https");
+      const [org] = await ctx.db
+        .select({ integration: organizations.integration })
+        .from(organizations)
+        .where(eq(organizations.id, me.orgId));
+      const current = org?.integration ?? {};
+      const {
+        farmerUrl: _u,
+        farmerHeaderName: _n,
+        farmerHeaderValue: _v,
+        farmerChannel: _c,
+        farmerLanguage: _l,
+        ...rest
+      } = current;
+      const value = body.headerValue ?? current.farmerHeaderValue;
+      if (body.url && !value)
+        throw badRequest("Enter the key or token of the messaging service");
+      const headerName =
+        body.headerName ?? current.farmerHeaderName ?? "Authorization";
+      const channel = body.channel ?? current.farmerChannel ?? "sms";
+      const language = body.language ?? current.farmerLanguage ?? "en";
+      await ctx.db
+        .update(organizations)
+        .set({
+          integration: body.url
+            ? {
+                ...rest,
+                farmerUrl: body.url,
+                farmerHeaderName: headerName,
+                farmerHeaderValue: value!,
+                farmerChannel: channel,
+                farmerLanguage: language,
+              }
+            : rest,
+        })
+        .where(eq(organizations.id, me.orgId));
+      await audit(ctx.db, {
+        orgId: me.orgId,
+        userId: me.id,
+        action: "integration.farmer_updated",
+        detail: { url: body.url, headerName, channel, language },
+      });
+      return {
+        farmerUrl: body.url,
+        farmerHeaderName: body.url ? headerName : null,
+        farmerHeaderValueSet: Boolean(body.url),
+        farmerChannel: channel,
+        farmerLanguage: language,
+      };
+    });
+
+    /** Sends a test message to a number the admin gives (their own). */
+    app.post("/integration/farmer/test", admin, async (request) => {
+      const me = authOf(request);
+      const { mobile } = z
+        .object({
+          mobile: z
+            .string()
+            .trim()
+            .regex(/^\+?[0-9 -]{6,20}$/),
+        })
+        .parse(request.body);
+      const [org] = await ctx.db
+        .select({
+          integration: organizations.integration,
+          name: organizations.name,
+        })
+        .from(organizations)
+        .where(eq(organizations.id, me.orgId));
+      const s = org?.integration ?? {};
+      if (!s.farmerUrl || !s.farmerHeaderValue)
+        return {
+          ok: false,
+          status: null,
+          error: "No messaging service set up",
+        };
+      try {
+        const res = await (ctx.fetch ?? fetch)(s.farmerUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-aigrain-event": "test",
+            [(s.farmerHeaderName || "authorization").toLowerCase()]:
+              s.farmerHeaderValue,
+          },
+          body: JSON.stringify({
+            id: "test",
+            event: "test",
+            data: {
+              schema: FARMER_SCHEMA,
+              channel: s.farmerChannel ?? "sms",
+              to: normaliseMobile(mobile),
+              language: s.farmerLanguage ?? "en",
+              text: `${org?.name ?? "AI-Grain"}: test message`,
+            },
           }),
           signal: AbortSignal.timeout(10_000),
         });

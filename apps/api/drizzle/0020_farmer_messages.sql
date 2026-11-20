@@ -1,0 +1,1 @@
+ALTER TABLE "samples" ADD COLUMN "farmer_consent" boolean DEFAULT false NOT NULL;

@@ -24,7 +24,7 @@ import { signBody } from "./service.js";
  * out, in order, when the connection is back.
  */
 
-type Target = "webhook" | "central" | "enam";
+type Target = "webhook" | "central" | "enam" | "farmer";
 
 /** After a failed try: 1, 2, 4 … minutes, at most an hour. */
 export function outboxDelayMs(attempts: number): number {
@@ -43,6 +43,7 @@ const targetsOf = (s: IntegrationSettings): Target[] => [
   ...(s.webhookUrl && s.webhookSecret ? (["webhook"] as const) : []),
   ...(s.centralUrl && s.centralKey ? (["central"] as const) : []),
   ...(s.enamUrl && s.enamHeaderValue ? (["enam"] as const) : []),
+  ...(s.farmerUrl && s.farmerHeaderValue ? (["farmer"] as const) : []),
 ];
 
 /**
@@ -106,6 +107,15 @@ async function sendOnce(
     url = settings.enamUrl;
     headers[(settings.enamHeaderName || "authorization").toLowerCase()] =
       settings.enamHeaderValue;
+  } else if (row.target === "farmer") {
+    if (!settings.farmerUrl || !settings.farmerHeaderValue)
+      return {
+        error: "Farmer messages are no longer set up",
+        network: false,
+      };
+    url = settings.farmerUrl;
+    headers[(settings.farmerHeaderName || "authorization").toLowerCase()] =
+      settings.farmerHeaderValue;
   } else {
     if (!settings.centralUrl || !settings.centralKey)
       return {

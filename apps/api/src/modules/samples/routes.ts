@@ -90,6 +90,8 @@ const SampleFields = z.object({
     .regex(/^\+?[0-9 -]{6,20}$/, "A phone number: digits, spaces, + or -")
     .nullable()
     .optional(),
+  /** The farmer agreed to get the result on their mobile. */
+  farmerConsent: z.boolean().optional(),
 });
 
 function defined<T extends object>(obj: T): Partial<T> {

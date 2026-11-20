@@ -174,6 +174,40 @@ state's e-NAM cell); this connection is built to carry them, and changes to
 the format will be versioned (`@2`). The farmer's mobile number is not sent
 here; connected systems that need it read it from the full result.
 
+## Farmer messages (SMS / WhatsApp)
+
+When a sample completes, the farmer gets their result on their mobile, but
+only when the operator ticked **The farmer agrees to get the result on this
+mobile** on the sample (`farmerConsent`, saved only together with a mobile).
+Set up the messaging service under **Integrations → Farmer messages**: its
+address, the header that authenticates (the value is a secret and never
+returned), SMS or WhatsApp, and the message language. Messages go through the
+outbox like every other result: kept in the database and retried until the
+service accepts them, so a station without internet sends them later.
+
+Each delivery is a `POST` with the usual envelope, `data` being:
+
+```json
+{
+  "schema": "ai-grain/farmer-message@1",
+  "channel": "sms",
+  "to": "919876543210",
+  "language": "hi",
+  "text": "Kisan FPO: अनाज जाँच परिणाम\nलॉट CG-RAI-77, Wheat\nग्रेड: 1 (FAQ)\nनमी 11.2%, दोष 2%, शुद्धता 98%\nजाँचें: https://…/verify/AB12CD",
+  "sampleId": "…",
+  "lotId": "CG-RAI-77",
+  "certificateUrl": "https://…/verify/AB12CD"
+}
+```
+
+`to` has digits only, with 91 added to 10-digit Indian numbers. Providers
+(MSG91, Gupshup, Twilio, the WhatsApp Business API …) each have their own
+request shape and, for SMS in India, a DLT-registered template; a small relay
+maps this message to the provider's call, or the provider's JSON webhook
+takes it directly. The text has the lot, crop, grade, main figures and the
+certificate link; never the farmer's name or ID. **Send a test** sends a
+test message to a number the admin types in.
+
 ## Webhook
 
 Each delivery is a `POST` with a JSON body:

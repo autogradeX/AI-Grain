@@ -12,4 +12,8 @@ export const m = defineMessages({
     en: "Not printed on the public certificate",
     hi: "सार्वजनिक प्रमाणपत्र पर नहीं छपता",
   },
+  consent: {
+    en: "The farmer agrees to get the result on this mobile (SMS or WhatsApp)",
+    hi: "किसान इस मोबाइल पर परिणाम पाने के लिए सहमत है (SMS या WhatsApp)",
+  },
 });

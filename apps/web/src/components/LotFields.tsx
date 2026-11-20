@@ -9,7 +9,11 @@ export interface Lot {
   farmerName: string;
   farmerId: string;
   farmerMobile: string;
+  /** The farmer agreed to get the result on their mobile (SMS or WhatsApp). */
+  farmerConsent: boolean;
 }
+
+type TextKey = Exclude<keyof Lot, "farmerConsent">;
 
 export const emptyLot: Lot = {
   enamLotId: "",
@@ -17,29 +21,37 @@ export const emptyLot: Lot = {
   farmerName: "",
   farmerId: "",
   farmerMobile: "",
+  farmerConsent: false,
 };
 
 /** The lot from a sample (nulls as empty strings), for a form. */
-export function lotOf(s: {
-  [K in keyof Lot]?: string | null | undefined;
-}): Lot {
+export function lotOf(
+  s: { [K in TextKey]?: string | null | undefined } & {
+    farmerConsent?: boolean;
+  },
+): Lot {
   return {
     enamLotId: s.enamLotId ?? "",
     gateEntryNo: s.gateEntryNo ?? "",
     farmerName: s.farmerName ?? "",
     farmerId: s.farmerId ?? "",
     farmerMobile: s.farmerMobile ?? "",
+    farmerConsent: s.farmerConsent ?? false,
   };
 }
 
 /** The lot as the API takes it: empty fields as null. */
-export function lotBody(lot: Lot): { [K in keyof Lot]: string | null } {
+export function lotBody(lot: Lot): { [K in TextKey]: string | null } & {
+  farmerConsent: boolean;
+} {
   return {
     enamLotId: lot.enamLotId.trim() || null,
     gateEntryNo: lot.gateEntryNo.trim() || null,
     farmerName: lot.farmerName.trim() || null,
     farmerId: lot.farmerId.trim() || null,
     farmerMobile: lot.farmerMobile.trim() || null,
+    // Consent goes with a number to send to.
+    farmerConsent: lot.farmerConsent && Boolean(lot.farmerMobile.trim()),
   };
 }
 
@@ -52,7 +64,7 @@ export function LotFields({
   onChange: (lot: Lot) => void;
 }) {
   const t = useT(m);
-  const input = (key: keyof Lot, extra: object = {}) => (
+  const input = (key: TextKey, extra: object = {}) => (
     <input
       value={value[key]}
       onChange={(e) => onChange({ ...value, [key]: e.target.value })}
@@ -81,6 +93,18 @@ export function LotFields({
           pattern: "\\+?[0-9 \\-]{6,20}",
         })}
       </Field>
+      {value.farmerMobile.trim() && (
+        <label className="row small full-row">
+          <input
+            type="checkbox"
+            checked={value.farmerConsent}
+            onChange={(e) =>
+              onChange({ ...value, farmerConsent: e.target.checked })
+            }
+          />
+          {t("consent")}
+        </label>
+      )}
     </>
   );
 }

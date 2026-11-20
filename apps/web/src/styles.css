@@ -3123,3 +3123,7 @@ body:has(.app-view) .toast {
   flex: 1 1 14rem;
   max-width: 24rem;
 }
+
+.full-row {
+  grid-column: 1 / -1;
+}
