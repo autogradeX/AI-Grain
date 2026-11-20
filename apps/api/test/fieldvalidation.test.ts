@@ -142,5 +142,14 @@ describe("field validation against a reference lab", () => {
     expect(csvReport.body).toContain("Within tolerance");
     expect(csvReport.body).toContain("LOT-B");
     expect(csvReport.body).toContain("SL/102");
+
+    const pdfReport = await t.app.inject({
+      method: "GET",
+      url: "/api/validation/report.pdf",
+      headers: bearer(token),
+    });
+    expect(pdfReport.statusCode).toBe(200);
+    expect(pdfReport.headers["content-type"]).toContain("application/pdf");
+    expect(pdfReport.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
   }, 180000);
 });

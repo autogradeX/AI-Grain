@@ -84,6 +84,16 @@ export function ValidationPage() {
         >
           {t("downloadReport")}
         </button>
+        <button
+          onClick={() =>
+            void download(
+              `/validation/report.pdf?${filter}`,
+              "ai-grain-validation.pdf",
+            )
+          }
+        >
+          {t("downloadPdf")}
+        </button>
       </div>
       {importing && <LabImport onClose={() => setImporting(false)} />}
       <RepeatabilityCard crop={crop} />

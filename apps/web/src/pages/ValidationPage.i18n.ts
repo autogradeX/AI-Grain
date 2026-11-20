@@ -1,6 +1,10 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  downloadPdf: {
+    en: "Download report for tenders (PDF)",
+    hi: "निविदा के लिए रिपोर्ट डाउनलोड करें (PDF)",
+  },
   downloadReport: {
     en: "Download the validation report (CSV)",
     hi: "सत्यापन रिपोर्ट डाउनलोड करें (CSV)",

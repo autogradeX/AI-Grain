@@ -14,7 +14,13 @@ import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { AppContext } from "../../context.js";
-import { samples, standards, type ReferenceResult } from "../../db/schema.js";
+import {
+  organizations,
+  samples,
+  standards,
+  type ReferenceResult,
+} from "../../db/schema.js";
+import { renderValidationReport } from "./pdf.js";
 import { audit } from "../../lib/audit.js";
 import { badRequest } from "../../lib/errors.js";
 import { ensureCrop } from "../crops/service.js";
@@ -43,17 +49,13 @@ export function validationRoutes(ctx: AppContext) {
      * Repeatability: every completed repeat run compared with the first run
      * of the same physical sample, with the share in each agreement band.
      */
-    app.get("/validation/repeatability", async (request) => {
-      const me = authOf(request);
-      const { crop } = z
-        .object({ crop: z.string().optional() })
-        .parse(request.query);
+    async function repeatability(orgId: string, crop: string | undefined) {
       const repeats = await ctx.db
         .select()
         .from(samples)
         .where(
           and(
-            eq(samples.orgId, me.orgId),
+            eq(samples.orgId, orgId),
             isNotNull(samples.repeatOf),
             eq(samples.status, "completed"),
             ...(crop ? [eq(samples.crop, crop.toLowerCase())] : []),
@@ -68,7 +70,7 @@ export function validationRoutes(ctx: AppContext) {
             .from(samples)
             .where(
               and(
-                eq(samples.orgId, me.orgId),
+                eq(samples.orgId, orgId),
                 inArray(samples.id, firstIds),
                 eq(samples.status, "completed"),
               ),
@@ -116,6 +118,14 @@ export function validationRoutes(ctx: AppContext) {
           bands,
         },
       };
+    }
+
+    app.get("/validation/repeatability", async (request) => {
+      const me = authOf(request);
+      const { crop } = z
+        .object({ crop: z.string().optional() })
+        .parse(request.query);
+      return repeatability(me.orgId, crop);
     });
 
     /** The rows and summary of a validation: every completed sample with a reference result. */
@@ -340,6 +350,73 @@ export function validationRoutes(ctx: AppContext) {
           'attachment; filename="ai-grain-validation.csv"',
         );
       return `\uFEFF${out.join("\r\n")}\r\n`;
+    });
+
+    /** The validation as an A4 PDF for a tender or an audit. */
+    app.get("/validation/report.pdf", async (request, reply) => {
+      const me = authOf(request);
+      const q = Query.parse(request.query);
+      const tolerances = tolerancesOf(q);
+      const { rows, summary } = await comparison(me.orgId, q, tolerances);
+      const [org] = await ctx.db
+        .select({ name: organizations.name })
+        .from(organizations)
+        .where(eq(organizations.id, me.orgId));
+      const crop = q.crop
+        ? await ensureCrop(ctx, me.orgId, q.crop.toLowerCase())
+        : null;
+      // Class names: the crop's, or every crop's that appears.
+      const classes = crop
+        ? crop.classes
+        : (
+            await Promise.all(
+              [...new Set(rows.map((r) => r.crop))].map((c) =>
+                ensureCrop(ctx, me.orgId, c),
+              ),
+            )
+          ).flatMap((c) => c.classes);
+      const standardName = q.standardId
+        ? (rows[0]?.standardName ?? null)
+        : null;
+      const rep = await repeatability(me.orgId, q.crop);
+      const pdf = await renderValidationReport({
+        orgName: org?.name ?? "",
+        crop: crop?.label ?? null,
+        standardName,
+        generatedAt: new Date(),
+        target: VALIDATION_TARGET,
+        summary,
+        classes,
+        repeatability: rep.summary,
+        samples: rows.slice(0, 500).map((r) => {
+          let largest: { cls: string; diff: number } | null = null;
+          const ref = r.reference!.byClassPct;
+          for (const [cls, v] of Object.entries(r.result!.byClassPct)) {
+            const other = ref[cls];
+            if (v === undefined || other === undefined) continue;
+            const diff = v - other;
+            if (!largest || Math.abs(diff) > Math.abs(largest.diff))
+              largest = { cls, diff };
+          }
+          return {
+            number: r.number,
+            enamLotId: r.enamLotId,
+            completedAt: r.completedAt,
+            lab: r.reference!.lab ?? r.reference!.graderName ?? null,
+            reportNo: r.reference!.reportNo ?? null,
+            methodGrade: r.result!.grade.grade,
+            referenceGrade: r.reference!.grade,
+            largestDiff: largest,
+          };
+        }),
+      });
+      reply
+        .header("content-type", "application/pdf")
+        .header(
+          "content-disposition",
+          'attachment; filename="ai-grain-validation.pdf"',
+        );
+      return pdf;
     });
 
     /**
