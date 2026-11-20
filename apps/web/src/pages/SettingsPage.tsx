@@ -1,3 +1,4 @@
+import { HelpReportsCard, SimpleModeCard } from "./SimpleModeSettings";
 import {
   keepPreviousData,
   useMutation,
@@ -49,6 +50,8 @@ export function SettingsPage() {
       <SessionsCard />
       <StationCard />
       <AutopilotSettingsCard />
+      {can.admin && <SimpleModeCard />}
+      {can.admin && <HelpReportsCard />}
       {can.admin && <ReportLayoutCard />}
       {can.admin && <MeasurementSettingsCard />}
       <OrgCard />

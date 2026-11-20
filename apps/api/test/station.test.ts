@@ -8,6 +8,7 @@ import {
   multipart,
   register,
   syntheticBoard,
+  tokenFromMail,
   type TestApp,
 } from "./helpers.js";
 
@@ -268,6 +269,56 @@ describe("a station sending results to its central server", () => {
     );
   });
 
+  it("sends the operator's help report to the central server", async () => {
+    const raipur = client(station, stationToken);
+    const hq = client(central, centralToken);
+    const health = await raipur<{
+      orchestration: boolean;
+      photosWaitingForInternet: number;
+      outbox: { waiting: number };
+    }>("GET", "/api/station/health");
+    expect(health.status).toBe(200);
+    expect(health.body).toMatchObject({
+      photosWaitingForInternet: 0,
+      outbox: { waiting: 0 },
+    });
+
+    const tooBig = await raipur("POST", "/api/station/help", {
+      diagnostics: { log: "x".repeat(60_000) },
+    });
+    expect(tooBig.status).toBe(400);
+    const sent = await raipur<{ id: string }>("POST", "/api/station/help", {
+      note: "The bottom camera shows grey",
+      diagnostics: { cameras: ["USB2.0 Camera", "USB2.0 Camera"] },
+    });
+    expect(sent.status).toBe(201);
+    const { outbox } = await import("../src/db/schema.js");
+    await station.ctx.db.update(outbox).set({ nextAttemptAt: new Date(0) });
+    expect((await sweep(station.ctx)).delivered).toBe(1);
+
+    const here = await raipur<{ items: { note: string }[] }>(
+      "GET",
+      "/api/station/help",
+    );
+    expect(here.body.items[0]?.note).toBe("The bottom camera shows grey");
+    const there = await hq<{
+      items: { note: string; diagnostics: Record<string, unknown> }[];
+    }>("GET", "/api/station/help");
+    expect(there.body.items).toHaveLength(1);
+    expect(there.body.items[0]).toMatchObject({
+      note: "The bottom camera shows grey",
+      diagnostics: {
+        station: "APMC Raipur",
+        cameras: ["USB2.0 Camera", "USB2.0 Camera"],
+      },
+    });
+    // Delivered twice (a retry after a lost answer): still one report.
+    await sweep(station.ctx);
+    expect(
+      (await hq<{ items: unknown[] }>("GET", "/api/station/help")).body.items,
+    ).toHaveLength(1);
+  });
+
   it("refuses a certificate whose contents don't match its hash", async () => {
     const hq = client(central, centralToken);
     const key = await hq<{ key: string }>("POST", "/api/integration/keys", {
@@ -314,6 +365,65 @@ describe("station mode", () => {
       addresses: ["http://192.168.1.20:3000"],
     });
     expect(res.body.qr).toMatch(/^data:image\/png;base64,/);
+    await t.close();
+  });
+});
+
+describe("simple mode", () => {
+  it("is set up by an admin and keeps operators on the simple screen", async () => {
+    const t = await createTestApp();
+    const { token } = await register(t, "admin@fpo.test", "Kisan FPO");
+    const admin = client(t, token);
+    const saved = await admin("PATCH", "/api/org", {
+      simpleMode: {
+        locked: true,
+        crops: ["wheat", "paddy"],
+        capture: "two",
+        weigh: true,
+        autoPrint: true,
+        language: "hi",
+      },
+    });
+    expect(saved.status).toBe(200);
+    const org = await admin<{ simpleMode: Record<string, unknown> }>(
+      "GET",
+      "/api/org",
+    );
+    expect(org.body.simpleMode).toEqual({
+      locked: true,
+      crops: ["wheat", "paddy"],
+      capture: "two",
+      weigh: true,
+      autoPrint: true,
+      language: "hi",
+    });
+    const bad = await admin("PATCH", "/api/org", {
+      simpleMode: { capture: "three" },
+    });
+    expect(bad.status).toBe(400);
+
+    // Operators can send help but can't read other people's reports.
+    await admin("POST", "/api/users/invites", {
+      email: "op@fpo.test",
+      role: "grader",
+    });
+    const accept = await t.app.inject({
+      method: "POST",
+      url: "/api/auth/invite/accept",
+      payload: {
+        token: tokenFromMail(t.mailer, "op@fpo.test"),
+        name: "Operator",
+        password: "operator password 1",
+      },
+    });
+    const op = client(t, accept.json<{ accessToken: string }>().accessToken);
+    expect(
+      (await op("POST", "/api/station/help", { diagnostics: {} })).status,
+    ).toBe(201);
+    expect((await op("GET", "/api/station/help")).status).toBe(403);
+    expect((await op("PATCH", "/api/org", { simpleMode: {} })).status).toBe(
+      403,
+    );
     await t.close();
   });
 });

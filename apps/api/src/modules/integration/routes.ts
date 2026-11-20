@@ -19,6 +19,7 @@ import {
   samples,
   type CertificatePayload,
   type IntegrationSettings,
+  supportReports,
 } from "../../db/schema.js";
 import { outboxStatus, sendNow } from "./outbox.js";
 import { hashPayload } from "../certificates/service.js";
@@ -454,6 +455,17 @@ const IngestBody = z.discriminatedUnion("event", [
   }),
   z.object({
     id: z.string().max(64),
+    event: z.literal("support.report"),
+    data: z.object({
+      id: z.uuid(),
+      station: z.string().max(200),
+      note: z.string().max(1000).nullable(),
+      diagnostics: z.record(z.string(), z.unknown()),
+      createdAt: z.string().max(40),
+    }),
+  }),
+  z.object({
+    id: z.string().max(64),
     event: z.literal("training.examples"),
     data: TrainingExamplesData,
   }),
@@ -518,6 +530,23 @@ export function machineRoutes(ctx: AppContext) {
         throw forbidden("This key can't send results: create a station key");
       const body = IngestBody.parse(request.body);
       if (body.event === "test") return { ok: true };
+      if (body.event === "support.report") {
+        // A station asked for help: its report lands with the network's support.
+        await ctx.db
+          .insert(supportReports)
+          .values({
+            id: body.data.id,
+            orgId: key.orgId,
+            userId: null,
+            note: body.data.note,
+            diagnostics: {
+              ...body.data.diagnostics,
+              station: body.data.station || key.name,
+            },
+          })
+          .onConflictDoNothing();
+        return { ok: true };
+      }
       if (body.event === "training.examples") {
         const kept = await receiveTrainingExamples(ctx, key, body.data);
         return { ok: true, kept };

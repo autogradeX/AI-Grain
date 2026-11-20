@@ -56,6 +56,20 @@ function initialLang(): Lang {
 
 let current: Lang = initialLang();
 
+/** Whether this device has a language someone chose (so a station default must not override it). */
+export function hasChosenLang(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** A language code from settings, if this app has it. */
+export function asLang(code: string | undefined): Lang | null {
+  return code && code in LANGS ? (code as Lang) : null;
+}
+
 const LangContext = createContext<{
   lang: Lang;
   setLang: (lang: Lang) => void;

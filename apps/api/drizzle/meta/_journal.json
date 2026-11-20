@@ -134,6 +134,13 @@
       "when": 1794213004638,
       "tag": "0018_no_board_rigs",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795183905146,
+      "tag": "0019_simple_mode",
+      "breakpoints": true
     }
   ]
 }

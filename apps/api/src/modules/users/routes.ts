@@ -258,6 +258,23 @@ export function userRoutes(ctx: AppContext) {
           measurement: z
             .object({ referenceMm: z.number().min(5).max(100).nullable() })
             .optional(),
+          // Simple mode (the station screen), replaced as a whole.
+          simpleMode: z
+            .object({
+              locked: z.boolean().optional(),
+              crops: z
+                .array(z.string().trim().min(1).max(60))
+                .max(12)
+                .optional(),
+              standards: z.record(z.string().max(60), z.uuid()).optional(),
+              capture: z.enum(["two", "one"]).optional(),
+              weigh: z.boolean().optional(),
+              moisture: z.boolean().optional(),
+              autoPrint: z.boolean().optional(),
+              language: z.string().max(5).optional(),
+              askFarmer: z.boolean().optional(),
+            })
+            .optional(),
           // The report layout, replaced as a whole.
           report: z
             .object({
@@ -292,6 +309,13 @@ export function userRoutes(ctx: AppContext) {
               body.measurement.referenceMm === null
                 ? {}
                 : { referenceMm: body.measurement.referenceMm },
+          }),
+          ...(body.simpleMode && {
+            simpleMode: Object.fromEntries(
+              Object.entries(body.simpleMode).filter(
+                ([, v]) => v !== undefined,
+              ),
+            ),
           }),
           ...(body.report && {
             report: Object.fromEntries(

@@ -33,6 +33,7 @@ import {
 } from "react";
 import {
   Link,
+  Navigate,
   NavLink,
   Outlet,
   useLocation,
@@ -357,6 +358,12 @@ export function Layout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [view] = usePhoneView();
+  // A station set to Simple mode: operators only see the simple screen.
+  const org = useQuery({
+    queryKey: ["org"],
+    queryFn: () => api.get<Org>("/org"),
+  });
+  const lockedToSimple = !can.admin && !!org.data?.simpleMode?.locked;
   // On phones: a native-style app with bottom tabs, unless switched to classic.
   const appView = drawer && view === "app";
   const here = routeInfo(pathname);
@@ -365,6 +372,8 @@ export function Layout() {
     if (idx > 0) void navigate(-1);
     else void navigate(here.parent ?? "/app");
   };
+
+  if (lockedToSimple) return <Navigate to="/simple" replace />;
 
   return (
     <div

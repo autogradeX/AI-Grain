@@ -22,6 +22,20 @@ export interface Org {
   report: ReportSettings;
   /** Reference coin for kernel size without the board. */
   measurement: { referenceMm?: number };
+  /** The station screen for operators (Settings → Simple mode). */
+  simpleMode?: SimpleModeSettings;
+}
+
+export interface SimpleModeSettings {
+  locked?: boolean;
+  crops?: string[];
+  standards?: Record<string, string>;
+  capture?: "two" | "one";
+  weigh?: boolean;
+  moisture?: boolean;
+  autoPrint?: boolean;
+  language?: string;
+  askFarmer?: boolean;
 }
 
 export interface Standard {

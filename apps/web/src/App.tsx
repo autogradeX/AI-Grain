@@ -74,6 +74,10 @@ const LocalModelPage = page(
   () => import("./pages/LocalModelPage"),
   "LocalModelPage",
 );
+const SimplePage = page(
+  () => import("./pages/simple/SimplePage"),
+  "SimplePage",
+);
 const OfflineSamplePage = page(
   () => import("./pages/OfflineSamplePage"),
   "OfflineSamplePage",
@@ -118,6 +122,14 @@ export function App() {
             {/* The server answers these with a 404 status too. */}
             <Route path="*" element={<NotFoundPage />} />
           </Route>
+          <Route
+            path="/simple"
+            element={
+              <RequireAuth>
+                <SimplePage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/app"
             element={

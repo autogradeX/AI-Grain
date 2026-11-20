@@ -145,6 +145,40 @@ their own. If the two photos can't be lined up (different trays, the tray
 moved, a camera knocked), the bottom photo is marked failed with that reason:
 delete both and take them again.
 
+## Simple mode: one tap for the operator
+
+Most stations are run by people who aren't technical. **Simple mode**
+(`/simple`) is one screen with big buttons: the operator taps the grain, and
+the station does the rest by itself: reads the balance and the moisture meter,
+photographs the tray (both cameras), lets Model Orchestration check it, asks
+the operator only about the grains it isn't sure of (one at a time, with a
+"Yes / Good grain / Something else / Not sure" answer), shows the grade in large
+type and prints the slip.
+
+Set it up once as admin in **Settings → Simple mode**: which crops to offer
+and the standard for each, one or two cameras, whether to weigh, read
+moisture, print by itself and ask for the farmer's details, the screen
+language, and **Operators only see this screen** (graders and viewers who sign
+in are taken straight to Simple mode; admins still see everything).
+
+The home screen checks the station each time it opens: server, cameras,
+balance, moisture meter, internet and Model Orchestration, each green, amber or
+red with what to do in plain words. **Help** sends what the station saw
+(devices, connection, the last errors) to the admin, and to the central server
+when there is one; they are listed under **Settings → Help reports from the
+station**.
+
+To make the station start straight into Simple mode at power-on, in full
+screen, printing without a dialog:
+
+```sh
+sh deploy/station/kiosk.sh            # as the user who signs in at the station
+```
+
+The first time, sign in, allow the cameras, and choose the balance and moisture
+meter once (as admin, in the full app). Alt+F4 leaves full screen until the next
+sign-in.
+
 ## Install
 
 ```sh
@@ -232,4 +266,5 @@ and unpack `files.tar.gz` into the `files` volume.
 | Photos stay **Waiting for internet**            | Check the router's internet line. They carry on by themselves; **Try now** on the sample retries at once.                             |
 | **Sending results** keeps growing               | Same; then check the central address and key with **Send a test**. An HTTP 401 means the key was revoked on the central server.       |
 | Phones can't open the station                   | The phone is on another Wi-Fi, or the station's address changed (reserve it on the router).                                           |
+| The operator says it "isn't working"            | Ask them to tap **Help** on the Simple mode screen and send; read it under **Settings → Help reports from the station**.              |
 | The station doesn't come back after a power cut | `sudo systemctl enable docker`, then `sudo docker compose up -d`.                                                                     |

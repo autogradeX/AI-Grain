@@ -115,6 +115,43 @@ export interface IntegrationSettings {
   enamUrl?: string;
   enamHeaderName?: string;
   enamHeaderValue?: string;
+  /**
+   * Farmer messages: the result goes to the farmer's mobile by SMS or
+   * WhatsApp through the organisation's messaging gateway (any provider: a
+   * small relay or the provider's own JSON API), only for samples where the
+   * farmer agreed. The header's value is a secret, never returned.
+   */
+  farmerUrl?: string;
+  farmerHeaderName?: string;
+  farmerHeaderValue?: string;
+  farmerChannel?: "sms" | "whatsapp";
+  /** The language of the message (en, hi …); English when not set. */
+  farmerLanguage?: string;
+}
+
+/**
+ * Simple mode: the station screen for operators who aren't technical (an
+ * FPO, a mandi counter). Set up once by an admin or installer; operators then
+ * pick a crop and tap one button.
+ */
+export interface SimpleModeSettings {
+  /** Operators (not admins) are taken straight to the simple screen. */
+  locked?: boolean;
+  /** The crops offered, in order (crop keys). */
+  crops?: string[];
+  /** The standard each crop is graded against (crop key → standard id). */
+  standards?: Record<string, string>;
+  /** "two": top and bottom USB cameras; "one": a single camera. */
+  capture?: "two" | "one";
+  /** Read the sample mass from the balance, and moisture from the meter. */
+  weigh?: boolean;
+  moisture?: boolean;
+  /** Print the slip by itself when the result is ready. */
+  autoPrint?: boolean;
+  /** The screen's language, e.g. "hi" (the operator can still switch). */
+  language?: string;
+  /** Ask for the farmer's details before each test. */
+  askFarmer?: boolean;
 }
 
 export const organizations = pgTable("organizations", {
@@ -137,6 +174,10 @@ export const organizations = pgTable("organizations", {
     .default({}),
   integration: jsonb("integration")
     .$type<IntegrationSettings>()
+    .notNull()
+    .default({}),
+  simpleMode: jsonb("simple_mode")
+    .$type<SimpleModeSettings>()
     .notNull()
     .default({}),
   createdAt: createdAt(),
@@ -775,7 +816,8 @@ export const outbox = pgTable(
     orgId: uuid("org_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    target: text("target").$type<"webhook" | "central" | "enam">().notNull(),
+    target: text("target")
+      .$type<"webhook" | "central" | "enam" | "farmer">().notNull(),
     event: text("event").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
     attempts: integer("attempts").notNull().default(0),
@@ -922,4 +964,27 @@ export const networkExamples = pgTable(
     uniqueIndex("network_examples_ref_idx").on(t.orgId, t.keyId, t.ref),
     index("network_examples_crop_idx").on(t.orgId, t.crop),
   ],
+);
+
+/**
+ * "Help" from a station: what the station's screen and server saw (devices,
+ * connection, recent errors), sent by an operator with one tap, for support.
+ */
+export const supportReports = pgTable(
+  "support_reports",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    note: text("note"),
+    diagnostics: jsonb("diagnostics")
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("support_reports_org_idx").on(t.orgId, t.createdAt)],
 );

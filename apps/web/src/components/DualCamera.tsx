@@ -1,79 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import {
+  BOTTOM_KEY,
   browserCameras,
   findPair,
+  grab,
+  looksBlank,
   PairError,
+  remember,
+  remembered,
   startPair,
+  TOP_KEY,
   type Size,
 } from "../devices/cameras";
 import { useT } from "../i18n";
 import { Card, ErrorNote, Field } from "./ui";
 import { m } from "./DualCamera.i18n";
-
-const TOP_KEY = "ai-grain.camera.top";
-const BOTTOM_KEY = "ai-grain.camera.bottom";
-
-const remembered = (key: string) => {
-  try {
-    return localStorage.getItem(key) ?? "";
-  } catch {
-    return "";
-  }
-};
-const remember = (key: string, value: string) => {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Found again next time.
-  }
-};
-
-/** The current frame of a video at its full size, as a JPEG. */
-function grab(video: HTMLVideoElement): Promise<Blob> {
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d")!.drawImage(video, 0, 0);
-  return new Promise((resolve, reject) =>
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("No frame from the camera"))),
-      "image/jpeg",
-      0.92,
-    ),
-  );
-}
-
-/**
- * Whether a frame shows something: a covered, unfocused or washed-out camera
- * gives an almost even picture. Checked on a small copy: the spread of its
- * brightness, and how much neighbouring pixels differ (edges of grains).
- */
-export function looksBlank(video: HTMLVideoElement): boolean {
-  const w = 160;
-  const h = Math.max(1, Math.round((video.videoHeight / video.videoWidth) * w));
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const g = canvas.getContext("2d", { willReadFrequently: true })!;
-  g.drawImage(video, 0, 0, w, h);
-  const { data } = g.getImageData(0, 0, w, h);
-  const lum = new Float32Array(w * h);
-  for (let i = 0; i < w * h; i++)
-    lum[i] =
-      0.299 * data[i * 4]! +
-      0.587 * data[i * 4 + 1]! +
-      0.114 * data[i * 4 + 2]!;
-  let mean = 0;
-  for (const v of lum) mean += v / lum.length;
-  let spread = 0;
-  let edges = 0;
-  for (let i = 0; i < lum.length; i++) {
-    spread += (lum[i]! - mean) ** 2 / lum.length;
-    if (i % w < w - 1) edges += Math.abs(lum[i]! - lum[i + 1]!) / lum.length;
-  }
-  return Math.sqrt(spread) < 10 || edges < 1.5;
-}
 
 type Phase =
   | { at: "listing" | "starting" | "finding" }
