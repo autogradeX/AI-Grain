@@ -23,6 +23,7 @@ export const GradeSpecSchema = z.object({
   minTestWeightKgPerHl: z.number().positive().optional(),
   minProteinPct: Pct.optional(),
   minOilPct: Pct.optional(),
+  maxAflatoxinPpb: z.number().min(0).max(10_000).optional(),
 });
 
 const Money = z.number().min(0).max(100_000_000);

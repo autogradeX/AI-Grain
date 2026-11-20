@@ -15,6 +15,14 @@ export const m = defineMessages({
     en: "Minimum protein % for grade {grade}",
     hi: "ग्रेड {grade} के लिए न्यूनतम प्रोटीन %",
   },
+  maxAflatoxin: {
+    en: "Aflatoxin max µg/kg (ppb)",
+    hi: "एफ़्लाटॉक्सिन अधिकतम µg/kg (ppb)",
+  },
+  maxAflatoxinAria: {
+    en: "Maximum total aflatoxin µg/kg for grade {grade}",
+    hi: "ग्रेड {grade} के लिए अधिकतम कुल एफ़्लाटॉक्सिन µg/kg",
+  },
   minOil: { en: "Oil content min %", hi: "तेल की मात्रा न्यूनतम %" },
   minOilAria: {
     en: "Minimum oil content % for grade {grade}",

@@ -90,6 +90,7 @@ Stations download models with their station key (`GET /api/v1/local-models`,
 - Optional: 80 mm thermal printer (USB), lab balance with USB/RS-232 (read in Chrome or Edge on the station itself), UPS.
 - Optional: two USB cameras for both sides of every grain at once (see **Two cameras** below).
 - Optional: grain moisture meter with a USB or RS-232 output. The drop button beside **Moisture** waits for the meter's next result (press its print or test key); most layouts are understood ("MOISTURE: 13.4 %", "13.4% T=27.1C", "Wheat,13.4,27.1"). The balance and the meter each remember their own port.
+- Optional: aflatoxin test strip reader (total aflatoxin, µg/kg): type the value in or import the reader's CSV the same way as NIR results (an "Aflatoxin" column). Grades can set a maximum; a sample without a value doesn't meet such a grade.
 - Optional: NIR analyser for protein and oil. Export its results as CSV and use **Samples → Import NIR results**: rows are matched by sample number or e-NAM lot ID, previewed, and only change samples still in progress.
 
 Give the station a fixed address on the router (DHCP reservation), for example `192.168.1.20`.

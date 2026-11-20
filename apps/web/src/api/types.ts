@@ -26,6 +26,7 @@ export interface Org {
   measurement: { referenceMm?: number };
   /** The station screen for operators (Settings → Simple mode). */
   simpleMode?: SimpleModeSettings;
+  privacy?: { farmerRetentionDays?: number };
 }
 
 export interface SimpleModeSettings {
@@ -197,6 +198,7 @@ export interface Sample {
   /** From an NIR analyser or a lab; null when not measured. */
   proteinPct: number | null;
   oilPct: number | null;
+  aflatoxinPpb: number | null;
   /** The e-NAM lot and its farmer. */
   enamLotId: string | null;
   gateEntryNo: string | null;

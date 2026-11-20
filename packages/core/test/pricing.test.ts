@@ -91,3 +91,34 @@ describe("quality to price", () => {
     expect(q.price).toBe(0);
   });
 });
+
+describe("aflatoxin limits", () => {
+  it("need a measured value under the maximum", async () => {
+    const { gradeSample } = await import("../src/index.js");
+    const percentages = {
+      byClass: {},
+      byGroup: { admixture: 0, broken_defective: 0, impurity: 0, harmful: 0 },
+      totalDefectsPct: 0,
+      purityPct: 100,
+    };
+    const grades = [
+      { grade: "Export", maxDefectPct: {}, maxAflatoxinPpb: 10 },
+      { grade: "Feed", maxDefectPct: {} },
+    ];
+    expect(gradeSample({ percentages }, grades).grade).toBe("Feed");
+    expect(gradeSample({ percentages, aflatoxinPpb: 8 }, grades).grade).toBe(
+      "Export",
+    );
+    expect(
+      gradeSample({ percentages, aflatoxinPpb: 15 }, grades).failures.Export,
+    ).toEqual([
+      {
+        scope: "aflatoxin",
+        limit: "aflatoxin",
+        value: 15,
+        allowed: 10,
+        kind: "max",
+      },
+    ]);
+  });
+});

@@ -19,10 +19,22 @@ export interface GradeSpec {
   minProteinPct?: number | undefined;
   /** Minimum oil content %, for oilseeds (NIR or lab). */
   minOilPct?: number | undefined;
+  /**
+   * Maximum total aflatoxin in µg/kg (ppb), from a rapid test strip reader
+   * or a lab. A photo can't measure it.
+   */
+  maxAflatoxinPpb?: number | undefined;
 }
 
 export type LimitScope =
-  "class" | "group" | "total" | "moisture" | "testWeight" | "protein" | "oil";
+  | "class"
+  | "group"
+  | "total"
+  | "moisture"
+  | "testWeight"
+  | "protein"
+  | "oil"
+  | "aflatoxin";
 
 export interface LimitFailure {
   scope: LimitScope;
@@ -40,6 +52,7 @@ export interface GradeInput {
   testWeightKgPerHl?: number | undefined;
   proteinPct?: number | undefined;
   oilPct?: number | undefined;
+  aflatoxinPpb?: number | undefined;
 }
 
 export interface GradeResult {
@@ -131,6 +144,17 @@ export function failedLimits(
   };
   minimum("protein", spec.minProteinPct, input.proteinPct);
   minimum("oil", spec.minOilPct, input.oilPct);
+  if (spec.maxAflatoxinPpb !== undefined) {
+    const value = input.aflatoxinPpb;
+    if (value === undefined || value > spec.maxAflatoxinPpb)
+      failed.push({
+        scope: "aflatoxin",
+        limit: "aflatoxin",
+        value: value ?? null,
+        allowed: spec.maxAflatoxinPpb,
+        kind: "max",
+      });
+  }
   return failed;
 }
 

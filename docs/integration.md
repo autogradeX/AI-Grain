@@ -132,6 +132,9 @@ anything the receiver missed (it was down, or a delivery failed three times).
   the lot, the farmer's name and the last 4 characters of the farmer's ID.
 - **`protein`, `oil`:** from an NIR analyser export or typed in; `null` when
   not measured. The camera doesn't measure them.
+- **`aflatoxin`:** total aflatoxin in µg/kg (ppb) from a rapid test strip
+  reader or a lab, imported or typed in; `null` when not measured. A photo
+  can't measure it; a standard's grade can set a maximum.
 - **`resultSource`:** says whether mass percentages come from weighing the
   cups (`weighed`) or from kernel areas in the photos (`estimate`).
 - **`certificate.verifyUrl`:** a public page that confirms the result, the

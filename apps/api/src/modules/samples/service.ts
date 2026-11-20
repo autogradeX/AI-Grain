@@ -65,6 +65,7 @@ export function gradeFor(
           testWeightKgPerHl: sample.testWeightKgPerHl ?? undefined,
           proteinPct: sample.proteinPct ?? undefined,
           oilPct: sample.oilPct ?? undefined,
+          aflatoxinPpb: sample.aflatoxinPpb ?? undefined,
         },
         grades,
       )

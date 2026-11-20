@@ -1,3 +1,4 @@
+import { privacyRoutes } from "./modules/privacy/routes.js";
 import cookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
 import multipart from "@fastify/multipart";
@@ -131,6 +132,7 @@ export async function buildApp(
       await api.register(integrationRoutes(ctx));
       await api.register(stationRoutes(ctx));
       await api.register(localModelRoutes(ctx));
+      await api.register(privacyRoutes(ctx));
       await api.register(machineRoutes(ctx), { prefix: "/v1" });
     },
     { prefix: "/api" },

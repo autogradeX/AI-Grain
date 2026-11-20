@@ -128,6 +128,7 @@ export function limitName(
   if (f.scope === "moisture") return "Moisture";
   if (f.scope === "protein") return "Protein";
   if (f.scope === "oil") return "Oil content";
+  if (f.scope === "aflatoxin") return "Total aflatoxin (µg/kg)";
   return "Test weight";
 }
 
@@ -299,6 +300,11 @@ export function renderReport(data: ReportData): Promise<Buffer> {
     line("Protein", `${fmt(sample.proteinPct, 1)} % (NIR or lab)`);
   if (sample.oilPct !== null)
     line("Oil content", `${fmt(sample.oilPct, 1)} % (NIR or lab)`);
+  if (sample.aflatoxinPpb !== null)
+    line(
+      "Total aflatoxin",
+      `${fmt(sample.aflatoxinPpb, 1)} µg/kg (test reader or lab)`,
+    );
   line(
     "Operator",
     [data.createdByName, data.completedByName]
@@ -730,6 +736,8 @@ export function renderSlip(data: ReportData): Promise<Buffer> {
   if (sample.proteinPct !== null)
     pair("Protein", `${fmt(sample.proteinPct, 1)} %`);
   if (sample.oilPct !== null) pair("Oil", `${fmt(sample.oilPct, 1)} %`);
+  if (sample.aflatoxinPpb !== null)
+    pair("Aflatoxin", `${fmt(sample.aflatoxinPpb, 1)} µg/kg`);
   if (data.dimensions) {
     pair("Length", `${fmt(data.dimensions.meanLengthMm)} mm`);
     pair("Breadth", `${fmt(data.dimensions.meanBreadthMm)} mm`);

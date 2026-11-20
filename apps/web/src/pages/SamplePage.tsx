@@ -348,6 +348,7 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
     testWeightKgPerHl: str(sample.testWeightKgPerHl),
     proteinPct: str(sample.proteinPct),
     oilPct: str(sample.oilPct),
+    aflatoxinPpb: str(sample.aflatoxinPpb),
   });
   const save = useMutation({
     mutationFn: () =>
@@ -357,6 +358,7 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
         testWeightKgPerHl: num(form.testWeightKgPerHl),
         proteinPct: num(form.proteinPct),
         oilPct: num(form.oilPct),
+        aflatoxinPpb: num(form.aflatoxinPpb),
       }),
     onSuccess: update,
   });
@@ -365,7 +367,8 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
     form.moisturePct !== str(sample.moisturePct) ||
     form.testWeightKgPerHl !== str(sample.testWeightKgPerHl) ||
     form.proteinPct !== str(sample.proteinPct) ||
-    form.oilPct !== str(sample.oilPct);
+    form.oilPct !== str(sample.oilPct) ||
+    form.aflatoxinPpb !== str(sample.aflatoxinPpb);
   const pctInput = (key: "proteinPct" | "oilPct") => (
     <input
       type="number"
@@ -446,6 +449,18 @@ function MassCard({ sample, editable }: { sample: Sample; editable: boolean }) {
         </Field>
         <Field label={t("oil")} hint={t("nirHint")}>
           {pctInput("oilPct")}
+        </Field>
+        <Field label={t("aflatoxin")} hint={t("aflatoxinHint")}>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            min="0"
+            max="10000"
+            disabled={!editable}
+            value={form.aflatoxinPpb}
+            onChange={(e) => setForm({ ...form, aflatoxinPpb: e.target.value })}
+          />
         </Field>
         <ErrorNote error={save.error} />
         {editable && dirty && (
@@ -776,6 +791,7 @@ function limitName(
   if (f.scope === "moisture") return t("limitMoisture");
   if (f.scope === "protein") return t("protein");
   if (f.scope === "oil") return t("oil");
+  if (f.scope === "aflatoxin") return t("aflatoxin");
   return t("limitTestWeight");
 }
 

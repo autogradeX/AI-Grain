@@ -113,6 +113,7 @@ interface GradeForm {
   minTestWeightKgPerHl: string;
   minProteinPct: string;
   minOilPct: string;
+  maxAflatoxinPpb: string;
 }
 
 const s = (v: number | undefined) => (v === undefined ? "" : String(v));
@@ -133,6 +134,7 @@ function toForm(g: GradeSpec): GradeForm {
     minTestWeightKgPerHl: s(g.minTestWeightKgPerHl),
     minProteinPct: s(g.minProteinPct),
     minOilPct: s(g.minOilPct),
+    maxAflatoxinPpb: s(g.maxAflatoxinPpb),
   };
 }
 
@@ -162,6 +164,8 @@ function fromForm(g: GradeForm, classIds: readonly string[]): GradeSpec {
   const oil = n(g.minOilPct);
   if (protein !== undefined) spec.minProteinPct = protein;
   if (oil !== undefined) spec.minOilPct = oil;
+  const aflatoxin = n(g.maxAflatoxinPpb);
+  if (aflatoxin !== undefined) spec.maxAflatoxinPpb = aflatoxin;
   return spec;
 }
 
@@ -584,6 +588,18 @@ function StandardForm({ standard }: { standard: Standard | null }) {
                       g.minOilPct,
                       (v) => setGrade(i, { minOilPct: v }),
                       t("minOilAria", { grade: g.grade }),
+                    )}
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td>{t("maxAflatoxin")}</td>
+                {grades.map((g, i) => (
+                  <td key={i}>
+                    {limitInput(
+                      g.maxAflatoxinPpb,
+                      (v) => setGrade(i, { maxAflatoxinPpb: v }),
+                      t("maxAflatoxinAria", { grade: g.grade }),
                     )}
                   </td>
                 ))}

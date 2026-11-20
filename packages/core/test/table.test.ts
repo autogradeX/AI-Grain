@@ -53,3 +53,17 @@ describe("instrument tables", () => {
     expect(() => readMeasurements("Sample,Operator\n1,A")).toThrow(/Protein/);
   });
 });
+
+describe("aflatoxin", () => {
+  it("is read from a test reader's export in µg/kg, above 100", () => {
+    const { rows, columns } = readMeasurements(
+      "Sample;Total Aflatoxin (ppb)\n7;12,5\n8;140\n9;20000",
+    );
+    expect(columns).toEqual(["Total Aflatoxin (ppb)"]);
+    expect(rows.map((r) => [r.values.aflatoxin, r.error ?? null])).toEqual([
+      [12.5, null],
+      [140, null],
+      [20000, "A value outside its range (0–100 %, aflatoxin 0–10000 µg/kg)"],
+    ]);
+  });
+});

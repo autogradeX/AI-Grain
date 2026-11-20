@@ -1,0 +1,1 @@
+ALTER TABLE "samples" ADD COLUMN "aflatoxin_ppb" double precision;

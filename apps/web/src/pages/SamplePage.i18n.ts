@@ -1,6 +1,11 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  aflatoxin: { en: "Total aflatoxin (µg/kg)", hi: "कुल एफ़्लाटॉक्सिन (µg/kg)" },
+  aflatoxinHint: {
+    en: "From a test strip reader or a lab; a photo can't measure it",
+    hi: "टेस्ट स्ट्रिप रीडर या लैब से; फ़ोटो इसे नहीं माप सकती",
+  },
   // Page
   backToSamples: { en: "← Samples", hi: "← नमूने" },
   heading: { en: "Sample #{number} · {crop}", hi: "नमूना #{number} · {crop}" },

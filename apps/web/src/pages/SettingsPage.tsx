@@ -1,3 +1,4 @@
+import { FarmerDataCard } from "./FarmerDataCard";
 import { HelpReportsCard, SimpleModeCard } from "./SimpleModeSettings";
 import {
   keepPreviousData,
@@ -52,6 +53,7 @@ export function SettingsPage() {
       <AutopilotSettingsCard />
       {can.admin && <SimpleModeCard />}
       {can.admin && <HelpReportsCard />}
+      {can.admin && <FarmerDataCard />}
       {can.admin && <ReportLayoutCard />}
       {can.admin && <MeasurementSettingsCard />}
       <OrgCard />

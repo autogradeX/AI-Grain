@@ -142,6 +142,13 @@ export async function assayingResult(ctx: AppContext, sample: SampleRow) {
       unit: "%",
     },
     {
+      code: "aflatoxin",
+      name: "Total aflatoxin",
+      kind: "measurement",
+      value: sample.aflatoxinPpb,
+      unit: "µg/kg",
+    },
+    {
       code: "length",
       name: "Mean kernel length",
       kind: "measurement",

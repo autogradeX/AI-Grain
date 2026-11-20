@@ -61,7 +61,16 @@ const FIELDS = {
   oil: (k: string) => k.includes("oil") || k === "fat" || k === "crudefat",
   moisture: (k: string) =>
     k.includes("moisture") || k === "h2o" || k === "water",
+  aflatoxin: (k: string) => k.includes("aflatoxin") || k.startsWith("afl"),
 } as const;
+
+/** Largest believable value per field: percentages, and µg/kg for aflatoxin. */
+const MAX: Record<MeasurementField, number> = {
+  protein: 100,
+  oil: 100,
+  moisture: 100,
+  aflatoxin: 10_000,
+};
 
 export type MeasurementField = Exclude<keyof typeof FIELDS, "sample" | "lot">;
 
@@ -77,7 +86,7 @@ export interface MeasurementRow {
 
 /**
  * Rows of an instrument's export: which sample (by number, or by e-NAM lot
- * ID) and its protein, oil and moisture. Unknown columns are ignored.
+ * ID) and its protein, oil, moisture and aflatoxin (µg/kg). Unknown columns are ignored.
  * Throws when the header names neither a sample nor a lot, or no value.
  */
 export function readMeasurements(text: string): {
@@ -94,17 +103,18 @@ export function readMeasurements(text: string): {
     protein: find(FIELDS.protein),
     oil: find(FIELDS.oil),
     moisture: find(FIELDS.moisture),
+    aflatoxin: find(FIELDS.aflatoxin),
   };
   if (col.sample < 0 && col.lot < 0)
     throw new Error(
       'No column names the sample: add a "Sample" (sample number) or "Lot" (e-NAM lot ID) column',
     );
-  const valueFields = (["protein", "oil", "moisture"] as const).filter(
-    (f) => col[f] >= 0,
-  );
+  const valueFields = (
+    ["protein", "oil", "moisture", "aflatoxin"] as const
+  ).filter((f) => col[f] >= 0);
   if (!valueFields.length)
     throw new Error(
-      'No measurement column: name them "Protein", "Oil" or "Moisture"',
+      'No measurement column: name them "Protein", "Oil", "Moisture" or "Aflatoxin"',
     );
   const rows = body.map((cells, i): MeasurementRow => {
     const raw = col.sample >= 0 ? cells[col.sample]?.replace(/^#/, "") : "";
@@ -119,8 +129,13 @@ export function readMeasurements(text: string): {
     if (sampleNumber === null && !lotId)
       row.error = "No sample number or lot ID";
     else if (!Object.keys(values).length) row.error = "No values";
-    else if (Object.values(values).some((v) => v < 0 || v > 100))
-      row.error = "A value outside 0–100 %";
+    else if (
+      (Object.entries(values) as [MeasurementField, number][]).some(
+        ([f, v]) => v < 0 || v > MAX[f],
+      )
+    )
+      row.error =
+        "A value outside its range (0–100 %, aflatoxin 0–10000 µg/kg)";
     return row;
   });
   return {

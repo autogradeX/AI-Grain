@@ -54,6 +54,7 @@ interface Verification {
       testWeightKgPerHl: number | null;
       proteinPct?: number;
       oilPct?: number;
+      aflatoxinPpb?: number;
     };
     kernels: { total: number; flagged: number; reviewed: number };
     model: string;
@@ -241,6 +242,12 @@ function Result({ v }: { v: Verification }) {
             <>
               <dt>{t("oil")}</dt>
               <dd>{pct(p.measurements.oilPct, 1)}</dd>
+            </>
+          )}
+          {p.measurements.aflatoxinPpb !== undefined && (
+            <>
+              <dt>{t("aflatoxin")}</dt>
+              <dd>{p.measurements.aflatoxinPpb} µg/kg</dd>
             </>
           )}
           <dt>{t("fingerprint")}</dt>

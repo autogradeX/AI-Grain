@@ -162,6 +162,20 @@
       "when": 1795186285973,
       "tag": "0022_network_standards",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795186760026,
+      "tag": "0023_aflatoxin",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795186878360,
+      "tag": "0024_privacy",
+      "breakpoints": true
     }
   ]
 }

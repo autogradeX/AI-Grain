@@ -134,6 +134,15 @@ export interface IntegrationSettings {
   farmerLanguage?: string;
 }
 
+/** Farmers' personal data (India's DPDP Act): what is kept, and how long. */
+export interface PrivacySettings {
+  /**
+   * Days after a sample is completed that the farmer's name, ID and mobile
+   * are kept; then the sweeper clears them (results stay). Unset: kept.
+   */
+  farmerRetentionDays?: number;
+}
+
 /**
  * Simple mode: the station screen for operators who aren't technical (an
  * FPO, a mandi counter). Set up once by an admin or installer; operators then
@@ -185,6 +194,8 @@ export const organizations = pgTable("organizations", {
     .$type<SimpleModeSettings>()
     .notNull()
     .default({}),
+  /** How long farmers' personal details are kept (see modules/privacy). */
+  privacy: jsonb("privacy").$type<PrivacySettings>().notNull().default({}),
   createdAt: createdAt(),
 });
 
@@ -402,6 +413,7 @@ export interface ReferenceResult {
   moisturePct?: number | undefined;
   proteinPct?: number | undefined;
   oilPct?: number | undefined;
+  aflatoxinPpb?: number | undefined;
 }
 
 export const samples = pgTable(
@@ -437,6 +449,8 @@ export const samples = pgTable(
     /** From an NIR analyser (imported or typed in) or a lab. */
     proteinPct: doublePrecision("protein_pct"),
     oilPct: doublePrecision("oil_pct"),
+    /** Total aflatoxin, µg/kg (ppb), from a test strip reader or a lab. */
+    aflatoxinPpb: doublePrecision("aflatoxin_ppb"),
     cupMassG: jsonb("cup_mass_g")
       .$type<Partial<Record<string, number>>>()
       .notNull()
@@ -726,6 +740,7 @@ export interface CertificatePayload {
     /** Only when measured (NIR or lab). */
     proteinPct?: number;
     oilPct?: number;
+    aflatoxinPpb?: number;
   };
   kernels: { total: number; flagged: number; reviewed: number };
   model: string;

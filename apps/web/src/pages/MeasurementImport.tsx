@@ -9,7 +9,7 @@ interface ImportRow {
   line: number;
   sampleNumber: number | null;
   lotId: string | null;
-  values: Partial<Record<"protein" | "oil" | "moisture", number>>;
+  values: Partial<Record<"protein" | "oil" | "moisture" | "aflatoxin", number>>;
   sampleId: string | null;
   error: string | null;
 }
@@ -94,7 +94,10 @@ export function MeasurementImport({ onClose }: { onClose: () => void }) {
                   </td>
                   <td>
                     {Object.entries(r.values)
-                      .map(([k, v]) => `${t(k as "protein")} ${v} %`)
+                      .map(
+                        ([k, v]) =>
+                          `${t(k as "protein")} ${v} ${k === "aflatoxin" ? "µg/kg" : "%"}`,
+                      )
                       .join(", ")}
                   </td>
                   <td>

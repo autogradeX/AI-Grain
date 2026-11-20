@@ -258,6 +258,12 @@ export function userRoutes(ctx: AppContext) {
           measurement: z
             .object({ referenceMm: z.number().min(5).max(100).nullable() })
             .optional(),
+          // How long farmers' details are kept (null: kept).
+          privacy: z
+            .object({
+              farmerRetentionDays: z.number().int().min(1).max(3650).nullable(),
+            })
+            .optional(),
           // Simple mode (the station screen), replaced as a whole.
           simpleMode: z
             .object({
@@ -309,6 +315,12 @@ export function userRoutes(ctx: AppContext) {
               body.measurement.referenceMm === null
                 ? {}
                 : { referenceMm: body.measurement.referenceMm },
+          }),
+          ...(body.privacy && {
+            privacy:
+              body.privacy.farmerRetentionDays === null
+                ? {}
+                : { farmerRetentionDays: body.privacy.farmerRetentionDays },
           }),
           ...(body.simpleMode && {
             simpleMode: Object.fromEntries(

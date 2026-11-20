@@ -7,8 +7,8 @@ export const m = defineMessages({
     hi: "NIR विश्लेषक या नमी मीटर से आयात",
   },
   hint: {
-    en: 'Choose the CSV your instrument exports. It needs a "Sample" column (sample number) or a "Lot" column (e-NAM lot ID), and any of "Protein", "Oil" and "Moisture". Only samples still in progress take values.',
-    hi: 'अपने उपकरण की निर्यात की हुई CSV चुनें। इसमें "Sample" (नमूना संख्या) या "Lot" (ई-नाम लॉट आईडी) कॉलम, और "Protein", "Oil", "Moisture" में से कोई कॉलम होना चाहिए। केवल जारी नमूनों में मान डाले जाते हैं।',
+    en: 'Choose the CSV your instrument exports. It needs a "Sample" column (sample number) or a "Lot" column (e-NAM lot ID), and any of "Protein", "Oil", "Moisture" and "Aflatoxin" (µg/kg, from a test strip reader). Only samples still in progress take values.',
+    hi: 'अपने उपकरण की निर्यात की हुई CSV चुनें। इसमें "Sample" (नमूना संख्या) या "Lot" (ई-नाम लॉट आईडी) कॉलम, और "Protein", "Oil", "Moisture", "Aflatoxin" (µg/kg, टेस्ट स्ट्रिप रीडर से) में से कोई कॉलम होना चाहिए। केवल जारी नमूनों में मान डाले जाते हैं।',
   },
   file: { en: "CSV file", hi: "CSV फ़ाइल" },
   preview: { en: "Check the file", hi: "फ़ाइल जाँचें" },
@@ -25,5 +25,6 @@ export const m = defineMessages({
   protein: { en: "protein", hi: "प्रोटीन" },
   oil: { en: "oil", hi: "तेल" },
   moisture: { en: "moisture", hi: "नमी" },
+  aflatoxin: { en: "aflatoxin", hi: "एफ़्लाटॉक्सिन" },
   close: { en: "Close", hi: "बंद करें" },
 });

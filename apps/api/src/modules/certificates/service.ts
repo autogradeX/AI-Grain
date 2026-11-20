@@ -140,6 +140,9 @@ export async function issueCertificate(
       testWeightKgPerHl: sample.testWeightKgPerHl,
       ...(sample.proteinPct !== null && { proteinPct: sample.proteinPct }),
       ...(sample.oilPct !== null && { oilPct: sample.oilPct }),
+      ...(sample.aflatoxinPpb !== null && {
+        aflatoxinPpb: sample.aflatoxinPpb,
+      }),
     },
     kernels: {
       total: kernels.total,

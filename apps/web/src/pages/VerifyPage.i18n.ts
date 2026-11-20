@@ -1,6 +1,7 @@
 import { defineMessages } from "../i18n";
 
 export const m = defineMessages({
+  aflatoxin: { en: "Total aflatoxin", hi: "कुल एफ़्लाटॉक्सिन" },
   enamLot: { en: "e-NAM lot", hi: "ई-नाम लॉट" },
   gateEntry: { en: "gate entry {no}", hi: "गेट एंट्री {no}" },
   farmer: { en: "Farmer", hi: "किसान" },

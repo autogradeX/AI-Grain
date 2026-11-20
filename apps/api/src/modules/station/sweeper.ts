@@ -5,6 +5,7 @@ import { classifyAndTriage } from "../autopilot/service.js";
 import { deliverDue } from "../integration/outbox.js";
 import { pullNetworkModels } from "../localmodel/network.js";
 import { syncWithCentral } from "./network.js";
+import { purgeExpiredFarmerData } from "../privacy/service.js";
 
 /**
  * Photos waiting for Model Orchestration (no internet) whose retry time has
@@ -49,7 +50,8 @@ export async function sweep(ctx: AppContext) {
   const delivered = await deliverDue(ctx);
   const models = await pullNetworkModels(ctx);
   const standards = await syncWithCentral(ctx);
-  return { resumed, delivered, models, standards };
+  const farmerDataCleared = await purgeExpiredFarmerData(ctx);
+  return { resumed, delivered, models, standards, farmerDataCleared };
 }
 
 /**

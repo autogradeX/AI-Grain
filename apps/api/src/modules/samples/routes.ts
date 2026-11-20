@@ -79,6 +79,7 @@ const SampleFields = z.object({
   testWeightKgPerHl: z.number().positive().max(200).nullable().optional(),
   proteinPct: Pct.nullable().optional(),
   oilPct: Pct.nullable().optional(),
+  aflatoxinPpb: z.number().min(0).max(10_000).nullable().optional(),
   model: z.enum(CLAUDE_MODELS).nullable().optional(),
   // The e-NAM lot and the farmer who brought it.
   enamLotId: z.string().trim().max(60).nullable().optional(),
@@ -251,6 +252,7 @@ export function sampleRoutes(ctx: AppContext) {
               ...(v.protein !== undefined && { proteinPct: v.protein }),
               ...(v.oil !== undefined && { oilPct: v.oil }),
               ...(v.moisture !== undefined && { moisturePct: v.moisture }),
+              ...(v.aflatoxin !== undefined && { aflatoxinPpb: v.aflatoxin }),
             })
             .where(eq(samples.id, result.sampleId));
           await refreshResult(ctx, result.sampleId);
@@ -721,6 +723,7 @@ export function sampleRoutes(ctx: AppContext) {
           moisturePct: Pct.optional(),
           proteinPct: Pct.optional(),
           oilPct: Pct.optional(),
+          aflatoxinPpb: z.number().min(0).max(10_000).optional(),
         })
         .nullable()
         .parse(request.body);

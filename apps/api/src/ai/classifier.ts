@@ -481,6 +481,7 @@ const standardSchema = z.object({
       minTestWeightKgPerHl: z.number().nullable(),
       minProteinPct: z.number().nullable(),
       minOilPct: z.number().nullable(),
+      maxAflatoxinPpb: z.number().nullable().optional(),
     }),
   ),
   definitions: z.array(
@@ -542,6 +543,12 @@ export function cleanStandardDraft(
     const oil = pct(g.minOilPct);
     if (protein !== undefined) spec.minProteinPct = protein;
     if (oil !== undefined) spec.minOilPct = oil;
+    if (
+      typeof g.maxAflatoxinPpb === "number" &&
+      g.maxAflatoxinPpb >= 0 &&
+      g.maxAflatoxinPpb <= 10_000
+    )
+      spec.maxAflatoxinPpb = g.maxAflatoxinPpb;
     grades.push(spec);
   }
   const definitions: Record<string, string> = {};
