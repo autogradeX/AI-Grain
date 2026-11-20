@@ -155,6 +155,31 @@ describe("farmer messages", () => {
       } as never,
       "xx",
     );
+    expect(
+      farmerText(
+        {
+          organisation: "FPO",
+          sampleNumber: 3,
+          lot: null,
+          enam: {
+            lotId: "L-1",
+            gateEntryNo: null,
+            farmer: { name: null, id: null, mobile: null },
+          },
+          commodity: { key: "wheat", name: "Wheat" },
+          grade: null,
+          standard: null,
+          parameters: [],
+          totalDefectsPct: 2,
+          purityPct: 98,
+          resultSource: "weighed",
+          certificate: null,
+        } as never,
+        "mr",
+      ),
+    ).toBe(
+      "FPO: धान्य चाचणी निकाल\nलॉट L-1, Wheat\nकोणताही ग्रेड नाही\nदोष 2%, शुद्धता 98%",
+    );
     expect(text).toBe(
       "FPO: Grain test result\nLot #3, Wheat\nGrade: 1 (FAQ)\nMoisture 11.2%, Defects 2%, Purity 98% (from photo)",
     );

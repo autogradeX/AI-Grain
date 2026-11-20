@@ -18,7 +18,7 @@ import {
   formatDate,
   Spinner,
 } from "../components/ui";
-import { useT } from "../i18n";
+import { LANGS, useT } from "../i18n";
 import { m } from "./IntegrationsPage.i18n";
 
 interface Integration {
@@ -416,8 +416,11 @@ function FarmerCard({ data }: { data: Integration }) {
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
             >
-              <option value="en">English</option>
-              <option value="hi">हिन्दी</option>
+              {Object.entries(LANGS).map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
             </select>
           </Field>
         </div>

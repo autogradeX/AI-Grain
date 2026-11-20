@@ -5,7 +5,15 @@ import {
   type ClassGroup,
 } from "@ai-grain/core";
 import { useCallback, useMemo } from "react";
-import { defineMessages, useLang, useT, type Lang } from "./index";
+import {
+  defineMessages,
+  inLang,
+  useLang,
+  useT,
+  type Lang,
+  type Message,
+  type RegionalLang,
+} from "./index";
 
 /** Words used across the app. Module-specific strings live next to each module. */
 export const common = defineMessages({
@@ -30,15 +38,160 @@ export const common = defineMessages({
   roleViewer: { en: "Viewer", hi: "दर्शक" },
 });
 
-const GROUPS: Record<ClassGroup | "sound", Record<Lang, string>> = {
-  sound: { en: "Sound grain", hi: "स्वस्थ दाने" },
-  admixture: { en: GROUP_LABELS.admixture, hi: "अन्य अनाज की मिलावट" },
+const GROUPS: Record<ClassGroup | "sound", Message> = {
+  sound: {
+    en: "Sound grain",
+    hi: "स्वस्थ दाने",
+    mr: "चांगले दाणे",
+    gu: "સારા દાણા",
+    pa: "ਚੰਗੇ ਦਾਣੇ",
+    te: "మంచి గింజలు",
+    or: "ଭଲ ଦାନା",
+  },
+  admixture: {
+    en: GROUP_LABELS.admixture,
+    hi: "अन्य अनाज की मिलावट",
+    mr: "इतर धान्यांची भेसळ",
+    gu: "અન્ય અનાજની ભેળસેળ",
+    pa: "ਹੋਰ ਅਨਾਜ ਦੀ ਮਿਲਾਵਟ",
+    te: "ఇతర ధాన్యాల కల్తీ",
+    or: "ଅନ୍ୟ ଶସ୍ୟ ମିଶ୍ରଣ",
+  },
   broken_defective: {
     en: GROUP_LABELS.broken_defective,
     hi: "टूटे व दोषपूर्ण दाने",
+    mr: "तुटलेले व दोषयुक्त दाणे",
+    gu: "તૂટેલા અને ખામીવાળા દાણા",
+    pa: "ਟੁੱਟੇ ਅਤੇ ਖ਼ਰਾਬ ਦਾਣੇ",
+    te: "విరిగిన, లోపమున్న గింజలు",
+    or: "ଭଙ୍ଗା ଓ ତ୍ରୁଟିଥିବା ଦାନା",
   },
-  impurity: { en: GROUP_LABELS.impurity, hi: "अशुद्धियाँ व बाहरी पदार्थ" },
-  harmful: { en: GROUP_LABELS.harmful, hi: "हानिकारक व रोगग्रस्त" },
+  impurity: {
+    en: GROUP_LABELS.impurity,
+    hi: "अशुद्धियाँ व बाहरी पदार्थ",
+    mr: "अशुद्धी व बाह्य पदार्थ",
+    gu: "અશુદ્ધિઓ અને બાહ્ય પદાર્થ",
+    pa: "ਅਸ਼ੁੱਧੀਆਂ ਅਤੇ ਬਾਹਰੀ ਪਦਾਰਥ",
+    te: "మలినాలు, బయటి పదార్థాలు",
+    or: "ଅଶୁଦ୍ଧତା ଓ ବାହ୍ୟ ପଦାର୍ଥ",
+  },
+  harmful: {
+    en: GROUP_LABELS.harmful,
+    hi: "हानिकारक व रोगग्रस्त",
+    mr: "हानिकारक व रोगग्रस्त",
+    gu: "હાનિકારક અને રોગગ્રસ્ત",
+    pa: "ਨੁਕਸਾਨਦੇਹ ਅਤੇ ਰੋਗੀ",
+    te: "హానికరమైన, వ్యాధి సోకిన",
+    or: "କ୍ଷତିକାରକ ଓ ରୋଗଗ୍ରସ୍ତ",
+  },
+};
+
+/*
+ * The regional languages have the crops and the classes an operator sees
+ * most; other preset labels show in English. (Translations to be checked
+ * by native speakers at each station.)
+ */
+const PRESET_LABELS_REGIONAL: Record<RegionalLang, Record<string, string>> = {
+  mr: {
+    Wheat: "गहू",
+    Barley: "जव",
+    Oats: "ओट्स",
+    Rapeseed: "रेपसीड",
+    "Hemp seeds": "भांगेचे बी",
+    Paddy: "भात (धान)",
+    Rice: "तांदूळ",
+    Maize: "मका",
+    "Chana (gram)": "हरभरा",
+    "Tur (arhar)": "तूर",
+    Moong: "मूग",
+    Soybean: "सोयाबीन",
+    Mustard: "मोहरी",
+    Sound: "चांगले",
+    Unclear: "अस्पष्ट",
+    Broken: "तुटलेले",
+    Brokens: "तुटलेले दाणे",
+    "Suspected artificial / fake grain": "बनावट दाणा असल्याचा संशय",
+  },
+  gu: {
+    Wheat: "ઘઉં",
+    Barley: "જવ",
+    Oats: "ઓટ્સ",
+    Rapeseed: "રાયડો",
+    "Hemp seeds": "ભાંગના બીજ",
+    Paddy: "ડાંગર",
+    Rice: "ચોખા",
+    Maize: "મકાઈ",
+    "Chana (gram)": "ચણા",
+    "Tur (arhar)": "તુવેર",
+    Moong: "મગ",
+    Soybean: "સોયાબીન",
+    Mustard: "રાઈ",
+    Sound: "સારા",
+    Unclear: "અસ્પષ્ટ",
+    Broken: "તૂટેલા",
+    Brokens: "તૂટેલા દાણા",
+    "Suspected artificial / fake grain": "નકલી દાણાની શંકા",
+  },
+  pa: {
+    Wheat: "ਕਣਕ",
+    Barley: "ਜੌਂ",
+    Oats: "ਜਵੀ",
+    Rapeseed: "ਤੋਰੀਆ",
+    "Hemp seeds": "ਭੰਗ ਦੇ ਬੀਜ",
+    Paddy: "ਝੋਨਾ",
+    Rice: "ਚੌਲ",
+    Maize: "ਮੱਕੀ",
+    "Chana (gram)": "ਛੋਲੇ",
+    "Tur (arhar)": "ਅਰਹਰ",
+    Moong: "ਮੂੰਗੀ",
+    Soybean: "ਸੋਇਆਬੀਨ",
+    Mustard: "ਸਰ੍ਹੋਂ",
+    Sound: "ਚੰਗੇ",
+    Unclear: "ਅਸਪਸ਼ਟ",
+    Broken: "ਟੁੱਟੇ",
+    Brokens: "ਟੁੱਟੇ ਦਾਣੇ",
+    "Suspected artificial / fake grain": "ਨਕਲੀ ਦਾਣੇ ਦਾ ਸ਼ੱਕ",
+  },
+  te: {
+    Wheat: "గోధుమ",
+    Barley: "బార్లీ",
+    Oats: "ఓట్స్",
+    Rapeseed: "రేప్‌సీడ్",
+    "Hemp seeds": "జనుము గింజలు",
+    Paddy: "వరి ధాన్యం",
+    Rice: "బియ్యం",
+    Maize: "మొక్కజొన్న",
+    "Chana (gram)": "శనగలు",
+    "Tur (arhar)": "కందులు",
+    Moong: "పెసలు",
+    Soybean: "సోయాబీన్",
+    Mustard: "ఆవాలు",
+    Sound: "మంచివి",
+    Unclear: "అస్పష్టం",
+    Broken: "విరిగినవి",
+    Brokens: "విరిగిన గింజలు",
+    "Suspected artificial / fake grain": "నకిలీ గింజ అనే అనుమానం",
+  },
+  or: {
+    Wheat: "ଗହମ",
+    Barley: "ବାର୍ଲି",
+    Oats: "ଓଟ୍ସ",
+    Rapeseed: "ରେପସିଡ୍",
+    "Hemp seeds": "ଗଞ୍ଜେଇ ମଞ୍ଜି",
+    Paddy: "ଧାନ",
+    Rice: "ଚାଉଳ",
+    Maize: "ମକା",
+    "Chana (gram)": "ବୁଟ",
+    "Tur (arhar)": "ହରଡ଼",
+    Moong: "ମୁଗ",
+    Soybean: "ସୋୟାବିନ",
+    Mustard: "ସୋରିଷ",
+    Sound: "ଭଲ",
+    Unclear: "ଅସ୍ପଷ୍ଟ",
+    Broken: "ଭଙ୍ଗା",
+    Brokens: "ଭଙ୍ଗା ଦାନା",
+    "Suspected artificial / fake grain": "ନକଲି ଦାନା ସନ୍ଦେହ",
+  },
 };
 
 /*
@@ -109,7 +262,9 @@ const PRESET_LABELS_HI: Record<string, string> = {
 
 /** Translates a crop or class label if it is an unchanged preset label. */
 export function presetLabel(label: string, lang: Lang): string {
-  return lang === "hi" ? (PRESET_LABELS_HI[label] ?? label) : label;
+  if (lang === "hi") return PRESET_LABELS_HI[label] ?? label;
+  if (lang === "en") return label;
+  return PRESET_LABELS_REGIONAL[lang][label] ?? label;
 }
 
 /**
@@ -128,7 +283,7 @@ export function useGrainLabels() {
   );
   return useMemo(
     () => ({
-      groupLabel: (g: ClassGroup | "sound") => GROUPS[g][lang],
+      groupLabel: (g: ClassGroup | "sound") => inLang(GROUPS[g], lang),
       classLabel,
       cropLabel: (label: string) => presetLabel(label, lang),
     }),

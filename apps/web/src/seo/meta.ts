@@ -1,4 +1,4 @@
-import type { Lang } from "../i18n";
+import { inLang, type Lang } from "../i18n";
 import { m } from "./seo.i18n";
 
 /*
@@ -36,7 +36,7 @@ export interface PageMeta {
   jsonLd: Record<string, unknown>[];
 }
 
-const text = (key: keyof typeof m, lang: Lang) => m[key][lang];
+const text = (key: keyof typeof m, lang: Lang) => inLang(m[key], lang);
 
 /** Plain text from Markdown, for descriptions. */
 function plain(markdown: string): string {

@@ -8,15 +8,36 @@ import {
   type ReactNode,
 } from "react";
 
-export type Lang = "en" | "hi";
+export type Lang = "en" | "hi" | "mr" | "gu" | "pa" | "te" | "or";
+
+/** Languages whose strings may be missing: they show English instead. */
+export type RegionalLang = Exclude<Lang, "en" | "hi">;
 
 /** Each language's name, written in that language, for the switcher. */
-export const LANGS: Record<Lang, string> = { en: "English", hi: "हिन्दी" };
+export const LANGS: Record<Lang, string> = {
+  en: "English",
+  hi: "हिन्दी",
+  mr: "मराठी",
+  gu: "ગુજરાતી",
+  pa: "ਪੰਜਾਬੀ",
+  te: "తెలుగు",
+  or: "ଓଡ଼ିଆ",
+};
 
-export interface Message {
+/**
+ * English and Hindi are required for every string. The regional languages
+ * are added module by module (Simple mode, the farmer's fields and the
+ * price first); a string without one shows in English.
+ */
+export interface Message extends Partial<Record<RegionalLang, string>> {
   en: string;
   hi: string;
 }
+
+/** A message in a language, English when it has none. */
+export const inLang = (msg: Message, lang: Lang): string => msg[lang] ?? msg.en;
+
+const isLang = (v: unknown): v is Lang => typeof v === "string" && v in LANGS;
 
 export type Messages<K extends string = string> = Record<K, Message>;
 
@@ -36,9 +57,10 @@ export function currentLang(): Lang {
   return current;
 }
 
-/** The locale for dates and numbers. Hindi keeps Latin digits, as is usual on forms and scales. */
+/** The locale for dates and numbers. */
 export function locale(lang: Lang = current): string {
-  return lang === "hi" ? "hi-IN-u-nu-latn" : "en-GB";
+  // Latin digits, as is usual on forms and scales.
+  return lang === "en" ? "en-GB" : `${lang}-IN-u-nu-latn`;
 }
 
 function initialLang(): Lang {
@@ -47,11 +69,12 @@ function initialLang(): Lang {
   if (typeof window === "undefined") return "en";
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === "en" || saved === "hi") return saved;
+    if (isLang(saved)) return saved;
   } catch {
     // Storage can be blocked; fall back to the browser's language.
   }
-  return navigator.language.toLowerCase().startsWith("hi") ? "hi" : "en";
+  const browser = navigator.language.toLowerCase().slice(0, 2);
+  return isLang(browser) ? browser : "en";
 }
 
 let current: Lang = initialLang();
@@ -126,7 +149,7 @@ export interface Translate<K extends string> {
 export function useT<K extends string>(messages: Messages<K>): Translate<K> {
   const { lang } = useLang();
   return useMemo(() => {
-    const text = (key: K) => messages[key][lang];
+    const text = (key: K) => inLang(messages[key], lang);
     return Object.assign((key: K, vars?: Vars) => fill(text(key), vars), {
       n: (key: PluralBase<K>, count: number, vars?: Vars) =>
         fill(text(`${key}_${count === 1 ? "one" : "other"}` as K), {
