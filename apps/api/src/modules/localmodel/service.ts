@@ -464,6 +464,13 @@ export async function trainLocalModel(
 export async function classifyLocally(
   ctx: AppContext,
   batchId: string,
+  options: {
+    /**
+     * Keep only confident verdicts on classes that aren't harmful; the rest
+     * stay unclassified for Model Orchestration (mode "first").
+     */
+    onlySure?: boolean;
+  } = {},
 ): Promise<boolean> {
   const [row] = await ctx.db
     .select({ batch: batches, sample: samples })
@@ -506,6 +513,11 @@ export async function classifyLocally(
       and(eq(crops.orgId, row.sample.orgId), eq(crops.key, row.sample.crop)),
     );
   const known = new Set(kernelClassIds(cropRow?.classes ?? []));
+  const harmful = new Set(
+    (cropRow?.classes ?? [])
+      .filter((c) => c.group === "harmful")
+      .map((c) => c.id),
+  );
   await ctx.db.transaction(async (tx) => {
     for (const k of todo) {
       const x = inputs.get(k.id);
@@ -517,6 +529,11 @@ export async function classifyLocally(
       const precision = model.metrics.perClass[v.cls]?.precision ?? 0;
       if (v.confidence === "high" && precision < QUALITY_BAR.classPrecision)
         v.confidence = "medium";
+      if (
+        options.onlySure &&
+        (v.confidence !== "high" || harmful.has(v.cls) || v.cls === UNCLEAR)
+      )
+        continue;
       await tx
         .update(kernels)
         .set({
@@ -524,7 +541,7 @@ export async function classifyLocally(
           aiConfidence: v.confidence,
           aiSource: "local",
           aiReason: x
-            ? `${model.origin === "network" ? "Network" : "Local"} model v${model.version} (offline), ${pct(v.p)}% sure`
+            ? `${model.origin === "network" ? "Network" : "Local"} model v${model.version}${options.onlySure ? "" : " (offline)"}, ${pct(v.p)}% sure`
             : "Local model: the crop couldn't be measured",
         })
         .where(eq(kernels.id, k.id));

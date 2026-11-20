@@ -145,7 +145,7 @@ export function localModelRoutes(ctx: AppContext) {
     app.put("/local-model/settings", admin, async (request) => {
       const me = authOf(request);
       const { mode } = z
-        .object({ mode: z.enum(["offline", "always", "off"]) })
+        .object({ mode: z.enum(["offline", "first", "always", "off"]) })
         .parse(request.body);
       const [org] = await ctx.db
         .select({ localModel: organizations.localModel })

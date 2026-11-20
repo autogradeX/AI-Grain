@@ -17,7 +17,7 @@ import { useGrainLabels } from "../i18n/common";
 import { useCrop } from "../api/crops";
 import { m } from "./LocalModelPage.i18n";
 
-type Mode = "offline" | "always" | "off";
+type Mode = "offline" | "first" | "always" | "off";
 
 interface Metrics {
   accuracy: number;
@@ -126,6 +126,7 @@ export function LocalModelPage() {
               onChange={(e) => setMode.mutate(e.target.value as Mode)}
             >
               <option value="offline">{t("modeOffline")}</option>
+              <option value="first">{t("modeFirst")}</option>
               <option value="always">{t("modeAlways")}</option>
               <option value="off">{t("modeOff")}</option>
             </select>

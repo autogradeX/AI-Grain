@@ -342,6 +342,7 @@ export function analyticsRoutes(ctx: AppContext) {
             .select({
               classified: sql<number>`count(${kernels.aiClass})::int`,
               acceptedByAi: sql<number>`count(*) filter (where ${kernels.aiClass} is not null and ${kernels.flagReason} is null)::int`,
+              byLocalModel: sql<number>`count(*) filter (where ${kernels.aiSource} = 'local')::int`,
               settledByExpert: sql<number>`count(*) filter (where ${kernels.expertClass} is not null and ${kernels.flagReason} is null)::int`,
               spotChecked: sql<number>`count(*) filter (where ${kernels.flagReason} = 'spot_check' and ${kernels.reviewStatus} <> 'pending')::int`,
               spotAgreed: sql<number>`count(*) filter (where ${kernels.flagReason} = 'spot_check' and ${kernels.reviewStatus} = 'confirmed')::int`,
@@ -370,6 +371,10 @@ export function analyticsRoutes(ctx: AppContext) {
             ? costTotal / completed.length
             : null,
           settledByExpert: ai?.settledByExpert ?? 0,
+          /** Share of classified kernels the local model classified (no request to Model Orchestration). */
+          localModelRate: ai?.classified
+            ? ai.byLocalModel / ai.classified
+            : null,
           aiHandledRate: ai?.classified
             ? ai.acceptedByAi / ai.classified
             : null,

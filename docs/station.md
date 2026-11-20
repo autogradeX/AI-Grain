@@ -50,8 +50,11 @@ finding don't change.
   kernels were checked. The page shows these numbers, per-class precision and
   recall, and what is missing when it isn't used yet.
 - **Modes:** _Only when offline_ (default: used when Model Orchestration
-  can't be reached), _Always_ (never calls Model Orchestration for that
-  crop), _Off_ (photos wait for internet).
+  can't be reached), _First_ (the local model settles the kernels it is sure
+  of, never harmful ones, and Model Orchestration looks only at the rest:
+  fewer requests, lower cost per test; **Analytics** shows the share it
+  classified), _Always_ (never calls Model Orchestration for that crop),
+  _Off_ (photos wait for internet).
 - **Who reviews what:** only high-confidence verdicts on non-harmful
   kernels stand. Harmful classes, medium- and low-confidence verdicts,
   clusters, unclear kernels and spot checks go to a person. Locally

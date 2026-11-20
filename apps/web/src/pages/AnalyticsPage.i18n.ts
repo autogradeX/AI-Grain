@@ -38,6 +38,14 @@ export const m = defineMessages({
     en: "mean difference in total defects, {count} weighed samples",
     hi: "कुल दोषों में औसत अंतर, {count} तौले गए नमूने",
   },
+  localModel: {
+    en: "Classified by the local model",
+    hi: "स्थानीय मॉडल से वर्गीकृत",
+  },
+  localModelNote: {
+    en: "of kernels, without a request to Model Orchestration",
+    hi: "दानों में से, मॉडल ऑर्केस्ट्रेशन से पूछे बिना",
+  },
   claudeCost: {
     en: "Model Orchestration cost (estimate)",
     hi: "मॉडल ऑर्केस्ट्रेशन खर्च (अनुमान)",

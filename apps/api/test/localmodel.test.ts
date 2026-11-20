@@ -250,6 +250,45 @@ describe("classifying offline with the organisation's own model", () => {
     }
   }, 120000);
 
+  it("settles the kernels it is sure of first and asks Model Orchestration about the rest", async () => {
+    const online = t.classifier.classify.bind(t.classifier);
+    await api("PUT", "/api/local-model/settings", { mode: "first" });
+    let sent = 0;
+    t.classifier.classify = (req) => {
+      sent += req.numbers.length;
+      return online(req);
+    };
+    try {
+      const { batchId } = await photographed(33);
+      const batch = await api<{ status: string }>(
+        "GET",
+        `/api/batches/${batchId}`,
+      );
+      expect(batch.body.status).toBe("classified");
+      const { kernels } = await import("../src/db/schema.js");
+      const { eq } = await import("drizzle-orm");
+      const rows = await t.ctx.db
+        .select({
+          aiSource: kernels.aiSource,
+          aiConfidence: kernels.aiConfidence,
+          aiClass: kernels.aiClass,
+          aiReason: kernels.aiReason,
+        })
+        .from(kernels)
+        .where(eq(kernels.batchId, batchId));
+      const local = rows.filter((r) => r.aiSource === "local");
+      // Most kernels settled locally, the rest asked; every kernel has a verdict.
+      expect(local.length).toBeGreaterThan(rows.length / 2);
+      expect(sent).toBe(rows.length - local.length);
+      expect(rows.every((r) => r.aiClass !== null)).toBe(true);
+      expect(local.every((r) => r.aiConfidence === "high")).toBe(true);
+      expect(local[0]!.aiReason).not.toContain("offline");
+    } finally {
+      t.classifier.classify = online;
+      await api("PUT", "/api/local-model/settings", { mode: "offline" });
+    }
+  }, 120000);
+
   it("doesn't use a model that can't tell the classes apart", async () => {
     // Another crop whose kernels all look alike, labelled by number: nothing to learn.
     const online = t.classifier.classify.bind(t.classifier);

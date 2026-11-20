@@ -85,9 +85,11 @@ export interface LocalModelSettings {
   /**
    * "offline": when Model Orchestration can't be reached (default).
    * "always": the local model only, Model Orchestration is never asked.
+   * "first": the local model settles the kernels it is sure of (never
+   *   harmful ones); Model Orchestration looks at the rest. Cheaper per test.
    * "off": never; photos wait for internet.
    */
-  mode?: "offline" | "always" | "off";
+  mode?: "offline" | "first" | "always" | "off";
   /** Training in progress, by crop: when it started (cleared when done). */
   training?: Record<string, string>;
   /** When this station last asked its central server for newer network models. */

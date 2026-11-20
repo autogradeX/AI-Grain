@@ -564,6 +564,13 @@ function SimpleReview({
   );
 }
 
+/** "1 min 05 s" or "40 s". */
+function took(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const min = Math.floor(s / 60);
+  return min ? `${min} min ${String(s % 60).padStart(2, "0")} s` : `${s} s`;
+}
+
 function SimpleResult({
   sampleId,
   onNext,
@@ -582,7 +589,16 @@ function SimpleResult({
   const pct = (v: number) => `${v.toFixed(2)} %`;
   return (
     <div className="simple-card simple-center">
-      <p className="muted">{t("done")}</p>
+      <p className="muted">
+        {t("done")}
+        {s.data.completedAt &&
+          ` · ${t("took", {
+            time: took(
+              (Date.parse(s.data.completedAt) - Date.parse(s.data.createdAt)) /
+                1000,
+            ),
+          })}`}
+      </p>
       <h1 className="simple-grade">
         {r?.grade.grade
           ? t("grade", { grade: r.grade.grade })

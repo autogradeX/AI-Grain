@@ -59,6 +59,10 @@ export const m = defineMessages({
     en: "When Model Orchestration can't be reached (recommended)",
     hi: "जब मॉडल ऑर्केस्ट्रेशन तक न पहुँचा जा सके (अनुशंसित)",
   },
+  modeFirst: {
+    en: "First: settles the grains it is sure of, Model Orchestration checks the rest (lower cost per test)",
+    hi: "पहले: जिन दानों पर पक्का है उन्हें खुद तय करे, बाकी मॉडल ऑर्केस्ट्रेशन जाँचे (प्रति जाँच कम खर्च)",
+  },
   modeAlways: {
     en: "Always: never use Model Orchestration",
     hi: "हमेशा: मॉडल ऑर्केस्ट्रेशन का उपयोग कभी नहीं",

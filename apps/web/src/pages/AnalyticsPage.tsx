@@ -27,6 +27,7 @@ interface Analytics {
     spotCheckAgreement: number | null;
     completedByAutopilot: number;
     settledByExpert: number;
+    localModelRate: number | null;
   };
   perDay: { date: string; created: number; completed: number }[];
   groupTrend: {
@@ -239,6 +240,15 @@ export function AnalyticsPage() {
               note={t("meanDifference", {
                 count: a.estimateVsWeighed.samples,
               })}
+            />
+            <Kpi
+              label={t("localModel")}
+              value={
+                a.totals.localModelRate === null
+                  ? "—"
+                  : `${Math.round(a.totals.localModelRate * 100)} %`
+              }
+              note={t("localModelNote")}
             />
             <Kpi
               label={t("claudeCost")}

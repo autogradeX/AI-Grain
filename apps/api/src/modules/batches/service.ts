@@ -528,13 +528,9 @@ export async function classifyBatch(
       error: null,
     }),
   });
-  const todo = await ctx.db
-    .select()
-    .from(kernels)
-    .where(and(eq(kernels.batchId, batchId), isNull(kernels.aiClass)))
-    .orderBy(asc(kernels.number));
-  // The organisation's local model: always, or when Model Orchestration
-  // can't be reached (when it has a model for the crop).
+  // The organisation's local model: always, first for the kernels it is
+  // sure of, or when Model Orchestration can't be reached (when it has a
+  // model for the crop).
   const [owner] = await ctx.db
     .select({ orgId: batches.orgId })
     .from(batches)
@@ -544,6 +540,12 @@ export async function classifyBatch(
     if (done) await setBatch(ctx, batchId, { status: "classified" });
     return true;
   }
+  if (mode === "first") await classifyLocally(ctx, batchId, { onlySure: true });
+  const todo = await ctx.db
+    .select()
+    .from(kernels)
+    .where(and(eq(kernels.batchId, batchId), isNull(kernels.aiClass)))
+    .orderBy(asc(kernels.number));
   const failure = await classifyKernels(ctx, batchId, todo, {
     kind: "classify",
     save: (verdicts) => saveVerdicts(ctx, batchId, verdicts),
